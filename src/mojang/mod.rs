@@ -1,10 +1,13 @@
 //! Mojang protocol: version manifest, version JSON, asset index, library schema.
 //!
-//! Pure types + pure logic only. No HTTP, no disk, no async. See
-//! `.planning/phases/02-mojang-protocol-and-instance-management/02-RESEARCH.md`
+//! Pure types + pure logic only (args/inherits/natives/rules/types).
+//! HTTP client and disk cache live in client.rs and cache.rs respectively.
+//! See `.planning/phases/02-mojang-protocol-and-instance-management/02-RESEARCH.md`
 //! (§1–§7 for verified schemas, §Pitfall 1–4 for protocol quirks).
 
 pub mod args;
+pub mod cache;
+pub mod client;
 pub mod inherits;
 pub mod natives;
 pub mod rules;

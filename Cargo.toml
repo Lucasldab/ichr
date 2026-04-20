@@ -45,3 +45,4 @@ zip = { version = "8", default-features = false, features = ["deflate", "zstd"] 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "test-util"] }
 tempfile = "3"
+filetime = "0.2"
