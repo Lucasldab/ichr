@@ -351,4 +351,108 @@ fn test_view_dispatches_without_panic() {
         ..AppState::default()
     };
     terminal.draw(|f| mineltui::tui::view::view(&state, f)).unwrap();
+
+    // GroupInline
+    let state = AppState {
+        active_view: ActiveView::GroupInline {
+            slug: "alpha".into(),
+            buffer: "smp".into(),
+            original: None,
+        },
+        instances: vec![],
+        ..AppState::default()
+    };
+    terminal.draw(|f| mineltui::tui::view::view(&state, f)).unwrap();
+}
+
+// ---- INST-06 group-assign smoke tests (Task 2-09-01) ------------------------
+
+use mineltui::domain::InstanceManifest;
+
+fn make_instance(slug: &str, name: &str, group: Option<&str>) -> InstanceManifest {
+    let mut m = InstanceManifest::new(name.to_string(), slug.to_string(), "1.20.4".to_string());
+    m.group = group.map(|s| s.to_string());
+    m
+}
+
+#[test]
+fn test_group_assign_emits_set_group_effect() {
+    let mut state = AppState {
+        active_view: ActiveView::InstanceList { selected: 0 },
+        instances: vec![make_instance("alpha", "Alpha", None)],
+        ..AppState::default()
+    };
+
+    // Open the group editor for the selected row.
+    let _ = update(&mut state, Action::OpenGroupInput {
+        slug: "alpha".into(),
+        current: String::new(),
+    });
+    assert!(
+        matches!(&state.active_view, ActiveView::GroupInline { slug, buffer, .. } if slug == "alpha" && buffer.is_empty()),
+        "expected GroupInline state with empty buffer"
+    );
+
+    // Type "smp" then backspace once -> "sm".
+    let _ = update(&mut state, Action::TypeGroup('s'));
+    let _ = update(&mut state, Action::TypeGroup('m'));
+    let _ = update(&mut state, Action::TypeGroup('p'));
+    let _ = update(&mut state, Action::BackspaceGroup);
+    if let ActiveView::GroupInline { buffer, .. } = &state.active_view {
+        assert_eq!(buffer, "sm");
+    } else {
+        panic!("expected GroupInline after typing");
+    }
+
+    // Submit -> Effect::SetGroup { slug: "alpha", group: Some("sm") } and modal closes.
+    let effects = update(&mut state, Action::SubmitGroup);
+    assert_eq!(effects.len(), 1, "expected exactly one Effect");
+    let Effect::SetGroup { slug, group } = &effects[0] else {
+        panic!("expected Effect::SetGroup, got {:?}", effects[0]);
+    };
+    assert_eq!(slug, "alpha");
+    assert_eq!(group.as_deref(), Some("sm"));
+    assert!(matches!(state.active_view, ActiveView::InstanceList { .. }));
+}
+
+#[test]
+fn test_group_assign_empty_buffer_clears_group() {
+    let mut state = AppState {
+        active_view: ActiveView::InstanceList { selected: 0 },
+        instances: vec![make_instance("beta", "Beta", Some("smp"))],
+        ..AppState::default()
+    };
+
+    // Open the editor prefilled with "smp" (as run.rs would do).
+    let _ = update(&mut state, Action::OpenGroupInput {
+        slug: "beta".into(),
+        current: "smp".into(),
+    });
+    // Clear the buffer with three backspaces.
+    let _ = update(&mut state, Action::BackspaceGroup);
+    let _ = update(&mut state, Action::BackspaceGroup);
+    let _ = update(&mut state, Action::BackspaceGroup);
+
+    let effects = update(&mut state, Action::SubmitGroup);
+    assert_eq!(effects.len(), 1);
+    let Effect::SetGroup { slug, group } = &effects[0] else {
+        panic!("expected Effect::SetGroup, got {:?}", effects[0]);
+    };
+    assert_eq!(slug, "beta");
+    assert!(group.is_none(), "empty submission must clear the group (pass None)");
+}
+
+#[test]
+fn test_group_cancel_does_not_emit_effect() {
+    let mut state = AppState {
+        active_view: ActiveView::GroupInline {
+            slug: "gamma".into(),
+            buffer: "typed-but-not-saved".into(),
+            original: None,
+        },
+        ..AppState::default()
+    };
+    let effects = update(&mut state, Action::CancelGroupInput);
+    assert!(effects.is_empty(), "cancel must not emit any Effect");
+    assert!(matches!(state.active_view, ActiveView::InstanceList { .. }));
 }

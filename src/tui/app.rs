@@ -29,6 +29,8 @@ pub enum ActiveView {
     CreateModal(CreateStep),
     DeleteConfirm { slug: String, display_name: String },
     RenameInline { slug: String, current: String, original: String },
+    /// Inline group editor (INST-06 — mirrors RenameInline).
+    GroupInline { slug: String, buffer: String, original: Option<String> },
 }
 
 impl Default for ActiveView {
@@ -83,6 +85,13 @@ pub enum Action {
     ConfirmDelete,
     CancelDelete,
 
+    // Group editor (INST-06 — mirrors rename pattern)
+    OpenGroupInput { slug: String, current: String },
+    TypeGroup(char),
+    BackspaceGroup,
+    SubmitGroup,
+    CancelGroupInput,
+
     // Background completions
     ManifestLoaded(Vec<VersionEntry>),
     InstancesLoaded(Vec<InstanceManifest>),
@@ -113,6 +122,7 @@ pub enum Effect {
         version_url: String,
         version_sha1: String,
     },
+    SetGroup { slug: String, group: Option<String> },
 }
 
 /// Apply an `Action`, mutate `state`, and return the side-effects to execute.
@@ -307,6 +317,40 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
         Action::CancelDelete => {
+            state.active_view = ActiveView::default();
+            vec![]
+        }
+
+        Action::OpenGroupInput { slug, current } => {
+            state.active_view = ActiveView::GroupInline {
+                slug,
+                buffer: current.clone(),
+                original: if current.is_empty() { None } else { Some(current) },
+            };
+            vec![]
+        }
+        Action::TypeGroup(c) => {
+            if let ActiveView::GroupInline { buffer, .. } = &mut state.active_view {
+                buffer.push(c);
+            }
+            vec![]
+        }
+        Action::BackspaceGroup => {
+            if let ActiveView::GroupInline { buffer, .. } = &mut state.active_view {
+                buffer.pop();
+            }
+            vec![]
+        }
+        Action::SubmitGroup => {
+            if let ActiveView::GroupInline { slug, buffer, .. } = state.active_view.clone() {
+                state.active_view = ActiveView::default();
+                let trimmed = buffer.trim().to_string();
+                let group = if trimmed.is_empty() { None } else { Some(trimmed) };
+                return vec![Effect::SetGroup { slug, group }];
+            }
+            vec![]
+        }
+        Action::CancelGroupInput => {
             state.active_view = ActiveView::default();
             vec![]
         }
