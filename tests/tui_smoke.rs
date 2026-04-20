@@ -223,6 +223,67 @@ fn test_type_search_appends_to_version_picker_search_field() {
     }
 }
 
+// ---- Phase 2 run.rs helper tests (Task 2-07-03) -----------------------------
+
+#[test]
+fn test_version_filter_includes_releases_and_excludes_old_beta() {
+    use mineltui::tui::run::filter_version_list;
+
+    let versions = vec![
+        VersionEntry {
+            id: "1.21.4".into(),
+            version_type: "release".into(),
+            url: String::new(),
+            time: String::new(),
+            release_time: String::new(),
+            sha1: String::new(),
+            compliance_level: 1,
+        },
+        VersionEntry {
+            id: "24w45a".into(),
+            version_type: "snapshot".into(),
+            url: String::new(),
+            time: String::new(),
+            release_time: String::new(),
+            sha1: String::new(),
+            compliance_level: 1,
+        },
+        VersionEntry {
+            id: "b1.8.1".into(),
+            version_type: "old_beta".into(),
+            url: String::new(),
+            time: String::new(),
+            release_time: String::new(),
+            sha1: String::new(),
+            compliance_level: 0,
+        },
+        VersionEntry {
+            id: "a1.2.6".into(),
+            version_type: "old_alpha".into(),
+            url: String::new(),
+            time: String::new(),
+            release_time: String::new(),
+            sha1: String::new(),
+            compliance_level: 0,
+        },
+    ];
+
+    // Releases-only: only "release" type passes; old_beta and old_alpha excluded.
+    let releases = filter_version_list(&versions, VersionFilter::Releases, "");
+    assert_eq!(releases.len(), 1);
+    assert_eq!(releases[0].id, "1.21.4");
+
+    // All: release + snapshot pass; old_beta and old_alpha still excluded.
+    let all = filter_version_list(&versions, VersionFilter::All, "");
+    assert_eq!(all.len(), 2);
+    assert!(all.iter().all(|v| v.version_type != "old_beta" && v.version_type != "old_alpha"));
+
+    // Search filters by id substring.
+    let searched = filter_version_list(&versions, VersionFilter::All, "1.21");
+    assert_eq!(searched.len(), 1);
+    assert_eq!(searched[0].id, "1.21.4");
+}
+
 // ---- Phase 2 view smoke tests (Task 2-07-02) --------------------------------
 
 #[test]
