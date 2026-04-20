@@ -5,5 +5,6 @@
 pub mod domain;
 pub mod error;
 pub mod persistence;
+pub mod tasks;
 
 pub use error::{AppError, Result};
