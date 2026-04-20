@@ -8,7 +8,7 @@ use super::views::{
     create_modal::render_create_modal,
     delete_confirm::render_delete_confirm,
     download_pane::render_download_pane,
-    instance_list::render_instance_list,
+    instance_list::{render_group_inline_overlay, render_instance_list},
     version_picker::render_version_picker,
 };
 
@@ -36,6 +36,7 @@ pub fn view(state: &AppState, f: &mut Frame) {
         },
         ActiveView::DeleteConfirm { .. } => render_delete_confirm(f, main, state),
         ActiveView::RenameInline { .. } => render_create_modal(f, main, state),
+        ActiveView::GroupInline { .. } => render_group_inline_overlay(f, main, state),
     }
 
     render_download_pane(f, dl, state);

@@ -1,6 +1,6 @@
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
-use ratatui::widgets::{Block, Borders, Cell, Row, Table};
+use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table};
 use ratatui::Frame;
 
 use crate::tui::app::{ActiveView, AppState};
@@ -39,6 +39,22 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
         ],
     )
     .header(Row::new(vec!["Name", "MC Version", "Group", "Last played"]))
-    .block(Block::default().borders(Borders::ALL).title("Instances (c/r/x/d)"));
+    .block(Block::default().borders(Borders::ALL).title("Instances (c/r/x/d/g)"));
     f.render_widget(table, area);
+}
+
+pub fn render_group_inline_overlay(f: &mut Frame, area: Rect, state: &AppState) {
+    if let ActiveView::GroupInline { slug, buffer, .. } = &state.active_view {
+        let w = area.width.min(60);
+        let h = 3u16;
+        let x = area.x + (area.width.saturating_sub(w)) / 2;
+        let y = area.y + (area.height.saturating_sub(h)) / 2;
+        let rect = Rect { x, y, width: w, height: h };
+        let text = format!("Group for {slug}: {buffer}_   (Enter=save, empty=clear, Esc=cancel)");
+        let p = Paragraph::new(text).block(
+            Block::default().borders(Borders::ALL).title("Set group (g)"),
+        );
+        f.render_widget(ratatui::widgets::Clear, rect);
+        f.render_widget(p, rect);
+    }
 }

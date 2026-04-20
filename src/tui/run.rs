@@ -24,7 +24,7 @@ use crate::mojang::client::MojangClient;
 use crate::mojang::types::VersionEntry;
 use crate::persistence::paths::AppPaths;
 use crate::services::{
-    clone_instance, create_instance, delete_instance, list_instances, rename_instance,
+    clone_instance, create_instance, delete_instance, list_instances, rename_instance, set_group,
 };
 use crate::install::install_version;
 use crate::tasks::{TaskEvent, TaskManager, DEFAULT_MAX_CONCURRENT};
@@ -171,6 +171,7 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         }
         ActiveView::DeleteConfirm { .. } => map_delete_confirm_event(ev),
         ActiveView::RenameInline { .. } => map_rename_inline_event(ev, state),
+        ActiveView::GroupInline { .. } => map_group_inline_event(ev, state),
     }
 }
 
@@ -197,6 +198,17 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
                     return Some(Action::OpenDeleteConfirm {
                         slug: m.slug.clone(),
                         display_name: m.display_name.clone(),
+                    });
+                }
+            }
+            None
+        }
+        CtEvent::Key(KeyEvent { code: KeyCode::Char('g'), .. }) => {
+            if let ActiveView::InstanceList { selected } = &state.active_view {
+                if let Some(m) = state.instances.get(*selected) {
+                    return Some(Action::OpenGroupInput {
+                        slug: m.slug.clone(),
+                        current: m.group.clone().unwrap_or_default(),
                     });
                 }
             }
@@ -290,6 +302,25 @@ fn map_rename_inline_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             if !modifiers.contains(KeyModifiers::CONTROL) =>
         {
             Some(Action::TypeRename(c))
+        }
+        _ => None,
+    }
+}
+
+fn map_group_inline_event(ev: CtEvent, state: &AppState) -> Option<Action> {
+    match ev {
+        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CancelGroupInput),
+        CtEvent::Key(KeyEvent { code: KeyCode::Backspace, .. }) => Some(Action::BackspaceGroup),
+        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
+            if matches!(state.active_view, ActiveView::GroupInline { .. }) {
+                return Some(Action::SubmitGroup);
+            }
+            None
+        }
+        CtEvent::Key(KeyEvent { code: KeyCode::Char(c), modifiers, .. })
+            if !modifiers.contains(KeyModifiers::CONTROL) =>
+        {
+            Some(Action::TypeGroup(c))
         }
         _ => None,
     }
@@ -441,6 +472,28 @@ async fn execute_effects(
                                     new_slug: m.slug,
                                 })
                                 .await;
+                        }
+                        Err(e) => {
+                            let _ = tx.send(Action::ServiceErrored(e.to_string())).await;
+                        }
+                    }
+                });
+            }
+
+            Effect::SetGroup { slug, group } => {
+                let paths = paths.clone();
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match set_group(&paths, &slug, group).await {
+                        Ok(_m) => {
+                            match list_instances(&paths).await {
+                                Ok(list) => {
+                                    let _ = tx.send(Action::InstancesLoaded(list)).await;
+                                }
+                                Err(e) => {
+                                    let _ = tx.send(Action::ServiceErrored(e.to_string())).await;
+                                }
+                            }
                         }
                         Err(e) => {
                             let _ = tx.send(Action::ServiceErrored(e.to_string())).await;
