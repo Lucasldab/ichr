@@ -12,17 +12,16 @@ fn assert_path_contains_segment(p: &std::path::Path, segment: &str) {
         .any(|c| c.as_os_str().to_string_lossy() == segment);
     assert!(
         found,
-        "expected path {:?} to contain segment {:?}",
-        p, segment
+        "expected path {p:?} to contain segment {segment:?}"
     );
 }
 
 #[test]
 fn resolve_returns_some() {
     let paths = AppPaths::resolve().expect("home directory should resolve on CI");
-    assert!(paths.data_dir.as_os_str().len() > 0);
-    assert!(paths.config_dir.as_os_str().len() > 0);
-    assert!(paths.cache_dir.as_os_str().len() > 0);
+    assert!(!paths.data_dir.as_os_str().is_empty());
+    assert!(!paths.config_dir.as_os_str().is_empty());
+    assert!(!paths.cache_dir.as_os_str().is_empty());
 }
 
 #[test]
@@ -80,13 +79,13 @@ fn linux_xdg_paths() {
     let paths = AppPaths::resolve().expect("paths resolve");
     let data_str = paths.data_dir.to_string_lossy();
     assert!(
-        data_str.contains(".local/share") || std::env::var("XDG_DATA_HOME").map_or(false, |v| data_str.starts_with(&v)),
+        data_str.contains(".local/share") || std::env::var("XDG_DATA_HOME").is_ok_and(|v| data_str.starts_with(&v)),
         "Linux data_dir {:?} should be under ~/.local/share or $XDG_DATA_HOME",
         paths.data_dir
     );
     let config_str = paths.config_dir.to_string_lossy();
     assert!(
-        config_str.contains(".config") || std::env::var("XDG_CONFIG_HOME").map_or(false, |v| config_str.starts_with(&v)),
+        config_str.contains(".config") || std::env::var("XDG_CONFIG_HOME").is_ok_and(|v| config_str.starts_with(&v)),
         "Linux config_dir {:?} should be under ~/.config or $XDG_CONFIG_HOME",
         paths.config_dir
     );

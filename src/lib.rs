@@ -7,5 +7,6 @@ pub mod error;
 pub mod observability;
 pub mod persistence;
 pub mod tasks;
+pub mod tui;
 
 pub use error::{AppError, Result};

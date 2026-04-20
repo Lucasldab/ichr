@@ -47,7 +47,7 @@ async fn spawn_task_reports_progress() {
             assert_eq!(pct, 50);
             assert_eq!(msg, "halfway");
         }
-        other => panic!("expected Progress, got {:?}", other),
+        other => panic!("expected Progress, got {other:?}"),
     }
 
     let second = recv_next(&mut rx).await;
@@ -63,7 +63,7 @@ async fn spawn_task_completes_ok() {
     let ev = recv_next(&mut rx).await;
     match ev {
         TaskEvent::Completed { id: got_id, result: Ok(()) } => assert_eq!(got_id, id),
-        other => panic!("expected Completed(Ok), got {:?}", other),
+        other => panic!("expected Completed(Ok), got {other:?}"),
     }
 }
 
@@ -99,7 +99,7 @@ async fn cancel_single_job_does_not_cancel_siblings() {
             TaskEvent::Completed { id, result: Ok(()) } if id == id_b => {
                 saw_b_ok = true;
             }
-            other => panic!("unexpected event: {:?}", other),
+            other => panic!("unexpected event: {other:?}"),
         }
     }
     assert!(saw_a_cancelled, "job A should have been cancelled");
@@ -161,10 +161,10 @@ async fn semaphore_bounds_concurrency_to_8() {
         }
     }
     assert_eq!(ok_count, 20);
+    let peak_val = peak.load(Ordering::SeqCst);
     assert!(
-        peak.load(Ordering::SeqCst) <= 8,
-        "peak concurrency {} exceeded semaphore bound 8",
-        peak.load(Ordering::SeqCst)
+        peak_val <= 8,
+        "peak concurrency {peak_val} exceeded semaphore bound 8"
     );
 }
 
@@ -173,7 +173,7 @@ async fn next_job_id_is_monotonic() {
     let (mgr, _rx) = new_manager(4, 2);
     let a = mgr.next_job_id();
     let b = mgr.next_job_id();
-    assert!(b > a, "expected {} > {}", b, a);
+    assert!(b > a, "expected {b} > {a}");
 }
 
 #[tokio::test]
@@ -187,6 +187,6 @@ async fn error_from_job_surfaces_in_completed() {
         TaskEvent::Completed { result: Err(msg), .. } => {
             assert!(msg.contains("boom"), "error message should mention 'boom': {msg}");
         }
-        other => panic!("expected Completed(Err), got {:?}", other),
+        other => panic!("expected Completed(Err), got {other:?}"),
     }
 }
