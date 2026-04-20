@@ -34,6 +34,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 
+ratatui-textarea = "0.9.1"  # Text input widget for create-instance modal (Phase 2)
+
 # --- Pre-wired for later phases (lock versions now so Cargo.lock is stable) ---
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream", "json", "gzip"] }
 sha1 = "0.10"
