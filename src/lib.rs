@@ -4,6 +4,7 @@
 
 pub mod domain;
 pub mod error;
+pub mod instance;
 pub mod mojang;
 pub mod observability;
 pub mod persistence;
