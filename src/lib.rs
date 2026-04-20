@@ -6,3 +6,5 @@
 
 // Module stubs — populated by later plans in phase 1.
 // Each plan adds its own `pub mod <name>;` line.
+
+pub mod persistence;
