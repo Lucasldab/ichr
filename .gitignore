@@ -4,13 +4,13 @@ CLAUDE.md
 AGENTS.md
 
 # Rust
-/target/
+/target
 **/*.rs.bk
-Cargo.lock.local
+Cargo.lock.*
 
 # Editor
-.vscode/
 .idea/
+.vscode/
 *.swp
 *.swo
 *~
@@ -23,3 +23,6 @@ Thumbs.db
 .env
 .env.local
 *.key
+
+# Logs (mineltui writes to data_dir, but allow local stray logs)
+*.log

@@ -1,0 +1,45 @@
+[package]
+name = "mineltui"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+description = "Terminal-UI Minecraft Java Edition launcher"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# TUI
+ratatui = "0.30"
+crossterm = { version = "0.29", features = ["event-stream"] }
+
+# Async runtime
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "process", "fs", "io-util"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tokio-stream = "0.1"
+futures = "0.3"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "1"
+
+# Filesystem / paths
+directories = "6"
+
+# Error handling
+anyhow = "1"
+thiserror = "2"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+
+# --- Pre-wired for later phases (lock versions now so Cargo.lock is stable) ---
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream", "json", "gzip"] }
+sha1 = "0.10"
+sha2 = "0.11"
+zip = { version = "8", default-features = false, features = ["deflate", "zstd"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "test-util"] }
+tempfile = "3"
