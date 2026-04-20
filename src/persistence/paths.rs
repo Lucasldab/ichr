@@ -87,6 +87,59 @@ impl AppPaths {
     pub fn runtime_dir(&self) -> PathBuf {
         self.data_dir.join("runtime")
     }
+
+    /// Path for per-version client jar: `versions/{id}/{id}.jar`.
+    pub fn version_jar(&self, version_id: &str) -> PathBuf {
+        self.versions_dir().join(version_id).join(format!("{version_id}.jar"))
+    }
+
+    /// Path for per-version JSON: `versions/{id}/{id}.json`.
+    pub fn version_json(&self, version_id: &str) -> PathBuf {
+        self.versions_dir().join(version_id).join(format!("{version_id}.json"))
+    }
+
+    /// Shared library path (Maven-layout). `maven_path` is the full relative path
+    /// from a library `downloads.artifact.path` field
+    /// (e.g. `"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar"`).
+    pub fn library_path(&self, maven_path: &str) -> PathBuf {
+        self.libraries_dir().join(maven_path)
+    }
+
+    /// Asset index JSON: `assets/indexes/{id}.json`.
+    pub fn asset_index(&self, id: &str) -> PathBuf {
+        self.assets_dir().join("indexes").join(format!("{id}.json"))
+    }
+
+    /// Asset object: `assets/objects/{hash[0..2]}/{hash}`.
+    /// Caller is responsible for validating that `hash` is a 40-char lowercase hex string.
+    pub fn asset_object(&self, hash: &str) -> PathBuf {
+        self.assets_dir().join("objects").join(&hash[..2]).join(hash)
+    }
+
+    /// Legacy virtual asset: `assets/virtual/{index_id}/{virtual_path}`.
+    pub fn asset_virtual(&self, index_id: &str, virtual_path: &str) -> PathBuf {
+        self.assets_dir().join("virtual").join(index_id).join(virtual_path)
+    }
+
+    /// Per-instance directory: `instances/{slug}/`.
+    pub fn instance_dir(&self, slug: &str) -> PathBuf {
+        self.instances_dir().join(slug)
+    }
+
+    /// Per-instance `.minecraft` working directory.
+    pub fn instance_minecraft_dir(&self, slug: &str) -> PathBuf {
+        self.instance_dir(slug).join(".minecraft")
+    }
+
+    /// Per-instance natives directory.
+    pub fn instance_natives_dir(&self, slug: &str) -> PathBuf {
+        self.instance_dir(slug).join("natives")
+    }
+
+    /// Per-instance manifest: `instances/{slug}/instance.json`.
+    pub fn instance_manifest(&self, slug: &str) -> PathBuf {
+        self.instance_dir(slug).join("instance.json")
+    }
 }
 
 /// Convenience: return `true` if `child` starts with `parent` after

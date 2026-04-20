@@ -105,3 +105,103 @@ fn windows_appdata_paths() {
     );
     assert_path_contains_segment(&paths.data_dir, "mineltui");
 }
+
+// ── Phase 2 accessor tests ────────────────────────────────────────────────────
+
+fn test_paths() -> AppPaths {
+    AppPaths::with_roots(
+        PathBuf::from("/d"),
+        PathBuf::from("/c"),
+        PathBuf::from("/cache"),
+    )
+}
+
+#[test]
+fn version_jar_path_format() {
+    let paths = test_paths();
+    assert_eq!(
+        paths.version_jar("1.21.4"),
+        PathBuf::from("/d/versions/1.21.4/1.21.4.jar"),
+    );
+}
+
+#[test]
+fn version_json_path_format() {
+    let paths = test_paths();
+    assert_eq!(
+        paths.version_json("1.21.4"),
+        PathBuf::from("/d/versions/1.21.4/1.21.4.json"),
+    );
+}
+
+#[test]
+fn library_path_joins_maven_segments() {
+    let paths = test_paths();
+    assert_eq!(
+        paths.library_path("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar"),
+        PathBuf::from("/d/libraries/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar"),
+    );
+}
+
+#[test]
+fn asset_index_path_format() {
+    let paths = test_paths();
+    assert_eq!(
+        paths.asset_index("19"),
+        PathBuf::from("/d/assets/indexes/19.json"),
+    );
+}
+
+#[test]
+fn asset_object_splits_hash_prefix() {
+    let paths = test_paths();
+    assert_eq!(
+        paths.asset_object("abcdef1234567890"),
+        PathBuf::from("/d/assets/objects/ab/abcdef1234567890"),
+    );
+}
+
+#[test]
+fn asset_virtual_layout() {
+    let paths = test_paths();
+    assert_eq!(
+        paths.asset_virtual("legacy", "sounds/step/grass1.ogg"),
+        PathBuf::from("/d/assets/virtual/legacy/sounds/step/grass1.ogg"),
+    );
+}
+
+#[test]
+fn instance_dir_uses_slug() {
+    let paths = test_paths();
+    assert_eq!(
+        paths.instance_dir("my-instance"),
+        PathBuf::from("/d/instances/my-instance"),
+    );
+}
+
+#[test]
+fn instance_minecraft_dir() {
+    let paths = test_paths();
+    assert_eq!(
+        paths.instance_minecraft_dir("my-instance"),
+        PathBuf::from("/d/instances/my-instance/.minecraft"),
+    );
+}
+
+#[test]
+fn instance_natives_dir() {
+    let paths = test_paths();
+    assert_eq!(
+        paths.instance_natives_dir("my-instance"),
+        PathBuf::from("/d/instances/my-instance/natives"),
+    );
+}
+
+#[test]
+fn instance_manifest_path() {
+    let paths = test_paths();
+    assert_eq!(
+        paths.instance_manifest("my-instance"),
+        PathBuf::from("/d/instances/my-instance/instance.json"),
+    );
+}
