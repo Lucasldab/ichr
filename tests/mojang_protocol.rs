@@ -386,3 +386,132 @@ fn test_inherits_from_no_parent_is_identity() {
     assert_eq!(result.id, "standalone");
     assert_eq!(result.main_class, child.main_class);
 }
+
+// ---------------------------------------------------------------------------
+// Task 2-02-03: Argument resolver tests (tests 20–26)
+// ---------------------------------------------------------------------------
+
+use mineltui::mojang::args::{resolve_game_args, resolve_jvm_args};
+
+// Test 20
+#[test]
+fn test_resolve_game_args_1_21_4_flattens_structured_args() {
+    let raw = include_str!("./fixtures/mojang/version_1_21_4.json");
+    let v: VersionJson = serde_json::from_str(raw).unwrap();
+    let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+    let result = resolve_game_args(&v, &ctx);
+    assert!(!result.is_empty(), "1.21.4 game args must be non-empty");
+    assert!(
+        result.contains(&"--username".to_string()),
+        "result must contain --username; got: {result:?}"
+    );
+    assert!(result.contains(&"--version".to_string()), "result must contain --version");
+}
+
+// Test 21
+#[test]
+fn test_resolve_game_args_1_12_2_splits_minecraft_arguments_on_whitespace() {
+    let raw = include_str!("./fixtures/mojang/version_1_12_2.json");
+    let v: VersionJson = serde_json::from_str(raw).unwrap();
+    let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+    let result = resolve_game_args(&v, &ctx);
+    assert!(result.len() > 10, "1.12.2 split args must have many tokens; got {}", result.len());
+    assert!(
+        result.iter().any(|s| s == "--username"),
+        "result must contain --username; got: {result:?}"
+    );
+    assert!(
+        result.iter().any(|s| s == "${auth_player_name}"),
+        "result must contain auth_player_name placeholder"
+    );
+}
+
+// Test 22
+#[test]
+fn test_resolve_jvm_args_1_21_4_os_linux_x86_64_contains_classpath_placeholder() {
+    let raw = include_str!("./fixtures/mojang/version_1_21_4.json");
+    let v: VersionJson = serde_json::from_str(raw).unwrap();
+    let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+    let result = resolve_jvm_args(&v, &ctx);
+    assert!(
+        result.contains(&"${classpath}".to_string()),
+        "JVM args for linux/x86_64 must contain classpath placeholder; got: {result:?}"
+    );
+    assert!(
+        !result.contains(&"-XstartOnFirstThread".to_string()),
+        "JVM args for linux must NOT contain osx-only -XstartOnFirstThread"
+    );
+}
+
+// Test 23
+#[test]
+fn test_resolve_jvm_args_1_21_4_unique_token_count_under_80() {
+    let raw = include_str!("./fixtures/mojang/version_1_21_4.json");
+    let v: VersionJson = serde_json::from_str(raw).unwrap();
+    let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+    let result = resolve_jvm_args(&v, &ctx);
+    assert!(
+        result.len() <= 20,
+        "rule filtering must produce a reasonable JVM arg count; got {}",
+        result.len()
+    );
+}
+
+// Test 24
+#[test]
+fn test_resolve_arguments_unknown_feature_flag_defaults_disallow() {
+    use std::collections::HashSet;
+    let args_json = r#"{
+        "game": [{
+            "rules": [{"action": "allow", "features": {"is_demo_user": true}}],
+            "value": "--demo"
+        }],
+        "jvm": []
+    }"#;
+    let arguments: mineltui::mojang::Arguments = serde_json::from_str(args_json).unwrap();
+    let mut v = vjson_stub("synthetic");
+    v.arguments = Some(arguments);
+    let ctx = RuleContext {
+        os: OsName::Linux,
+        arch: Arch::X86_64,
+        features: HashSet::new(),
+    };
+    let result = resolve_game_args(&v, &ctx);
+    assert!(
+        !result.contains(&"--demo".to_string()),
+        "unknown feature flag must NOT produce --demo; got: {result:?}"
+    );
+}
+
+// Test 25
+#[test]
+fn test_resolve_arguments_prefers_arguments_struct_over_legacy_string() {
+    let args_json = r#"{"game":["--structured-arg"],"jvm":[]}"#;
+    let arguments: mineltui::mojang::Arguments = serde_json::from_str(args_json).unwrap();
+    let mut v = vjson_stub("synthetic");
+    v.arguments = Some(arguments);
+    v.minecraft_arguments = Some("--legacy-arg".to_string());
+    let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+    let result = resolve_game_args(&v, &ctx);
+    assert!(
+        result.contains(&"--structured-arg".to_string()),
+        "structured arguments must be returned when both formats present"
+    );
+    assert!(
+        !result.contains(&"--legacy-arg".to_string()),
+        "legacy minecraftArguments must NOT be used when arguments struct is present"
+    );
+}
+
+// Test 26
+#[test]
+fn test_resolve_arguments_missing_both_returns_empty() {
+    let mut v = vjson_stub("empty");
+    v.arguments = None;
+    v.minecraft_arguments = None;
+    let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+    let game = resolve_game_args(&v, &ctx);
+    let jvm = resolve_jvm_args(&v, &ctx);
+    assert!(game.is_empty(), "game args must be empty when both None");
+    assert!(jvm.is_empty(), "jvm args must be empty when both None");
+}
