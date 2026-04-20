@@ -37,6 +37,9 @@ pub enum AppError {
 
     #[error("Invalid instance name: {reason}")]
     InvalidInstanceName { reason: String },
+
+    #[error("Instance not found: {slug}")]
+    InstanceNotFound { slug: String },
 }
 
 pub type Result<T> = std::result::Result<T, AppError>;

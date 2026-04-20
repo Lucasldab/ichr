@@ -8,6 +8,7 @@ pub mod instance;
 pub mod mojang;
 pub mod observability;
 pub mod persistence;
+pub mod services;
 pub mod tasks;
 pub mod tui;
 
