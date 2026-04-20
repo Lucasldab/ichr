@@ -2,8 +2,11 @@
 //! a real terminal); instead exercises `update()` directly, which is the only
 //! place state mutation happens.
 
+use mineltui::mojang::types::VersionEntry;
 use mineltui::tasks::{JobId, TaskEvent};
-use mineltui::tui::{update, Action, AppState, Effect};
+use mineltui::tui::{update, Action, ActiveView, AppState, CreateStep, Effect, VersionFilter};
+
+// ---- Phase 1 tests (preserved) ---------------------------------------------
 
 #[test]
 fn quit_action_sets_should_quit_and_emits_quit_effect() {
@@ -62,4 +65,229 @@ fn tick_action_does_not_mutate_state() {
     assert!(!state.should_quit);
     assert!(state.active_jobs.is_empty());
     assert!(effects.is_empty());
+}
+
+// ---- Phase 2 tests (Task 2-07-01b) -----------------------------------------
+
+#[test]
+fn test_open_create_modal_sets_active_view() {
+    let mut state = AppState::default();
+    let _effects = update(&mut state, Action::OpenCreateModal);
+    assert!(matches!(
+        state.active_view,
+        ActiveView::CreateModal(CreateStep::NameInput { .. })
+    ));
+}
+
+#[test]
+fn test_close_modal_returns_to_instance_list() {
+    let mut state = AppState {
+        active_view: ActiveView::CreateModal(CreateStep::NameInput {
+            current: "hi".into(),
+            error: None,
+        }),
+        ..AppState::default()
+    };
+    let _effects = update(&mut state, Action::CloseModal);
+    assert!(matches!(state.active_view, ActiveView::InstanceList { .. }));
+}
+
+#[test]
+fn test_submit_name_advances_to_version_picker() {
+    let mut state = AppState {
+        active_view: ActiveView::CreateModal(CreateStep::NameInput {
+            current: String::new(),
+            error: None,
+        }),
+        ..AppState::default()
+    };
+    let _effects = update(&mut state, Action::SubmitInstanceName("Test".into()));
+    assert!(matches!(
+        &state.active_view,
+        ActiveView::CreateModal(CreateStep::VersionPicker { name, .. }) if name == "Test"
+    ));
+}
+
+#[test]
+fn test_submit_empty_name_stays_on_name_input_with_error() {
+    let mut state = AppState {
+        active_view: ActiveView::CreateModal(CreateStep::NameInput {
+            current: String::new(),
+            error: None,
+        }),
+        ..AppState::default()
+    };
+    let _effects = update(&mut state, Action::SubmitInstanceName(String::new()));
+    assert!(matches!(
+        &state.active_view,
+        ActiveView::CreateModal(CreateStep::NameInput { error: Some(_), .. })
+    ));
+}
+
+#[test]
+fn test_toggle_version_filter_cycles_releases_and_all() {
+    let mut state = AppState::default();
+    assert_eq!(state.versions_filter, VersionFilter::Releases);
+    let _effects = update(&mut state, Action::SetVersionFilter(VersionFilter::All));
+    assert_eq!(state.versions_filter, VersionFilter::All);
+    let _effects = update(&mut state, Action::SetVersionFilter(VersionFilter::Releases));
+    assert_eq!(state.versions_filter, VersionFilter::Releases);
+}
+
+#[test]
+fn test_select_version_emits_create_instance_effect() {
+    let mut state = AppState {
+        versions: vec![VersionEntry {
+            id: "1.21.4".into(),
+            version_type: "release".into(),
+            url: "https://example.invalid/1.21.4.json".into(),
+            time: "2024-12-01T00:00:00Z".into(),
+            release_time: "2024-12-01T00:00:00Z".into(),
+            sha1: "0000000000000000000000000000000000000000".into(),
+            compliance_level: 1,
+        }],
+        active_view: ActiveView::CreateModal(CreateStep::VersionPicker {
+            name: "X".into(),
+            filter: VersionFilter::Releases,
+            search: String::new(),
+            error: None,
+        }),
+        ..AppState::default()
+    };
+
+    let effects = update(&mut state, Action::SelectVersion("1.21.4".into()));
+    assert_eq!(effects.len(), 1);
+    let Effect::CreateInstance { ref mc_version_id, .. } = effects[0] else {
+        panic!("expected CreateInstance, got {:?}", effects[0]);
+    };
+    assert_eq!(mc_version_id, "1.21.4");
+}
+
+#[test]
+fn test_progress_updates_active_jobs() {
+    let mut state = AppState::default();
+    let id = JobId(1);
+    let _effects = update(
+        &mut state,
+        Action::Task(TaskEvent::Progress { id, pct: 50, msg: "libs".into() }),
+    );
+    assert_eq!(state.active_jobs.len(), 1);
+    assert_eq!(state.active_jobs[0].0, JobId(1));
+    assert_eq!(state.active_jobs[0].1, 50);
+    assert_eq!(state.active_jobs[0].2, "libs");
+}
+
+#[test]
+fn test_instance_installed_action_reloads_list() {
+    let mut state = AppState::default();
+    let effects = update(&mut state, Action::VersionInstalled { slug: "a".into() });
+    assert!(
+        effects.iter().any(|e| matches!(e, Effect::FetchInstances)),
+        "expected FetchInstances effect"
+    );
+}
+
+#[test]
+fn test_confirm_delete_emits_delete_instance_effect() {
+    let mut state = AppState {
+        active_view: ActiveView::DeleteConfirm {
+            slug: "alpha".into(),
+            display_name: "Alpha".into(),
+        },
+        ..AppState::default()
+    };
+    let effects = update(&mut state, Action::ConfirmDelete);
+    assert!(
+        effects.iter().any(|e| matches!(e, Effect::DeleteInstance(s) if s == "alpha")),
+        "expected DeleteInstance(alpha)"
+    );
+    assert!(matches!(state.active_view, ActiveView::InstanceList { .. }));
+}
+
+#[test]
+fn test_type_search_appends_to_version_picker_search_field() {
+    let mut state = AppState {
+        active_view: ActiveView::CreateModal(CreateStep::VersionPicker {
+            name: "Test".into(),
+            filter: VersionFilter::Releases,
+            search: String::new(),
+            error: None,
+        }),
+        ..AppState::default()
+    };
+    let _effects = update(&mut state, Action::TypeSearch('a'));
+    if let ActiveView::CreateModal(CreateStep::VersionPicker { search, .. }) = &state.active_view {
+        assert!(search.ends_with('a'));
+    } else {
+        panic!("expected VersionPicker after TypeSearch");
+    }
+}
+
+// ---- Phase 2 view smoke tests (Task 2-07-02) --------------------------------
+
+#[test]
+fn test_view_renders_empty_state_without_crash() {
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let state = AppState::default();
+    terminal.draw(|f| mineltui::tui::view::view(&state, f)).unwrap();
+}
+
+#[test]
+fn test_view_dispatches_without_panic() {
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    // InstanceList (default)
+    let state = AppState::default();
+    terminal.draw(|f| mineltui::tui::view::view(&state, f)).unwrap();
+
+    // CreateModal / NameInput
+    let state = AppState {
+        active_view: ActiveView::CreateModal(CreateStep::NameInput {
+            current: "test".into(),
+            error: None,
+        }),
+        ..AppState::default()
+    };
+    terminal.draw(|f| mineltui::tui::view::view(&state, f)).unwrap();
+
+    // CreateModal / VersionPicker
+    let state = AppState {
+        active_view: ActiveView::CreateModal(CreateStep::VersionPicker {
+            name: "MyInstance".into(),
+            filter: VersionFilter::Releases,
+            search: String::new(),
+            error: None,
+        }),
+        ..AppState::default()
+    };
+    terminal.draw(|f| mineltui::tui::view::view(&state, f)).unwrap();
+
+    // DeleteConfirm
+    let state = AppState {
+        active_view: ActiveView::DeleteConfirm {
+            slug: "my-inst".into(),
+            display_name: "My Inst".into(),
+        },
+        ..AppState::default()
+    };
+    terminal.draw(|f| mineltui::tui::view::view(&state, f)).unwrap();
+
+    // RenameInline
+    let state = AppState {
+        active_view: ActiveView::RenameInline {
+            slug: "my-inst".into(),
+            current: "My Inst".into(),
+            original: "My Inst".into(),
+        },
+        ..AppState::default()
+    };
+    terminal.draw(|f| mineltui::tui::view::view(&state, f)).unwrap();
 }
