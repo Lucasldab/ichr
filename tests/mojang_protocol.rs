@@ -1,7 +1,15 @@
 //! Mojang protocol parse tests. Fixtures in `tests/fixtures/mojang/` are
 //! frozen snapshots fetched live 2026-04-20 (see 02-01-...-SUMMARY.md).
 
-use mineltui::mojang::{AssetIndexFile, VersionJson, VersionManifest};
+use std::collections::HashMap;
+
+use mineltui::mojang::{AssetIndexFile, Library, Rule, VersionJson, VersionManifest};
+use mineltui::mojang::rules::RuleContext;
+use mineltui::mojang::rules::evaluate_rules;
+use mineltui::mojang::natives::needs_native_extraction;
+use mineltui::mojang::inherits::resolve_inherits;
+use mineltui::error::AppError;
+use mineltui::domain::platform::{Arch, OsName};
 
 // ---------------------------------------------------------------------------
 // Task 2-02-01: Parse tests (tests 1–7)
@@ -114,4 +122,267 @@ fn test_parse_snapshot_version_json() {
         v.arguments.is_some() || v.minecraft_arguments.is_some(),
         "snapshot must have either arguments or minecraftArguments"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Task 2-02-02: Rules, natives, inheritsFrom tests (tests 8–19)
+// ---------------------------------------------------------------------------
+
+/// Build a minimal Rule from a JSON literal — avoids hand-constructing serde_json::Value.
+fn rule_from_json(json: &str) -> Rule {
+    serde_json::from_str(json).expect("rule JSON must parse")
+}
+
+/// Build a minimal VersionJson stub for inheritsFrom tests.
+fn vjson_stub(id: &str) -> VersionJson {
+    serde_json::from_str(&format!(
+        r#"{{
+            "id": "{id}",
+            "type": "release",
+            "mainClass": "net.minecraft.client.main.Main",
+            "assetIndex": {{
+                "id": "x",
+                "sha1": "0000000000000000000000000000000000000000",
+                "size": 0,
+                "totalSize": 0,
+                "url": "http://example.com/"
+            }},
+            "assets": "x",
+            "downloads": {{}},
+            "libraries": [],
+            "releaseTime": "2020-01-01T00:00:00Z",
+            "time": "2020-01-01T00:00:00Z"
+        }}"#
+    ))
+    .unwrap()
+}
+
+// Test 8
+#[test]
+fn test_library_rules_empty_array() {
+    let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+    assert!(evaluate_rules(&[], &ctx), "empty rules must return true (include)");
+}
+
+// Test 9
+#[test]
+fn test_library_rules_allow_linux_only_on_linux() {
+    let rules = vec![rule_from_json(r#"{"action":"allow","os":{"name":"linux"}}"#)];
+    let linux_ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+    let windows_ctx = RuleContext::for_os_arch(OsName::Windows, Arch::X86_64);
+    assert!(evaluate_rules(&rules, &linux_ctx), "linux-only rule must be true on linux");
+    assert!(!evaluate_rules(&rules, &windows_ctx), "linux-only rule must be false on windows");
+}
+
+// Test 10
+#[test]
+fn test_library_rules_disallow_on_osx_means_include_on_linux() {
+    let rules = vec![
+        rule_from_json(r#"{"action":"allow"}"#),
+        rule_from_json(r#"{"action":"disallow","os":{"name":"osx"}}"#),
+    ];
+    let linux_ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+    // allow all, then disallow osx — on linux the disallow doesn't match, so result is allow
+    assert!(
+        evaluate_rules(&rules, &linux_ctx),
+        "allow-all + disallow-osx must be true on linux"
+    );
+}
+
+// Test 11
+#[test]
+fn test_library_rules_arch_x86_excludes_x86_64_system() {
+    // Rule requires arch == "x86" (32-bit). Our system is x86_64, so it must NOT match.
+    let rules = vec![rule_from_json(r#"{"action":"allow","os":{"arch":"x86"}}"#)];
+    let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+    assert!(
+        !evaluate_rules(&rules, &ctx),
+        "x86 rule must not match an x86_64 system"
+    );
+}
+
+// Test 12
+#[test]
+fn test_needs_extraction_legacy_library() {
+    let lib_json = r#"{
+        "name": "org.lwjgl.lwjgl:lwjgl-platform:2.9.4",
+        "downloads": {
+            "classifiers": {
+                "natives-linux": {
+                    "path": "org/lwjgl/lwjgl/lwjgl-platform/2.9.4/lwjgl-platform-2.9.4-natives-linux.jar",
+                    "sha1": "0000000000000000000000000000000000000000",
+                    "size": 1234,
+                    "url": "http://example.com/natives-linux.jar"
+                }
+            }
+        },
+        "rules": [],
+        "natives": { "linux": "natives-linux", "windows": "natives-windows" }
+    }"#;
+    let lib: Library = serde_json::from_str(lib_json).expect("legacy library must parse");
+    assert!(needs_native_extraction(&lib), "pre-1.19 library with natives+classifiers must need extraction");
+}
+
+// Test 13
+#[test]
+fn test_needs_extraction_embedded_native_library() {
+    // 1.19+ embedded native: separate library entry with classifier-style name, no natives key
+    let lib_json = r#"{
+        "name": "org.lwjgl:lwjgl-glfw:3.3.1:natives-linux",
+        "downloads": {
+            "artifact": {
+                "path": "org/lwjgl/lwjgl-glfw/3.3.1/lwjgl-glfw-3.3.1-natives-linux.jar",
+                "sha1": "0000000000000000000000000000000000000000",
+                "size": 5678,
+                "url": "http://example.com/lwjgl-glfw-natives-linux.jar"
+            }
+        },
+        "rules": [{"action":"allow","os":{"name":"linux"}}]
+    }"#;
+    let lib: Library = serde_json::from_str(lib_json).expect("embedded native library must parse");
+    assert!(
+        !needs_native_extraction(&lib),
+        "1.19+ embedded-native library must NOT need extraction"
+    );
+}
+
+// Test 14
+#[test]
+fn test_inherits_from_two_level_merge() {
+    let parent_lib_json = r#"{
+        "name": "com.example:parent-lib:1.0",
+        "downloads": {},
+        "rules": []
+    }"#;
+    let child_lib_json = r#"{
+        "name": "com.example:child-lib:1.0",
+        "downloads": {},
+        "rules": []
+    }"#;
+
+    let mut parent = vjson_stub("parent-id");
+    parent.libraries = vec![serde_json::from_str(parent_lib_json).unwrap()];
+    parent.main_class = "A".to_string();
+    parent.arguments = Some(serde_json::from_str(r#"{"game":["-g0"],"jvm":[]}"#).unwrap());
+
+    let mut child = vjson_stub("child-id");
+    child.inherits_from = Some("parent-id".to_string());
+    child.main_class = "B".to_string();
+    child.libraries = vec![serde_json::from_str(child_lib_json).unwrap()];
+    child.arguments = Some(serde_json::from_str(r#"{"game":["-g1"],"jvm":[]}"#).unwrap());
+
+    let mut parents = HashMap::new();
+    parents.insert("parent-id".to_string(), parent);
+
+    let merged = resolve_inherits(&child, &parents).expect("two-level merge must succeed");
+    assert_eq!(merged.main_class, "B", "child mainClass must win");
+    assert_eq!(merged.libraries.len(), 2, "merged libraries must have both entries");
+    let game_args: Vec<String> = merged
+        .arguments
+        .unwrap()
+        .game
+        .iter()
+        .filter_map(|e| {
+            if let mineltui::mojang::ArgumentEntry::Plain(s) = e {
+                Some(s.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(game_args, vec!["-g0", "-g1"], "game args must be parent-first then child");
+}
+
+// Test 15
+#[test]
+fn test_inherits_from_library_dedup_by_group_artifact() {
+    let parent_lib_json = r#"{"name":"org.example:lib:1.0","downloads":{},"rules":[]}"#;
+    let child_lib_json = r#"{"name":"org.example:lib:2.0","downloads":{},"rules":[]}"#;
+
+    let mut parent = vjson_stub("parent");
+    parent.libraries = vec![serde_json::from_str(parent_lib_json).unwrap()];
+
+    let mut child = vjson_stub("child");
+    child.inherits_from = Some("parent".to_string());
+    child.libraries = vec![serde_json::from_str(child_lib_json).unwrap()];
+
+    let mut parents = HashMap::new();
+    parents.insert("parent".to_string(), parent);
+
+    let merged = resolve_inherits(&child, &parents).expect("dedup merge must succeed");
+    assert_eq!(merged.libraries.len(), 1, "dedup by group:artifact must yield exactly 1 library");
+    assert!(
+        merged.libraries[0].name.contains("2.0"),
+        "child version (2.0) must survive dedup"
+    );
+}
+
+// Test 16
+#[test]
+fn test_inherits_from_cycle_detection() {
+    let mut a = vjson_stub("A");
+    a.inherits_from = Some("B".to_string());
+
+    let mut b = vjson_stub("B");
+    b.inherits_from = Some("A".to_string());
+
+    let mut parents = HashMap::new();
+    parents.insert("B".to_string(), b);
+    // A is the child, but also put it in the map since B will try to look up A
+    parents.insert("A".to_string(), a.clone());
+
+    let result = resolve_inherits(&a, &parents);
+    assert!(
+        matches!(result, Err(AppError::InheritsFromCycle(_))),
+        "cycle must yield InheritsFromCycle error, got: {result:?}"
+    );
+}
+
+// Test 17
+#[test]
+fn test_inherits_from_depth_cap() {
+    // Chain: A -> B -> C -> D (4 levels, exceeds MAX_DEPTH=3)
+    let mut a = vjson_stub("A");
+    a.inherits_from = Some("B".to_string());
+
+    let mut b = vjson_stub("B");
+    b.inherits_from = Some("C".to_string());
+
+    let mut c = vjson_stub("C");
+    c.inherits_from = Some("D".to_string());
+
+    let d = vjson_stub("D");
+
+    let mut parents = HashMap::new();
+    parents.insert("B".to_string(), b);
+    parents.insert("C".to_string(), c);
+    parents.insert("D".to_string(), d);
+
+    let result = resolve_inherits(&a, &parents);
+    assert!(
+        matches!(result, Err(AppError::InheritsFromDepthExceeded { .. })),
+        "depth > 3 must yield InheritsFromDepthExceeded, got: {result:?}"
+    );
+}
+
+// Test 18
+#[test]
+fn test_inherits_from_parent_missing_errors() {
+    let mut child = vjson_stub("child");
+    child.inherits_from = Some("ghost".to_string());
+
+    let result = resolve_inherits(&child, &HashMap::new());
+    assert!(
+        matches!(result, Err(AppError::InheritsFromParentMissing(ref id)) if id == "ghost"),
+        "missing parent must yield InheritsFromParentMissing(ghost), got: {result:?}"
+    );
+}
+
+// Test 19
+#[test]
+fn test_inherits_from_no_parent_is_identity() {
+    let child = vjson_stub("standalone");
+    let result = resolve_inherits(&child, &HashMap::new()).expect("no inheritsFrom must succeed");
+    assert_eq!(result.id, "standalone");
+    assert_eq!(result.main_class, child.main_class);
 }

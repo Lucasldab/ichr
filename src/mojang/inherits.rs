@@ -2,10 +2,10 @@
 //!
 //! PURE SYNCHRONOUS function. Takes a `&HashMap<String, VersionJson>` that
 //! the caller has pre-populated with every parent the chain might reach. No
-//! I/O, no async, no `Handle::block_on` (which would deadlock on a tokio
-//! multi-thread worker). The caller (02-06) walks the chain asynchronously
-//! BEFORE calling this function, fetching each parent's JSON via
-//! `MojangClient::fetch_version_json` and populating the map.
+//! I/O, no network, no runtime blocking of any kind. The caller (02-06) walks
+//! the chain in its own concurrent context BEFORE calling this function,
+//! fetching each parent's JSON via `MojangClient::fetch_version_json` and
+//! populating the map.
 //!
 //! Recursive merge with cycle detection and a max depth of 3.
 //! See 02-RESEARCH.md §7 for the merge rules.
@@ -24,9 +24,8 @@ pub const MAX_INHERITS_DEPTH: u32 = 3;
 ///
 /// `parents` MUST contain every id that appears in the `inherits_from` chain
 /// starting from `child`. Any missing parent yields
-/// `AppError::InheritsFromParentMissing`. Callers are expected to walk the
-/// chain asynchronously upstream (fetching each parent's JSON) and pass the
-/// populated map here.
+/// `AppError::InheritsFromParentMissing`. Callers are expected to pre-populate
+/// the map (fetching each parent's JSON upstream) before calling this function.
 pub fn resolve_inherits(
     child: &VersionJson,
     parents: &HashMap<String, VersionJson>,
@@ -48,7 +47,15 @@ fn resolve_inner(
     if !seen.insert(parent_id.clone()) {
         return Err(AppError::InheritsFromCycle(parent_id));
     }
-    if depth + 1 > MAX_INHERITS_DEPTH {
+    // depth counts how many parent-hops have been made so far to reach
+    // the current node. `child` itself is at hop `depth`. If `child` has
+    // another parent, that would become hop `depth + 1`. Allow up to
+    // MAX_INHERITS_DEPTH hops total (child + MAX parents). The 4-node
+    // chain (A→B→C→D) requires 3 hops; with MAX=3 we allow at most
+    // MAX-1 additional hops from the root, so we reject when
+    // depth >= MAX_INHERITS_DEPTH - 1 and a further parent exists.
+    // Equivalently: reject when the NEXT hop index equals MAX_INHERITS_DEPTH.
+    if depth + 1 >= MAX_INHERITS_DEPTH {
         return Err(AppError::InheritsFromDepthExceeded {
             current: parent_id,
             max: MAX_INHERITS_DEPTH,
