@@ -31,6 +31,12 @@ pub enum AppError {
 
     #[error("SHA1 mismatch for {target}: expected {expected}, got {got}")]
     Sha1Mismatch { target: String, expected: String, got: String },
+
+    #[error("Instance manifest serde error: {0}")]
+    InstanceSerde(String),
+
+    #[error("Invalid instance name: {reason}")]
+    InvalidInstanceName { reason: String },
 }
 
 pub type Result<T> = std::result::Result<T, AppError>;

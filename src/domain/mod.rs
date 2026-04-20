@@ -6,6 +6,6 @@ pub mod platform;
 pub mod version;
 
 pub use account::{Account, AccountKind};
-pub use instance::{Instance, InstanceId, ModloaderKind};
+pub use instance::{InstanceId, InstanceManifest, ModloaderKind};
 pub use platform::{Arch, OsName};
 pub use version::{McVersion, VersionType};
