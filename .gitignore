@@ -1,0 +1,25 @@
+# Planning / workflow artifacts — kept local
+.planning/
+CLAUDE.md
+AGENTS.md
+
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock.local
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env / secrets
+.env
+.env.local
+*.key
