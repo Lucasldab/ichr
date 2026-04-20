@@ -13,6 +13,18 @@ pub enum AppError {
 
     #[error("Operation cancelled")]
     Cancelled,
+
+    #[error("Mojang JSON parse error: {0}")]
+    MojangParse(#[from] serde_json::Error),
+
+    #[error("inheritsFrom chain cycle detected at {0}")]
+    InheritsFromCycle(String),
+
+    #[error("inheritsFrom chain exceeded max depth {max} at {current}")]
+    InheritsFromDepthExceeded { current: String, max: u32 },
+
+    #[error("inheritsFrom parent {0} not present in parents map (caller must pre-fetch)")]
+    InheritsFromParentMissing(String),
 }
 
 pub type Result<T> = std::result::Result<T, AppError>;
