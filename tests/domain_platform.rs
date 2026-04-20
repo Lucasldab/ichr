@@ -14,7 +14,8 @@ fn arch_current_is_known_variant() {
 
 #[test]
 fn arch_current_matches_std_env_consts() {
-    let mojang = Arch::current().mojang_str();
+    let arch = Arch::current();
+    let mojang = arch.mojang_str();
     match std::env::consts::ARCH {
         "x86_64" => assert_eq!(mojang, "x86_64"),
         "aarch64" => assert_eq!(mojang, "arm64"),
