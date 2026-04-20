@@ -4,7 +4,7 @@
 use mineltui::error::AppError;
 use mineltui::persistence::AppPaths;
 use mineltui::services::{
-    create_instance, delete_instance, list_instances, rename_instance, set_group,
+    clone_instance, create_instance, delete_instance, list_instances, rename_instance, set_group,
 };
 use tempfile::tempdir;
 
@@ -171,6 +171,128 @@ async fn test_delete_instance_removes_directory() {
 async fn test_delete_instance_missing_returns_not_found() {
     let (_td, paths) = make_paths();
     let err = delete_instance(&paths, "nope").await.unwrap_err();
+    assert!(
+        matches!(err, AppError::InstanceNotFound { .. }),
+        "expected InstanceNotFound, got {err:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// clone_instance
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_clone_copies_mods_and_config_not_saves() {
+    let (_td, paths) = make_paths();
+    // Create source instance
+    create_instance(&paths, "A", "1.21.4").await.unwrap();
+    let src_mc = paths.instance_minecraft_dir("a");
+
+    // Populate mods, config, saves, and natives
+    tokio::fs::write(src_mc.join("mods").join("foo.jar"), b"mod-bytes")
+        .await
+        .unwrap();
+    tokio::fs::write(src_mc.join("config").join("bar.toml"), b"config-bytes")
+        .await
+        .unwrap();
+    tokio::fs::create_dir_all(src_mc.join("saves").join("world"))
+        .await
+        .unwrap();
+    tokio::fs::write(
+        src_mc.join("saves").join("world").join("level.dat"),
+        b"save-bytes",
+    )
+    .await
+    .unwrap();
+    let natives_dir = paths.instance_dir("a").join("natives");
+    tokio::fs::create_dir_all(&natives_dir).await.unwrap();
+    tokio::fs::write(natives_dir.join("libfoo.so"), b"native-bytes")
+        .await
+        .unwrap();
+
+    // Clone
+    let cloned = clone_instance(&paths, "a", "A Copy").await.unwrap();
+    assert_eq!(cloned.slug, "a-copy");
+
+    let dst_mc = paths.instance_minecraft_dir("a-copy");
+
+    // mods and config MUST be copied with same content
+    let mods_bytes = tokio::fs::read(dst_mc.join("mods").join("foo.jar"))
+        .await
+        .unwrap();
+    assert_eq!(mods_bytes, b"mod-bytes");
+    let config_bytes = tokio::fs::read(dst_mc.join("config").join("bar.toml"))
+        .await
+        .unwrap();
+    assert_eq!(config_bytes, b"config-bytes");
+
+    // saves and natives MUST NOT be copied
+    assert!(
+        !dst_mc.join("saves").join("world").join("level.dat").exists(),
+        "saves should not be cloned"
+    );
+    assert!(
+        !paths
+            .instance_dir("a-copy")
+            .join("natives")
+            .join("libfoo.so")
+            .exists(),
+        "natives should not be cloned"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_clone_resets_timestamps_and_play_time() {
+    let (_td, paths) = make_paths();
+    create_instance(&paths, "Src", "1.21.4").await.unwrap();
+
+    // Manually update the source manifest to have play state
+    let mut m = mineltui::instance::read_instance_manifest(&paths, "src")
+        .await
+        .unwrap();
+    m.last_played_at = Some("2026-01-01T00:00:00Z".to_string());
+    m.total_play_time_ms = 99999;
+    mineltui::instance::write_instance_manifest(&paths, &m)
+        .await
+        .unwrap();
+
+    let cloned = clone_instance(&paths, "src", "Src Copy").await.unwrap();
+    assert_eq!(cloned.last_played_at, None, "last_played_at should be reset");
+    assert_eq!(cloned.total_play_time_ms, 0, "total_play_time_ms should be reset");
+    // created_at on the clone must not carry over the source's last_played_at
+    assert_ne!(
+        cloned.created_at,
+        "2026-01-01T00:00:00Z",
+        "created_at should be a fresh timestamp, not the source's last_played_at value"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_clone_new_name_collision_appends_suffix() {
+    let (_td, paths) = make_paths();
+    create_instance(&paths, "A", "1.21.4").await.unwrap();
+    // First clone produces "a-copy"
+    clone_instance(&paths, "a", "A Copy").await.unwrap();
+    // Second clone with same name produces "a-copy-2"
+    let second = clone_instance(&paths, "a", "A Copy").await.unwrap();
+    assert_eq!(second.slug, "a-copy-2");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_clone_rejects_empty_new_name() {
+    let (_td, paths) = make_paths();
+    create_instance(&paths, "A", "1.21.4").await.unwrap();
+    let err = clone_instance(&paths, "a", "").await.unwrap_err();
+    assert!(
+        matches!(err, AppError::InvalidInstanceName { .. }),
+        "expected InvalidInstanceName, got {err:?}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_clone_missing_source_returns_not_found() {
+    let (_td, paths) = make_paths();
+    let err = clone_instance(&paths, "nope", "X").await.unwrap_err();
     assert!(
         matches!(err, AppError::InstanceNotFound { .. }),
         "expected InstanceNotFound, got {err:?}"
