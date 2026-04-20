@@ -115,6 +115,7 @@ fn map_event(ev: CtEvent) -> Option<Action> {
 }
 
 /// Execute declarative side-effects. Keeps `update` pure.
+/// Full wiring is implemented in Task 2-07-03; this stub makes 01a/01b compile.
 async fn execute_effects(effects: Vec<Effect>, _tx: &mpsc::Sender<Action>) {
     for ef in effects {
         match ef {
@@ -122,6 +123,12 @@ async fn execute_effects(effects: Vec<Effect>, _tx: &mpsc::Sender<Action>) {
                 // No additional work — the `should_quit` flag in AppState
                 // drives the event loop to break on the next iteration.
             }
+            Effect::FetchManifest => {}
+            Effect::FetchInstances => {}
+            Effect::DeleteInstance(_) => {}
+            Effect::RenameInstance { .. } => {}
+            Effect::CloneInstance { .. } => {}
+            Effect::CreateInstance { .. } => {}
         }
     }
 }

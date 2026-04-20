@@ -4,7 +4,8 @@ pub mod app;
 pub mod run;
 pub mod terminal;
 pub mod view;
+pub mod views;
 
-pub use app::{update, Action, AppState, Effect};
+pub use app::{update, ActiveView, Action, AppState, CreateStep, Effect, VersionFilter};
 pub use run::run;
 pub use terminal::{init as init_terminal, restore as restore_terminal, Tui};
