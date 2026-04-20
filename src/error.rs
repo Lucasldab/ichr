@@ -25,6 +25,12 @@ pub enum AppError {
 
     #[error("inheritsFrom parent {0} not present in parents map (caller must pre-fetch)")]
     InheritsFromParentMissing(String),
+
+    #[error("HTTP error: {0}")]
+    Http(String),
+
+    #[error("SHA1 mismatch for {target}: expected {expected}, got {got}")]
+    Sha1Mismatch { target: String, expected: String, got: String },
 }
 
 pub type Result<T> = std::result::Result<T, AppError>;
