@@ -1,9 +1,16 @@
-//! Elm-style app state for Phase 2.
+//! Elm-style app state for Phase 2 + Phase 3.
 //!
-//! Phase 1 variants (Quit, Task, Tick) are preserved. Phase 2 adds:
-//!   - view navigation (OpenCreateModal, CloseModal, ConfirmDelete, ...)
-//!   - instance lifecycle (SelectVersion, RenameInstance, CloneInstance)
-//!   - background completion (ManifestLoaded, InstancesLoaded, VersionInstalled, ...)
+//! Phase 1 variants (Quit, Task, Tick) are preserved. Phase 2 adds view
+//! navigation (OpenCreateModal, CloseModal, ConfirmDelete, ...), instance
+//! lifecycle (SelectVersion, RenameInstance, CloneInstance), and background
+//! completions (ManifestLoaded, InstancesLoaded, VersionInstalled, ...).
+//! Phase 3 adds the launch lifecycle (LaunchInstance, LaunchJobStarted,
+//! InstanceLaunched, InstanceExited, LaunchFailed, StopInstance), the
+//! running_instances map (slug to CancellationToken), and LaunchFailedModal.
+
+use std::collections::HashMap;
+
+use tokio_util::sync::CancellationToken;
 
 use crate::domain::platform::{Arch, OsName};
 use crate::domain::InstanceManifest;
@@ -31,6 +38,9 @@ pub enum ActiveView {
     RenameInline { slug: String, current: String, original: String },
     /// Inline group editor (INST-06 — mirrors RenameInline).
     GroupInline { slug: String, buffer: String, original: Option<String> },
+    /// Launch-failed modal — shown when Action::LaunchFailed is dispatched.
+    /// Esc dismisses and returns to InstanceList.
+    LaunchFailedModal { slug: String, error: String, log_tail: String },
 }
 
 impl Default for ActiveView {
@@ -39,7 +49,7 @@ impl Default for ActiveView {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct AppState {
     pub should_quit: bool,
     pub active_view: ActiveView,
@@ -50,6 +60,9 @@ pub struct AppState {
     pub arch: Option<Arch>,
     pub os: Option<OsName>,
     pub last_error: Option<String>,
+    /// Tracks slug → CancellationToken for every currently-running launch job.
+    /// Populated by Action::LaunchJobStarted; cleared by InstanceExited / LaunchFailed.
+    pub running_instances: HashMap<String, CancellationToken>,
 }
 
 
@@ -92,6 +105,21 @@ pub enum Action {
     SubmitGroup,
     CancelGroupInput,
 
+    // Phase 3: launch lifecycle
+    /// Dispatch when Enter is pressed on a non-running instance row.
+    LaunchInstance { slug: String },
+    /// Internal — emitted by execute_effects inside the spawned task body BEFORE
+    /// calling launch_instance. Inserts the CancellationToken into running_instances.
+    LaunchJobStarted { slug: String, token: CancellationToken },
+    /// Tracing signal: launch_instance has started executing (after token is stored).
+    InstanceLaunched { slug: String },
+    /// Emitted when the game process exits (cleanly or via cancellation).
+    InstanceExited { slug: String, duration_ms: u64 },
+    /// Emitted when launch_instance returns a non-cancellation error.
+    LaunchFailed { slug: String, error: String, log_tail: String },
+    /// Dispatch when `s` is pressed on a running instance row.
+    StopInstance { slug: String },
+
     // Background completions
     ManifestLoaded(Vec<VersionEntry>),
     InstancesLoaded(Vec<InstanceManifest>),
@@ -123,6 +151,10 @@ pub enum Effect {
         version_sha1: String,
     },
     SetGroup { slug: String, group: Option<String> },
+    /// Spawn a launch_instance task for the given slug.
+    LaunchInstance { slug: String },
+    /// Cancel the running launch task for the given slug.
+    KillProcess { slug: String },
 }
 
 /// Apply an `Action`, mutate `state`, and return the side-effects to execute.
@@ -374,6 +406,36 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         Action::ServiceErrored(e) => {
             state.last_error = Some(e);
             vec![]
+        }
+
+        // Phase 3: launch lifecycle
+        Action::LaunchInstance { slug } => {
+            if state.running_instances.contains_key(&slug) {
+                // Belt-and-suspenders: already running, no-op (T-03-05-01).
+                vec![]
+            } else {
+                vec![Effect::LaunchInstance { slug }]
+            }
+        }
+        Action::LaunchJobStarted { slug, token } => {
+            state.running_instances.insert(slug, token);
+            vec![]
+        }
+        Action::InstanceLaunched { slug: _ } => {
+            // Tracing signal only — token already inserted via LaunchJobStarted.
+            vec![]
+        }
+        Action::InstanceExited { slug, duration_ms: _ } => {
+            state.running_instances.remove(&slug);
+            vec![Effect::FetchInstances]
+        }
+        Action::LaunchFailed { slug, error, log_tail } => {
+            state.running_instances.remove(&slug);
+            state.active_view = ActiveView::LaunchFailedModal { slug, error, log_tail };
+            vec![]
+        }
+        Action::StopInstance { slug } => {
+            vec![Effect::KillProcess { slug }]
         }
     }
 }

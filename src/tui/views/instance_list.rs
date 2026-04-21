@@ -20,11 +20,16 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
             } else {
                 Style::default()
             };
+            let last_col = if state.running_instances.contains_key(&m.slug) {
+                Cell::from("running").style(Style::default().add_modifier(Modifier::BOLD))
+            } else {
+                Cell::from(m.last_played_at.clone().unwrap_or_default())
+            };
             Row::new(vec![
                 Cell::from(m.display_name.clone()),
                 Cell::from(m.mc_version_id.clone()),
                 Cell::from(m.group.clone().unwrap_or_default()),
-                Cell::from(m.last_played_at.clone().unwrap_or_default()),
+                last_col,
             ])
             .style(style)
         })
@@ -39,7 +44,7 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
         ],
     )
     .header(Row::new(vec!["Name", "MC Version", "Group", "Last played"]))
-    .block(Block::default().borders(Borders::ALL).title("Instances (c/r/x/d/g)"));
+    .block(Block::default().borders(Borders::ALL).title("Instances (c/r/x/d/g/Enter/s)"));
     f.render_widget(table, area);
 }
 
