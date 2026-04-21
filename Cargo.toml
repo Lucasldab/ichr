@@ -48,6 +48,7 @@ zip = { version = "8", default-features = false, features = ["deflate", "zstd"] 
 oauth2 = { version = "5", default-features = false, features = ["reqwest", "rustls-tls"] }
 keyring = "3.6.3"
 aes-gcm = "0.10.3"
+base64 = "0.22"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "test-util"] }
