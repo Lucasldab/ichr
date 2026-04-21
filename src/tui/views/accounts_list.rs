@@ -1,7 +1,7 @@
 //! AUTH-06 accounts list view. Renders state.accounts as a table with
 //! the active account marked. Empty state prompts for first add.
 
-use ratatui::layout::{Constraint, Layout};
+use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Paragraph, Row, Table};
@@ -9,8 +9,7 @@ use ratatui::Frame;
 
 use crate::tui::app::{ActiveView, AppState};
 
-pub fn render_accounts_list(state: &AppState, f: &mut Frame) {
-    let area = f.area();
+pub fn render_accounts_list(f: &mut Frame, area: Rect, state: &AppState) {
     let chunks = Layout::vertical([
         Constraint::Length(3),  // header
         Constraint::Min(5),     // table

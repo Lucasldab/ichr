@@ -42,9 +42,9 @@ pub fn view(state: &AppState, f: &mut Frame) {
         ActiveView::RenameInline { .. } => render_create_modal(f, main, state),
         ActiveView::GroupInline { .. } => render_group_inline_overlay(f, main, state),
         ActiveView::LaunchFailedModal { .. } => render_launch_failed_modal(f, main, state),
-        ActiveView::AccountsList { .. } => render_accounts_list(state, f),
-        ActiveView::AddAccountDeviceCode { .. } => render_add_account_device_code(state, f),
-        ActiveView::AccountAuthFailed { .. } => render_account_auth_failed(state, f),
+        ActiveView::AccountsList { .. } => render_accounts_list(f, main, state),
+        ActiveView::AddAccountDeviceCode { .. } => render_add_account_device_code(f, main, state),
+        ActiveView::AccountAuthFailed { .. } => render_account_auth_failed(f, main, state),
     }
 
     render_download_pane(f, dl, state);
