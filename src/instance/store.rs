@@ -39,6 +39,38 @@ pub async fn write_instance_manifest(
     atomic_write(&path, &bytes).await
 }
 
+/// Record that a launch is about to begin: set `last_played_at` to now.
+/// `total_play_time_ms` is not touched — that is updated on exit.
+pub async fn mark_launch_started(
+    paths: &AppPaths,
+    slug: &str,
+) -> Result<InstanceManifest, AppError> {
+    if !tokio::fs::try_exists(&paths.instance_manifest(slug)).await? {
+        return Err(AppError::InstanceNotFound { slug: slug.to_string() });
+    }
+    let mut m = read_instance_manifest(paths, slug).await?;
+    m.last_played_at = Some(crate::domain::instance::now_iso8601_utc());
+    write_instance_manifest(paths, &m).await?;
+    Ok(m)
+}
+
+/// Record a completed launch: add `additional_ms` to `total_play_time_ms`
+/// (saturating) and refresh `last_played_at`.
+pub async fn update_play_time(
+    paths: &AppPaths,
+    slug: &str,
+    additional_ms: u64,
+) -> Result<InstanceManifest, AppError> {
+    if !tokio::fs::try_exists(&paths.instance_manifest(slug)).await? {
+        return Err(AppError::InstanceNotFound { slug: slug.to_string() });
+    }
+    let mut m = read_instance_manifest(paths, slug).await?;
+    m.last_played_at = Some(crate::domain::instance::now_iso8601_utc());
+    m.total_play_time_ms = m.total_play_time_ms.saturating_add(additional_ms);
+    write_instance_manifest(paths, &m).await?;
+    Ok(m)
+}
+
 /// Scan `instances_dir` and return all successfully-parsed manifests.
 ///
 /// Sort order: `last_played_at` DESC (most recent first; `None` last),
@@ -78,4 +110,78 @@ pub async fn list_instance_manifests(paths: &AppPaths) -> Result<Vec<InstanceMan
         }
     });
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::InstanceManifest;
+    use tempfile::TempDir;
+
+    fn paths_in(td: &TempDir) -> AppPaths {
+        AppPaths::with_roots(
+            td.path().to_path_buf(),
+            td.path().to_path_buf(),
+            td.path().to_path_buf(),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_update_play_time_saturating() {
+        let td = TempDir::new().unwrap();
+        let paths = paths_in(&td);
+        let mut m = InstanceManifest::new("x".into(), "x".into(), "1.21.4".into());
+        m.total_play_time_ms = u64::MAX - 1;
+        write_instance_manifest(&paths, &m).await.unwrap();
+        let updated = update_play_time(&paths, "x", 1000).await.unwrap();
+        assert_eq!(
+            updated.total_play_time_ms,
+            u64::MAX,
+            "play_time_ms must saturate at u64::MAX"
+        );
+        assert!(
+            updated.last_played_at.is_some(),
+            "last_played_at must be set"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_update_play_time_missing_slug() {
+        let td = TempDir::new().unwrap();
+        let paths = paths_in(&td);
+        let result = update_play_time(&paths, "nope", 100).await;
+        assert!(
+            matches!(result, Err(AppError::InstanceNotFound { .. })),
+            "missing slug must return InstanceNotFound; got {result:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_mark_launch_started_sets_last_played_at() {
+        let td = TempDir::new().unwrap();
+        let paths = paths_in(&td);
+        let m = InstanceManifest::new("y".into(), "y".into(), "1.21.4".into());
+        write_instance_manifest(&paths, &m).await.unwrap();
+        let updated = mark_launch_started(&paths, "y").await.unwrap();
+        assert!(
+            updated.last_played_at.is_some(),
+            "mark_launch_started must set last_played_at"
+        );
+        // play_time_ms should remain unchanged (0)
+        assert_eq!(
+            updated.total_play_time_ms, 0,
+            "mark_launch_started must not change total_play_time_ms"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_mark_launch_started_missing_slug() {
+        let td = TempDir::new().unwrap();
+        let paths = paths_in(&td);
+        let result = mark_launch_started(&paths, "nonexistent").await;
+        assert!(
+            matches!(result, Err(AppError::InstanceNotFound { .. })),
+            "missing slug must return InstanceNotFound; got {result:?}"
+        );
+    }
 }

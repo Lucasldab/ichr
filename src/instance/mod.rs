@@ -10,4 +10,7 @@ pub mod slug;
 pub mod store;
 
 pub use slug::{slugify, unique_slug};
-pub use store::{list_instance_manifests, read_instance_manifest, write_instance_manifest};
+pub use store::{
+    list_instance_manifests, mark_launch_started, read_instance_manifest,
+    update_play_time, write_instance_manifest,
+};
