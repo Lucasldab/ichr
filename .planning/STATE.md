@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-05-chain-orchestrator-PLAN.md
-last_updated: "2026-04-21T03:53:34.595Z"
+stopped_at: Completed 04-06-account-store-PLAN.md
+last_updated: "2026-04-21T03:58:59.956Z"
 last_activity: 2026-04-21
 progress:
   total_phases: 12
   completed_phases: 3
   total_plans: 31
-  completed_plans: 26
-  percent: 84
+  completed_plans: 27
+  percent: 87
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 ## Current Position
 
 Phase: 4 (Microsoft Authentication) — EXECUTING
-Plan: 6 of 10
+Plan: 7 of 10
 Status: Ready to execute
 Last activity: 2026-04-21
 
@@ -72,6 +72,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P03 | 15 | 2 tasks | 2 files |
 | Phase 04 P04 | 15 | 1 tasks | 2 files |
 | Phase 04 P05 | 12 | 1 tasks | 1 files |
+| Phase 04 P06 | 25 | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Added reqwest form feature in Cargo.toml — required for .form() in reqwest 0.13 with default-features=false
 - [Phase 04]: ensure_valid_mc_token always refreshes regardless of token age (MC tokens expire 24h; cannot safely skip refresh)
 - [Phase 04]: AuthChainOutput includes refresh_token + expiry timestamps so store.rs can persist without unpacking Account
+- [Phase 04]: Encrypted file uses JSON map {account_id -> base64(nonce||ciphertext)} for per-entry granularity without full re-encryption on update
+- [Phase 04]: StoreConfig.force_fallback skips keyring entirely for deterministic CI tests where libsecret daemon is absent
 
 ### Pending Todos
 
@@ -143,6 +146,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-21T03:53:34.592Z
-Stopped at: Completed 04-05-chain-orchestrator-PLAN.md
+Last session: 2026-04-21T03:58:59.952Z
+Stopped at: Completed 04-06-account-store-PLAN.md
 Resume file: None
