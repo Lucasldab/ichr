@@ -11,7 +11,7 @@ use ratatui::Frame;
 
 use crate::tui::app::{ActiveView, AppState};
 
-pub fn render_add_account_device_code(state: &AppState, f: &mut Frame) {
+pub fn render_add_account_device_code(f: &mut Frame, area: Rect, state: &AppState) {
     let (user_code, uri, expires_at, stage) = match &state.active_view {
         ActiveView::AddAccountDeviceCode {
             user_code,
@@ -22,7 +22,7 @@ pub fn render_add_account_device_code(state: &AppState, f: &mut Frame) {
         _ => return,
     };
 
-    let area = centered_rect(60, 40, f.area());
+    let area = centered_rect(60, 40, area);
     f.render_widget(Clear, area);
 
     let remaining = expires_at.saturating_duration_since(Instant::now()).as_secs();

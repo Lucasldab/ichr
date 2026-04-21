@@ -8,12 +8,12 @@ use ratatui::Frame;
 
 use crate::tui::app::{ActiveView, AppState};
 
-pub fn render_account_auth_failed(state: &AppState, f: &mut Frame) {
+pub fn render_account_auth_failed(f: &mut Frame, area: Rect, state: &AppState) {
     let reason = match &state.active_view {
         ActiveView::AccountAuthFailed { reason } => reason.clone(),
         _ => return,
     };
-    let area = centered_rect(60, 40, f.area());
+    let area = centered_rect(60, 40, area);
     f.render_widget(Clear, area);
     let chunks = Layout::vertical([Constraint::Min(3), Constraint::Length(3)]).split(area);
     let body = Paragraph::new(reason)

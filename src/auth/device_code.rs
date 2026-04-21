@@ -165,6 +165,19 @@ pub async fn request_device_code(
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
+        // AADSTS700016 ("unauthorized_client" / "Application with identifier ...
+        // was not found in the directory 'Microsoft Accounts'") means the
+        // legacy Mojang launcher client_id is no longer accepted. User must
+        // register their own Azure AD app and set MINELTUI_MSA_CLIENT_ID.
+        // See docs/msa-setup.md for the registration walkthrough.
+        if body.contains("AADSTS700016") || body.contains("unauthorized_client") {
+            return Err(AuthError::DeviceCodeRequest(
+                "Microsoft rejected the default client ID. You need to register \
+                 your own Azure AD app and set MINELTUI_MSA_CLIENT_ID. \
+                 See docs/msa-setup.md for a 5-step walkthrough."
+                    .to_string(),
+            ));
+        }
         return Err(AuthError::DeviceCodeRequest(format!(
             "HTTP {status}: {body}"
         )));
