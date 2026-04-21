@@ -71,7 +71,7 @@ pub enum AuthError {
     #[error("Xbox Live authentication failed: {0}")]
     XboxLive(String),
 
-    #[error("Xbox authentication error: {xerr}")]
+    #[error("Xbox authentication error: {message} (XErr: {xerr})")]
     XstsDenied { xerr: u64, message: String },
 
     #[error("Minecraft token exchange failed: {0}")]
