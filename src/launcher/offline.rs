@@ -62,6 +62,44 @@ pub fn offline_auth(username: &str) -> OfflineAuth {
     }
 }
 
+/// MSA auth fields — adapter from `crate::auth::MsaTokens` to the fields
+/// consumed by `SubstitutionContext`. Keeps all auth-field production in
+/// one place alongside the offline equivalent (`OfflineAuth`).
+#[derive(Debug, Clone)]
+pub struct MsaAuth {
+    /// `mc_player_name` from `MsaTokens`.
+    pub username: String,
+    /// Hyphenated MC UUID from `MsaTokens.mc_uuid`.
+    pub uuid: String,
+    /// Live MC access token from `MsaTokens.mc_access_token`.
+    pub access_token: String,
+    /// XSTS user hash (uhs) from `MsaTokens.xuid`.
+    pub xuid: String,
+    /// XSTS user hash (uhs) from `MsaTokens.user_hash` (same value as `xuid`).
+    pub xbox_user_hash: String,
+    /// MSA client ID — from `crate::auth::device_code::client_id()`.
+    pub clientid: String,
+    /// Always `"msa"` for this variant. Offline uses `"legacy"`.
+    pub user_type: String,
+}
+
+impl MsaAuth {
+    /// Convert `crate::auth::MsaTokens` into the launcher-local `MsaAuth` shape.
+    /// `clientid` is sourced from `crate::auth::device_code::client_id()`
+    /// so any env-var override is respected automatically.
+    pub fn from_tokens(tokens: &crate::auth::MsaTokens) -> Self {
+        Self {
+            username: tokens.mc_player_name.clone(),
+            uuid: tokens.mc_uuid.clone(),
+            access_token: tokens.mc_access_token.clone(),
+            xuid: tokens.xuid.clone(),
+            xbox_user_hash: tokens.user_hash.clone(),
+            clientid: crate::auth::device_code::client_id(),
+            user_type: tokens.user_type.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -152,5 +190,26 @@ mod tests {
         let username = "SomeUser";
         let auth = offline_auth(username);
         assert_eq!(auth.uuid, offline_uuid(username));
+    }
+
+    #[test]
+    fn test_msa_auth_from_tokens() {
+        let t = crate::auth::MsaTokens {
+            mc_access_token: "mc-tok".into(),
+            mc_uuid: "11111111-1111-4111-8111-111111111111".into(),
+            mc_player_name: "PlayerOne".into(),
+            xuid: "uhs-1".into(),
+            user_hash: "uhs-1".into(),
+            user_type: "msa".into(),
+        };
+        let a = MsaAuth::from_tokens(&t);
+        assert_eq!(a.username, "PlayerOne");
+        assert_eq!(a.access_token, "mc-tok");
+        assert_eq!(a.uuid, "11111111-1111-4111-8111-111111111111");
+        assert_eq!(a.xuid, "uhs-1");
+        assert_eq!(a.xbox_user_hash, "uhs-1");
+        assert_eq!(a.user_type, "msa");
+        // Default when MINELTUI_MSA_CLIENT_ID env var is unset.
+        assert_eq!(a.clientid, "00000000402b5328");
     }
 }

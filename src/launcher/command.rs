@@ -14,7 +14,7 @@ use crate::mojang::types::VersionJson;
 use crate::persistence::paths::AppPaths;
 
 use super::classpath::{build_classpath, classpath_separator};
-use super::offline::OfflineAuth;
+use super::offline::{MsaAuth, OfflineAuth};
 use super::substitute::{substitute_all, SubstitutionContext};
 
 /// Legacy JVM-arg baseline for pre-1.13 versions whose version JSON has no
@@ -90,6 +90,64 @@ pub fn compose(
 
     // JVM args: use structured arguments.jvm when present; fall back to
     // the legacy baseline for pre-1.13 versions that have no jvm block.
+    let jvm_templates: Vec<String> = {
+        let resolved = resolve_jvm_args(version, ctx);
+        if resolved.is_empty() {
+            LEGACY_JVM_ARGS.iter().map(|s| (*s).to_string()).collect()
+        } else {
+            resolved
+        }
+    };
+
+    let jvm_args = substitute_all(&jvm_templates, &sub_ctx);
+    let game_args = substitute_all(&resolve_game_args(version, ctx), &sub_ctx);
+
+    Ok(LaunchCommand {
+        java_bin: java_bin.to_path_buf(),
+        jvm_args,
+        main_class: version.main_class.clone(),
+        game_args,
+    })
+}
+
+/// Compose a `LaunchCommand` for an MSA-authenticated launch.
+///
+/// Identical structure to `compose` but populates `SubstitutionContext` with
+/// live Minecraft session fields from `MsaAuth` instead of offline placeholders.
+pub fn compose_msa(
+    version: &VersionJson,
+    auth: &MsaAuth,
+    paths: &AppPaths,
+    slug: &str,
+    ctx: &RuleContext,
+    java_bin: &Path,
+) -> Result<LaunchCommand, AppError> {
+    let classpath = build_classpath(version, ctx, paths)?;
+
+    let sub_ctx = SubstitutionContext {
+        auth_player_name: auth.username.clone(),
+        auth_uuid: auth.uuid.clone(),
+        auth_access_token: auth.access_token.clone(),
+        auth_xuid: auth.xuid.clone(),
+        clientid: auth.clientid.clone(),
+        auth_xbox_user_hash: auth.xbox_user_hash.clone(),
+        user_type: auth.user_type.clone(),
+        version_name: version.id.clone(),
+        version_type: version.version_type.clone(),
+        game_directory: paths.instance_minecraft_dir(slug),
+        assets_root: paths.assets_dir(),
+        assets_index_name: version.asset_index.id.clone(),
+        natives_directory: paths.instance_natives_dir(slug),
+        library_directory: paths.libraries_dir(),
+        classpath,
+        classpath_separator: classpath_separator(),
+        arch: ctx.arch.mojang_str().to_string(),
+        launcher_name: "mineltui".to_string(),
+        launcher_version: env!("CARGO_PKG_VERSION").to_string(),
+        resolution_width: String::new(),
+        resolution_height: String::new(),
+    };
+
     let jvm_templates: Vec<String> = {
         let resolved = resolve_jvm_args(version, ctx);
         if resolved.is_empty() {
@@ -246,5 +304,116 @@ mod tests {
         let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
         let cmd = compose(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
         assert_eq!(cmd.main_class, v.main_class);
+    }
+
+    // ---- MSA compose tests --------------------------------------------------
+
+    fn msa_auth_fixture() -> MsaAuth {
+        MsaAuth {
+            username: "PlayerOne".into(),
+            uuid: "11111111-1111-4111-8111-111111111111".into(),
+            access_token: "mc-tok".into(),
+            xuid: "uhs-1".into(),
+            xbox_user_hash: "uhs-1".into(),
+            clientid: "00000000402b5328".into(),
+            user_type: "msa".into(),
+        }
+    }
+
+    #[test]
+    fn test_compose_msa_access_token_in_game_args() {
+        let v = load("tests/fixtures/mojang/version_1_21_4.json");
+        let auth = msa_auth_fixture();
+        let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+        let cmd = compose_msa(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+
+        assert!(
+            cmd.game_args.iter().any(|a| a == "mc-tok"),
+            "game_args must contain the real MC access token; got {:?}",
+            cmd.game_args
+        );
+    }
+
+    #[test]
+    fn test_compose_msa_user_type_is_msa() {
+        let v = load("tests/fixtures/mojang/version_1_21_4.json");
+        let auth = msa_auth_fixture();
+        let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+        let cmd = compose_msa(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+
+        assert!(
+            cmd.game_args.iter().any(|a| a == "msa"),
+            "game_args must contain user_type=\"msa\"; got {:?}",
+            cmd.game_args
+        );
+    }
+
+    #[test]
+    fn test_compose_msa_player_name() {
+        let v = load("tests/fixtures/mojang/version_1_21_4.json");
+        let auth = msa_auth_fixture();
+        let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+        let cmd = compose_msa(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+
+        assert!(
+            cmd.game_args.iter().any(|a| a == "PlayerOne"),
+            "game_args must contain player name; got {:?}",
+            cmd.game_args
+        );
+    }
+
+    #[test]
+    fn test_compose_msa_uuid() {
+        let v = load("tests/fixtures/mojang/version_1_21_4.json");
+        let auth = msa_auth_fixture();
+        let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+        let cmd = compose_msa(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+
+        assert!(
+            cmd.game_args.iter().any(|a| a == "11111111-1111-4111-8111-111111111111"),
+            "game_args must contain the MSA UUID; got {:?}",
+            cmd.game_args
+        );
+    }
+
+    #[test]
+    fn test_compose_msa_xuid_present() {
+        let v = load("tests/fixtures/mojang/version_1_21_4.json");
+        let auth = msa_auth_fixture();
+        let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+        let cmd = compose_msa(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+
+        assert!(
+            cmd.game_args.iter().any(|a| a == "uhs-1")
+                || cmd.jvm_args.iter().any(|a| a.contains("uhs-1")),
+            "args must contain xuid/xbox_user_hash value; game={:?} jvm={:?}",
+            cmd.game_args,
+            cmd.jvm_args
+        );
+    }
+
+    #[test]
+    fn test_compose_msa_no_unsubstituted_tokens() {
+        let v = load("tests/fixtures/mojang/version_1_21_4.json");
+        let auth = msa_auth_fixture();
+        let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+        let cmd = compose_msa(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+
+        for arg in cmd.jvm_args.iter().chain(cmd.game_args.iter()) {
+            assert!(
+                !arg.contains("${"),
+                "no unsubstituted ${{var}} tokens allowed; found in: {arg}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_compose_msa_java_bin_preserved() {
+        let v = load("tests/fixtures/mojang/version_1_21_4.json");
+        let auth = msa_auth_fixture();
+        let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
+        let java = Path::new("/usr/bin/java");
+        let cmd = compose_msa(&v, &auth, &fixture_paths(), "myslug", &ctx, java).unwrap();
+        assert_eq!(cmd.java_bin, PathBuf::from("/usr/bin/java"));
     }
 }

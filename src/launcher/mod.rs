@@ -18,3 +18,5 @@ pub mod offline;
 pub mod service;
 pub mod spawn;
 pub mod substitute;
+
+pub use crate::auth::AuthContext;

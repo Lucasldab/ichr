@@ -569,7 +569,8 @@ async fn execute_effects(
                     let res = launcher::service::launch_instance(
                         &paths2,
                         &slug,
-                        &username,
+                        crate::auth::AuthContext::Offline { username },
+                        None,
                         task_tx,
                         token,
                         job_id,
