@@ -20,6 +20,7 @@ use tokio::time::interval;
 use super::app::{update, Action, ActiveView, AppState, CreateStep, Effect, VersionFilter};
 use super::terminal::Tui;
 use super::view::view;
+use crate::auth::service::{AccountAuthEvent, AccountService};
 use crate::launcher;
 use crate::mojang::client::MojangClient;
 use crate::mojang::types::VersionEntry;
@@ -68,6 +69,14 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
     // Build the shared Mojang HTTP client.
     let mojang = Arc::new(MojangClient::new()?);
 
+    // Build the AccountService (uses a separate reqwest client with the same UA).
+    let http_for_auth = reqwest::Client::builder()
+        .user_agent(crate::mojang::client::USER_AGENT)
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| anyhow::anyhow!("reqwest for auth: {e}"))?;
+    let account_service = Arc::new(AccountService::new(&paths, http_for_auth));
+
     // Build the task plumbing. TaskEvents arrive on task_rx; we convert each
     // into an Action::Task and forward to the event loop via action_tx.
     let (action_tx, mut action_rx) = mpsc::channel::<Action>(256);
@@ -104,6 +113,22 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
         });
     }
 
+    // Load accounts on startup.
+    {
+        let svc = Arc::clone(&account_service);
+        let tx = action_tx.clone();
+        tokio::spawn(async move {
+            match svc.list_accounts().await {
+                Ok(list) => {
+                    let _ = tx.send(Action::AccountsLoaded(list)).await;
+                }
+                Err(e) => {
+                    let _ = tx.send(Action::ServiceErrored(e.to_string())).await;
+                }
+            }
+        });
+    }
+
     let mut events = EventStream::new();
     let mut render_tick = interval(Duration::from_millis(16));
     // Interval fires immediately on the first poll; consume that initial tick
@@ -122,7 +147,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
                     Some(Ok(ev)) => {
                         if let Some(action) = map_event(ev, &state) {
                             let effects = update(&mut state, action);
-                            execute_effects(effects, &state, &paths, Arc::clone(&mojang), &task_manager, &action_tx).await;
+                            execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), &task_manager, &action_tx).await;
                         }
                     }
                     Some(Err(e)) => {
@@ -136,7 +161,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
                 match maybe_action {
                     Some(action) => {
                         let effects = update(&mut state, action);
-                        execute_effects(effects, &state, &paths, Arc::clone(&mojang), &task_manager, &action_tx).await;
+                        execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), &task_manager, &action_tx).await;
                     }
                     None => break,
                 }
@@ -180,6 +205,9 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         ActiveView::RenameInline { .. } => map_rename_inline_event(ev, state),
         ActiveView::GroupInline { .. } => map_group_inline_event(ev, state),
         ActiveView::LaunchFailedModal { .. } => map_launch_failed_modal_event(ev),
+        ActiveView::AccountsList { .. } => map_accounts_list_event(ev, state),
+        ActiveView::AddAccountDeviceCode { .. } => map_add_account_device_code_event(ev),
+        ActiveView::AccountAuthFailed { .. } => map_account_auth_failed_event(ev),
     }
 }
 
@@ -248,6 +276,11 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             }
             None
         }
+        CtEvent::Key(KeyEvent { code: KeyCode::Char('A'), modifiers, .. })
+            if !modifiers.contains(KeyModifiers::CONTROL) =>
+        {
+            Some(Action::OpenAccounts)
+        }
         CtEvent::Key(KeyEvent { code: KeyCode::Down, .. })
         | CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
             Some(Action::MoveSelection(1))
@@ -256,6 +289,52 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         | CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
             Some(Action::MoveSelection(-1))
         }
+        _ => None,
+    }
+}
+
+fn map_accounts_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
+    match ev {
+        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CloseAccounts),
+        CtEvent::Key(KeyEvent { code: KeyCode::Char('a'), .. }) => Some(Action::AddAccount),
+        CtEvent::Key(KeyEvent { code: KeyCode::Char('x'), .. }) => {
+            if let ActiveView::AccountsList { selected } = &state.active_view {
+                if let Some(account) = state.accounts.get(*selected) {
+                    return Some(Action::RemoveAccount { id: account.id.clone() });
+                }
+            }
+            None
+        }
+        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
+            if let ActiveView::AccountsList { selected } = &state.active_view {
+                if let Some(account) = state.accounts.get(*selected) {
+                    return Some(Action::ActivateAccount { id: account.id.clone() });
+                }
+            }
+            None
+        }
+        CtEvent::Key(KeyEvent { code: KeyCode::Down, .. })
+        | CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
+            Some(Action::MoveSelection(1))
+        }
+        CtEvent::Key(KeyEvent { code: KeyCode::Up, .. })
+        | CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
+            Some(Action::MoveSelection(-1))
+        }
+        _ => None,
+    }
+}
+
+fn map_add_account_device_code_event(ev: CtEvent) -> Option<Action> {
+    match ev {
+        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CancelAddAccount),
+        _ => None,
+    }
+}
+
+fn map_account_auth_failed_event(ev: CtEvent) -> Option<Action> {
+    match ev {
+        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CloseModal),
         _ => None,
     }
 }
@@ -377,6 +456,7 @@ async fn execute_effects(
     state: &AppState,
     paths: &AppPaths,
     mojang: Arc<MojangClient>,
+    account_service: Arc<AccountService>,
     task_manager: &TaskManager,
     action_tx: &mpsc::Sender<Action>,
 ) {
@@ -547,15 +627,9 @@ async fn execute_effects(
                 });
             }
 
-            Effect::LaunchInstance { slug } => {
-                // Look up username (display_name) from current state — used as offline username.
-                let username = state
-                    .instances
-                    .iter()
-                    .find(|m| m.slug == slug)
-                    .map(|m| m.display_name.clone())
-                    .unwrap_or_else(|| slug.clone());
+            Effect::LaunchInstance { slug, auth_ctx } => {
                 let paths2 = paths.clone();
+                let svc = Arc::clone(&account_service);
                 let tx = action_tx.clone();
                 let job_id = task_manager.next_job_id();
                 let slug_for_task = slug.clone();
@@ -569,8 +643,8 @@ async fn execute_effects(
                     let res = launcher::service::launch_instance(
                         &paths2,
                         &slug,
-                        crate::auth::AuthContext::Offline { username },
-                        None,
+                        auth_ctx,
+                        Some(svc.as_ref()),
                         task_tx,
                         token,
                         job_id,
@@ -612,6 +686,95 @@ async fn execute_effects(
                 if let Some(token) = state.running_instances.get(&slug) {
                     token.cancel();
                 }
+            }
+
+            Effect::StartDeviceCodeAuth => {
+                let svc = Arc::clone(&account_service);
+                let tx = action_tx.clone();
+                let token = tokio_util::sync::CancellationToken::new();
+                let _ = action_tx
+                    .send(Action::AddAccountTokenCreated(token.clone()))
+                    .await;
+                let (event_tx, mut event_rx) = mpsc::channel::<AccountAuthEvent>(16);
+                // Forwarder: AccountAuthEvent -> Action
+                let tx_fwd = tx.clone();
+                tokio::spawn(async move {
+                    while let Some(ev) = event_rx.recv().await {
+                        let action = match ev {
+                            AccountAuthEvent::Started { user_code, verification_uri, expires_in } => {
+                                Action::AccountAuthStarted {
+                                    user_code,
+                                    verification_uri,
+                                    expires_at: std::time::Instant::now()
+                                        + std::time::Duration::from_secs(expires_in),
+                                }
+                            }
+                            AccountAuthEvent::Progress { stage } => {
+                                Action::AccountAuthProgress { stage }
+                            }
+                        };
+                        if tx_fwd.send(action).await.is_err() {
+                            break;
+                        }
+                    }
+                });
+                tokio::spawn(async move {
+                    match svc.start_device_code_auth(token, event_tx).await {
+                        Ok(out) => {
+                            let _ = tx.send(Action::AccountAdded { account: out.account }).await;
+                        }
+                        Err(crate::auth::AuthError::UserCancelled) => {
+                            // Cancellation is expected — silently return to AccountsList.
+                            let _ = tx.send(Action::CloseAccounts).await;
+                        }
+                        Err(e) => {
+                            let _ = tx
+                                .send(Action::AccountAuthFailed { reason: e.to_string() })
+                                .await;
+                        }
+                    }
+                });
+            }
+
+            Effect::RemoveAccount { id } => {
+                let svc = Arc::clone(&account_service);
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = svc.remove_account(&id).await {
+                        let _ = tx.send(Action::ServiceErrored(e.to_string())).await;
+                    }
+                    if let Ok(list) = svc.list_accounts().await {
+                        let _ = tx.send(Action::AccountsLoaded(list)).await;
+                    }
+                });
+            }
+
+            Effect::ActivateAccount { id } => {
+                let svc = Arc::clone(&account_service);
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = svc.activate_account(&id).await {
+                        let _ = tx.send(Action::ServiceErrored(e.to_string())).await;
+                    }
+                    if let Ok(list) = svc.list_accounts().await {
+                        let _ = tx.send(Action::AccountsLoaded(list)).await;
+                    }
+                });
+            }
+
+            Effect::FetchAccounts => {
+                let svc = Arc::clone(&account_service);
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match svc.list_accounts().await {
+                        Ok(list) => {
+                            let _ = tx.send(Action::AccountsLoaded(list)).await;
+                        }
+                        Err(e) => {
+                            let _ = tx.send(Action::ServiceErrored(e.to_string())).await;
+                        }
+                    }
+                });
             }
         }
     }
