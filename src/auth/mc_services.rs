@@ -85,6 +85,24 @@ pub async fn login_with_xbox(
     let status = resp.status();
     if !status.is_success() {
         let body_text = resp.text().await.unwrap_or_default();
+        // Minecraft services returns 403 with "Invalid app registration" when
+        // the Azure AD app hosting the device-code flow isn't trusted by MC
+        // services. Common causes: app registered in an M365 Dev sandbox
+        // tenant (MC services only trusts consumer-linked tenants), wrong
+        // signInAudience, redirect URIs configured, or propagation lag.
+        // See docs/msa-setup.md + https://aka.ms/AppRegInfo.
+        if body_text.contains("Invalid app registration") {
+            return Err(AuthError::McLogin(
+                "Microsoft rejected the app registration (Invalid app registration). \
+                 The Azure AD app isn't trusted by Minecraft services. \
+                 Most common causes: registered in an M365 Dev sandbox tenant \
+                 (register in a tenant created via Azure Free instead), \
+                 signInAudience is not \"PersonalMicrosoftAccount\", \
+                 or propagation lag (wait 10–15 min after registering). \
+                 See docs/msa-setup.md and https://aka.ms/AppRegInfo."
+                    .to_string(),
+            ));
+        }
         return Err(AuthError::McLogin(format!(
             "HTTP {status}: {}",
             truncate_for_msg(&body_text, 200)
