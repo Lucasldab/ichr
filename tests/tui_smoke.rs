@@ -491,12 +491,24 @@ fn test_enter_on_running_is_noop() {
 #[test]
 fn test_s_on_running_emits_kill_effect() {
     let mut state = AppState::default();
-    state.running_instances.insert("beta".into(), CancellationToken::new());
+    let token = CancellationToken::new();
+    state.running_instances.insert("beta".into(), token.clone());
     let effects = update(&mut state, Action::StopInstance { slug: "beta".into() });
     assert_eq!(effects.len(), 1);
     assert!(
         matches!(&effects[0], Effect::KillProcess { slug } if slug == "beta"),
         "expected Effect::KillProcess(beta), got {effects:?}"
+    );
+    // Badge-clearance guarantee: update() removes the slug from running_instances
+    // immediately so the running badge disappears on the next render, even before
+    // the async launch task dispatches InstanceExited.
+    assert!(
+        !state.running_instances.contains_key("beta"),
+        "slug must be removed from running_instances on StopInstance (badge UX)"
+    );
+    assert!(
+        token.is_cancelled(),
+        "token must be cancelled on StopInstance so the async launch task unwinds"
     );
 }
 
