@@ -2,6 +2,7 @@
 //!
 //! Library crate; `src/main.rs` is the binary entry point.
 
+pub mod auth;
 pub mod domain;
 pub mod error;
 pub mod install;

@@ -44,7 +44,13 @@ sha1 = "0.10"
 sha2 = "0.11"
 zip = { version = "8", default-features = false, features = ["deflate", "zstd"] }
 
+# Auth (Phase 4)
+oauth2 = { version = "5", default-features = false, features = ["reqwest", "rustls-tls"] }
+keyring = "3.6.3"
+aes-gcm = "0.10.3"
+
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "test-util"] }
 tempfile = "3"
 filetime = "0.2"
+httpmock = "0.8.3"

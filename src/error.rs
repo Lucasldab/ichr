@@ -52,6 +52,12 @@ pub enum AppError {
 
     #[error("Process spawn failed: {0}")]
     SpawnFailed(String),
+
+    #[error("Authentication error: {0}")]
+    Auth(#[from] crate::auth::AuthError),
+
+    #[error("No active account — add a Microsoft account or launch in offline mode")]
+    NoActiveAccount,
 }
 
 pub type Result<T> = std::result::Result<T, AppError>;
