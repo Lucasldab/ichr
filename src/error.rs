@@ -40,6 +40,18 @@ pub enum AppError {
 
     #[error("Instance not found: {slug}")]
     InstanceNotFound { slug: String },
+
+    #[error("Launch failed (exit code {code}): {message}")]
+    LaunchFailed { code: i32, message: String },
+
+    #[error("Version not installed for instance {slug} — run install first")]
+    VersionNotInstalled { slug: String },
+
+    #[error("Java binary not found: checked MINELTUI_JAVA env var and PATH")]
+    JavaNotFound,
+
+    #[error("Process spawn failed: {0}")]
+    SpawnFailed(String),
 }
 
 pub type Result<T> = std::result::Result<T, AppError>;
