@@ -471,7 +471,7 @@ fn test_enter_on_non_running_emits_launch_effect() {
     let effects = update(&mut state, Action::LaunchInstance { slug: "alpha".into() });
     assert_eq!(effects.len(), 1);
     assert!(
-        matches!(&effects[0], Effect::LaunchInstance { slug } if slug == "alpha"),
+        matches!(&effects[0], Effect::LaunchInstance { slug, .. } if slug == "alpha"),
         "expected Effect::LaunchInstance(alpha), got {effects:?}"
     );
 }
@@ -589,4 +589,168 @@ fn test_d_on_running_is_noop() {
         action.is_none(),
         "pressing d on a running instance must return None, got {action:?}"
     );
+}
+
+// ---- Phase 4 account management smoke tests (Task 04-09-03) -----------------
+
+use mineltui::auth::{Account, AuthContext, StorageBackend};
+use mineltui::tui::run::map_event_pub;
+use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
+
+fn sample_account(id: &str, active: bool) -> Account {
+    Account {
+        id: id.into(),
+        mc_username: format!("P{id}"),
+        mc_uuid: format!("{id:0>8}-0000-4000-8000-000000000000"),
+        mc_token_expires_at: 0,
+        msa_token_expires_at: 0,
+        added_at: 0,
+        last_refreshed_at: 0,
+        is_active: active,
+        storage: StorageBackend::EncryptedFile,
+    }
+}
+
+// (1) A keybind opens Accounts view from InstanceList
+#[test]
+fn test_capital_a_opens_accounts_view_from_instance_list() {
+    let state = AppState::default();
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('A'), KeyModifiers::NONE));
+    let action = map_event_pub(ev, &state).expect("should emit Action");
+    assert!(matches!(action, Action::OpenAccounts));
+}
+
+// (2) 'a' key in AccountsList emits AddAccount
+#[test]
+fn test_a_in_accounts_list_emits_add_account() {
+    let state = AppState {
+        active_view: ActiveView::AccountsList { selected: 0 },
+        ..AppState::default()
+    };
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE));
+    let action = map_event_pub(ev, &state).unwrap();
+    assert!(matches!(action, Action::AddAccount));
+}
+
+// (3) Enter in AccountsList emits ActivateAccount for selected
+#[test]
+fn test_enter_in_accounts_list_activates_selected() {
+    let state = AppState {
+        accounts: vec![sample_account("A", false), sample_account("B", false)],
+        active_view: ActiveView::AccountsList { selected: 1 },
+        ..AppState::default()
+    };
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    let action = map_event_pub(ev, &state).unwrap();
+    match action {
+        Action::ActivateAccount { id } => assert_eq!(id, "B"),
+        other => panic!("expected ActivateAccount, got {other:?}"),
+    }
+}
+
+// (4) x in AccountsList emits RemoveAccount for selected
+#[test]
+fn test_x_in_accounts_list_removes_selected() {
+    let state = AppState {
+        accounts: vec![sample_account("A", true)],
+        active_view: ActiveView::AccountsList { selected: 0 },
+        ..AppState::default()
+    };
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+    let action = map_event_pub(ev, &state).unwrap();
+    match action {
+        Action::RemoveAccount { id } => assert_eq!(id, "A"),
+        other => panic!("expected RemoveAccount, got {other:?}"),
+    }
+}
+
+// (5) Esc in AccountsList emits CloseAccounts
+#[test]
+fn test_esc_in_accounts_list_closes() {
+    let state = AppState {
+        active_view: ActiveView::AccountsList { selected: 0 },
+        ..AppState::default()
+    };
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    let action = map_event_pub(ev, &state).unwrap();
+    assert!(matches!(action, Action::CloseAccounts));
+}
+
+// (6) Esc in AddAccountDeviceCode emits CancelAddAccount
+#[test]
+fn test_esc_in_device_code_modal_cancels() {
+    let state = AppState {
+        active_view: ActiveView::AddAccountDeviceCode {
+            user_code: "X".into(),
+            verification_uri: "u".into(),
+            expires_at: std::time::Instant::now(),
+            stage: "s".into(),
+        },
+        ..AppState::default()
+    };
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    let action = map_event_pub(ev, &state).unwrap();
+    assert!(matches!(action, Action::CancelAddAccount));
+}
+
+// (7) Esc in AccountAuthFailed emits CloseModal
+#[test]
+fn test_esc_in_auth_failed_modal_closes() {
+    let state = AppState {
+        active_view: ActiveView::AccountAuthFailed { reason: "r".into() },
+        ..AppState::default()
+    };
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    let action = map_event_pub(ev, &state).unwrap();
+    assert!(matches!(action, Action::CloseModal) || matches!(action, Action::CloseAccounts));
+}
+
+// (8) LaunchInstance with active account builds Msa AuthContext in Effect
+#[test]
+fn test_launch_effect_with_active_account_is_msa() {
+    let mut state = AppState {
+        // new(display_name, slug, mc_version_id)
+        instances: vec![mineltui::domain::InstanceManifest::new(
+            "s".into(),
+            "s".into(),
+            "1.21.4".into(),
+        )],
+        active_account_id: Some("acc-1".into()),
+        ..AppState::default()
+    };
+    let effects = update(&mut state, Action::LaunchInstance { slug: "s".into() });
+    match effects.as_slice() {
+        [Effect::LaunchInstance { auth_ctx: AuthContext::Msa { account_id }, .. }] => {
+            assert_eq!(account_id, "acc-1");
+        }
+        other => panic!("expected Msa launch, got {other:?}"),
+    }
+}
+
+// (9) AccountsLoaded derives active_account_id from list
+#[test]
+fn test_accounts_loaded_sets_active_id() {
+    let mut state = AppState::default();
+    let list = vec![sample_account("A", true), sample_account("B", false)];
+    let _ = update(&mut state, Action::AccountsLoaded(list));
+    assert_eq!(state.active_account_id.as_deref(), Some("A"));
+}
+
+// (10) MoveSelection in AccountsList updates selected index
+#[test]
+fn test_move_selection_in_accounts_list() {
+    let mut state = AppState {
+        accounts: vec![
+            sample_account("A", false),
+            sample_account("B", false),
+            sample_account("C", false),
+        ],
+        active_view: ActiveView::AccountsList { selected: 0 },
+        ..AppState::default()
+    };
+    let _ = update(&mut state, Action::MoveSelection(1));
+    match state.active_view {
+        ActiveView::AccountsList { selected } => assert_eq!(selected, 1),
+        _ => panic!("view changed unexpectedly"),
+    }
 }
