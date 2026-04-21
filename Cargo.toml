@@ -38,7 +38,7 @@ ratatui-textarea = "0.9.1"  # Text input widget for create-instance modal (Phase
 time = { version = "0.3", default-features = false, features = ["std", "formatting"] }
 
 # --- Pre-wired for later phases (lock versions now so Cargo.lock is stable) ---
-reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream", "json", "gzip"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream", "json", "gzip", "form"] }
 md-5 = { version = "0.10", default-features = false }
 sha1 = "0.10"
 sha2 = "0.11"
