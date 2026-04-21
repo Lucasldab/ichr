@@ -140,6 +140,16 @@ impl AppPaths {
     pub fn instance_manifest(&self, slug: &str) -> PathBuf {
         self.instance_dir(slug).join("instance.json")
     }
+
+    /// Per-instance log file for Minecraft stdout/stderr drain.
+    /// Path: `{data_dir}/instances/{slug}/logs/mineltui.log`.
+    /// The file is APPENDED at each launch; sessions are separated by a
+    /// timestamped header written by `launcher::spawn` (plan 03-03).
+    /// Minecraft's own `logs/latest.log` is a separate file managed by
+    /// Minecraft's own log4j config — do not conflate.
+    pub fn instance_log_file(&self, slug: &str) -> PathBuf {
+        self.instance_dir(slug).join("logs").join("mineltui.log")
+    }
 }
 
 /// Convenience: return `true` if `child` starts with `parent` after
