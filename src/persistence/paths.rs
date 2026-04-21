@@ -150,6 +150,22 @@ impl AppPaths {
     pub fn instance_log_file(&self, slug: &str) -> PathBuf {
         self.instance_dir(slug).join("logs").join("mineltui.log")
     }
+
+    /// Encrypted fallback refresh-token file.
+    /// Path: `{config_dir}/accounts.enc` — AES-256-GCM encrypted blob.
+    /// Used when the keyring secret service is unavailable.
+    pub fn accounts_file(&self) -> PathBuf {
+        self.config_dir.join("accounts.enc")
+    }
+
+    /// Non-secret account metadata file.
+    /// Path: `{config_dir}/accounts.json` — JSON array of Account records
+    /// (ids, usernames, UUIDs, expiry timestamps). Refresh tokens are
+    /// stored separately in the keyring or accounts.enc; this file only
+    /// holds the metadata needed to render the account picker.
+    pub fn accounts_json_file(&self) -> PathBuf {
+        self.config_dir.join("accounts.json")
+    }
 }
 
 /// Convenience: return `true` if `child` starts with `parent` after
@@ -157,4 +173,21 @@ impl AppPaths {
 #[doc(hidden)]
 pub fn path_starts_with(child: &Path, parent: &Path) -> bool {
     child.starts_with(parent)
+}
+
+#[cfg(test)]
+mod accounts_path_tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_accounts_file_under_config_dir() {
+        let p = AppPaths::with_roots(
+            PathBuf::from("/d"),
+            PathBuf::from("/c"),
+            PathBuf::from("/ca"),
+        );
+        assert_eq!(p.accounts_file(), PathBuf::from("/c/accounts.enc"));
+        assert_eq!(p.accounts_json_file(), PathBuf::from("/c/accounts.json"));
+    }
 }

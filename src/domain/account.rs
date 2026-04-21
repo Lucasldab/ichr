@@ -81,7 +81,7 @@ mod tests {
         let parsed: Account = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.id, acc.id);
         assert_eq!(parsed.mc_uuid, acc.mc_uuid);
-        assert_eq!(parsed.is_active, true);
+        assert!(parsed.is_active);
         assert!(matches!(parsed.storage, StorageBackend::EncryptedFile));
     }
 
