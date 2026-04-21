@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-06-account-store-PLAN.md
-last_updated: "2026-04-21T03:58:59.956Z"
+stopped_at: Completed 04-07-account-service-PLAN.md
+last_updated: "2026-04-21T04:03:58.098Z"
 last_activity: 2026-04-21
 progress:
   total_phases: 12
   completed_phases: 3
   total_plans: 31
-  completed_plans: 27
-  percent: 87
+  completed_plans: 28
+  percent: 90
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 ## Current Position
 
 Phase: 4 (Microsoft Authentication) — EXECUTING
-Plan: 7 of 10
+Plan: 8 of 10
 Status: Ready to execute
 Last activity: 2026-04-21
 
@@ -73,6 +73,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P04 | 15 | 1 tasks | 2 files |
 | Phase 04 P05 | 12 | 1 tasks | 1 files |
 | Phase 04 P06 | 25 | 1 tasks | 3 files |
+| Phase 04 P07 | 10 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -126,6 +127,8 @@ Recent decisions affecting current work:
 - [Phase 04]: AuthChainOutput includes refresh_token + expiry timestamps so store.rs can persist without unpacking Account
 - [Phase 04]: Encrypted file uses JSON map {account_id -> base64(nonce||ciphertext)} for per-entry granularity without full re-encryption on update
 - [Phase 04]: StoreConfig.force_fallback skips keyring entirely for deterministic CI tests where libsecret daemon is absent
+- [Phase 04]: list_accounts also gets #[tracing::instrument(skip_all)] for consistent all-methods tracing policy
+- [Phase 04]: resolve_msa_tokens_for_launch returns MsaTokens only — correct return for launcher integration path
 
 ### Pending Todos
 
@@ -146,6 +149,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-21T03:58:59.952Z
-Stopped at: Completed 04-06-account-store-PLAN.md
+Last session: 2026-04-21T04:03:58.094Z
+Stopped at: Completed 04-07-account-service-PLAN.md
 Resume file: None
