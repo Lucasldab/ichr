@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-03-xbox-mc-services-PLAN.md
-last_updated: "2026-04-21T03:43:27.387Z"
+stopped_at: Completed 04-04-device-code-PLAN.md
+last_updated: "2026-04-21T03:49:02.055Z"
 last_activity: 2026-04-21
 progress:
   total_phases: 12
   completed_phases: 3
   total_plans: 31
-  completed_plans: 24
-  percent: 77
+  completed_plans: 25
+  percent: 81
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 ## Current Position
 
 Phase: 4 (Microsoft Authentication) — EXECUTING
-Plan: 4 of 10
+Plan: 5 of 10
 Status: Ready to execute
 Last activity: 2026-04-21
 
@@ -70,6 +70,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P01 | 15 | 2 tasks | 14 files |
 | Phase 04 P02 | 5 | 1 tasks | 1 files |
 | Phase 04 P03 | 15 | 2 tasks | 2 files |
+| Phase 04 P04 | 15 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -117,6 +118,8 @@ Recent decisions affecting current work:
 - [Phase 04]: XErr 2148916236 and 2148916237 kept as separate match arms for distinct user messages
 - [Phase 04]: httpmock 0.8.3 uses body_includes (not body_contains) for substring body matching
 - [Phase 04]: XstsErrorBody.message discarded in favour of map_xerr output for consistent user-facing XSTS errors
+- [Phase 04]: Hand-rolled reqwest POSTs for MSA device-code instead of oauth2 5.0 crate for httpmock base_url injection
+- [Phase 04]: Added reqwest form feature in Cargo.toml — required for .form() in reqwest 0.13 with default-features=false
 
 ### Pending Todos
 
@@ -137,6 +140,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-21T03:43:27.384Z
-Stopped at: Completed 04-03-xbox-mc-services-PLAN.md
+Last session: 2026-04-21T03:49:02.051Z
+Stopped at: Completed 04-04-device-code-PLAN.md
 Resume file: None

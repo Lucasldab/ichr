@@ -83,7 +83,7 @@ mineltui is a terminal-UI Minecraft Java Edition launcher built in Rust + ratatu
 - [x] 04-01-auth-scaffold-PLAN.md — Cargo deps (keyring, aes-gcm, httpmock) + AppError auth variants + `pub mod auth;` module skeleton + Account struct + AppPaths::accounts_file
 - [x] 04-02-xsts-errors-PLAN.md — Pure map_xerr function for all 7 documented XErr codes + unknown-code fallback + 11 unit tests
 - [x] 04-03-xbox-mc-services-PLAN.md — Hand-rolled Xbox Live + XSTS + Minecraft services reqwest clients (RpsTicket d= prefix, XSTS 401 XErr parsing, identityToken XBL3.0 format, entitlement check) with httpmock tests
-- [ ] 04-04-device-code-PLAN.md — MSA OAuth device-code flow (RFC 8628) with polling state machine (authorization_pending, slow_down +5s, expired_token, access_denied) + refresh_access_token + CancellationToken support
+- [x] 04-04-device-code-PLAN.md — MSA OAuth device-code flow (RFC 8628) with polling state machine (authorization_pending, slow_down +5s, expired_token, access_denied) + refresh_access_token + CancellationToken support
 - [ ] 04-05-chain-orchestrator-PLAN.md — run_full_auth + ensure_valid_mc_token composing XBL/XSTS/MC + end-to-end httpmock tests
 - [ ] 04-06-account-store-PLAN.md — keyring-first + AES-256-GCM encrypted-file fallback (machine-id key, 0600 perms) + accounts.json metadata persistence
 - [ ] 04-07-account-service-PLAN.md — AccountService facade: start_device_code_auth / list / remove / activate / resolve_auth_context_for_launch / resolve_msa_tokens_for_launch
