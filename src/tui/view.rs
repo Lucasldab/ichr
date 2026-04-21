@@ -5,6 +5,9 @@ use ratatui::Frame;
 
 use super::app::{ActiveView, AppState, CreateStep};
 use super::views::{
+    account_auth_failed::render_account_auth_failed,
+    accounts_list::render_accounts_list,
+    add_account_device_code::render_add_account_device_code,
     create_modal::render_create_modal,
     delete_confirm::render_delete_confirm,
     download_pane::render_download_pane,
@@ -39,6 +42,9 @@ pub fn view(state: &AppState, f: &mut Frame) {
         ActiveView::RenameInline { .. } => render_create_modal(f, main, state),
         ActiveView::GroupInline { .. } => render_group_inline_overlay(f, main, state),
         ActiveView::LaunchFailedModal { .. } => render_launch_failed_modal(f, main, state),
+        ActiveView::AccountsList { .. } => render_accounts_list(state, f),
+        ActiveView::AddAccountDeviceCode { .. } => render_add_account_device_code(state, f),
+        ActiveView::AccountAuthFailed { .. } => render_account_auth_failed(state, f),
     }
 
     render_download_pane(f, dl, state);
