@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-04-device-code-PLAN.md
-last_updated: "2026-04-21T03:49:02.055Z"
+stopped_at: Completed 04-05-chain-orchestrator-PLAN.md
+last_updated: "2026-04-21T03:53:34.595Z"
 last_activity: 2026-04-21
 progress:
   total_phases: 12
   completed_phases: 3
   total_plans: 31
-  completed_plans: 25
-  percent: 81
+  completed_plans: 26
+  percent: 84
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 ## Current Position
 
 Phase: 4 (Microsoft Authentication) — EXECUTING
-Plan: 5 of 10
+Plan: 6 of 10
 Status: Ready to execute
 Last activity: 2026-04-21
 
@@ -71,6 +71,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P02 | 5 | 1 tasks | 1 files |
 | Phase 04 P03 | 15 | 2 tasks | 2 files |
 | Phase 04 P04 | 15 | 1 tasks | 2 files |
+| Phase 04 P05 | 12 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,8 @@ Recent decisions affecting current work:
 - [Phase 04]: XstsErrorBody.message discarded in favour of map_xerr output for consistent user-facing XSTS errors
 - [Phase 04]: Hand-rolled reqwest POSTs for MSA device-code instead of oauth2 5.0 crate for httpmock base_url injection
 - [Phase 04]: Added reqwest form feature in Cargo.toml — required for .form() in reqwest 0.13 with default-features=false
+- [Phase 04]: ensure_valid_mc_token always refreshes regardless of token age (MC tokens expire 24h; cannot safely skip refresh)
+- [Phase 04]: AuthChainOutput includes refresh_token + expiry timestamps so store.rs can persist without unpacking Account
 
 ### Pending Todos
 
@@ -140,6 +143,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-21T03:49:02.051Z
-Stopped at: Completed 04-04-device-code-PLAN.md
+Last session: 2026-04-21T03:53:34.592Z
+Stopped at: Completed 04-05-chain-orchestrator-PLAN.md
 Resume file: None

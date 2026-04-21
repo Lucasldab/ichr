@@ -84,7 +84,7 @@ mineltui is a terminal-UI Minecraft Java Edition launcher built in Rust + ratatu
 - [x] 04-02-xsts-errors-PLAN.md — Pure map_xerr function for all 7 documented XErr codes + unknown-code fallback + 11 unit tests
 - [x] 04-03-xbox-mc-services-PLAN.md — Hand-rolled Xbox Live + XSTS + Minecraft services reqwest clients (RpsTicket d= prefix, XSTS 401 XErr parsing, identityToken XBL3.0 format, entitlement check) with httpmock tests
 - [x] 04-04-device-code-PLAN.md — MSA OAuth device-code flow (RFC 8628) with polling state machine (authorization_pending, slow_down +5s, expired_token, access_denied) + refresh_access_token + CancellationToken support
-- [ ] 04-05-chain-orchestrator-PLAN.md — run_full_auth + ensure_valid_mc_token composing XBL/XSTS/MC + end-to-end httpmock tests
+- [x] 04-05-chain-orchestrator-PLAN.md — run_full_auth + ensure_valid_mc_token composing XBL/XSTS/MC + end-to-end httpmock tests
 - [ ] 04-06-account-store-PLAN.md — keyring-first + AES-256-GCM encrypted-file fallback (machine-id key, 0600 perms) + accounts.json metadata persistence
 - [ ] 04-07-account-service-PLAN.md — AccountService facade: start_device_code_auth / list / remove / activate / resolve_auth_context_for_launch / resolve_msa_tokens_for_launch
 - [ ] 04-08-launcher-integration-PLAN.md — launch_instance signature change (AuthContext enum + Option<AccountService>), compose_msa, MsaAuth adapter, offline path byte-identical
@@ -199,7 +199,7 @@ Phases execute in numeric order. Phases 3 and 4 have no interdependency after Ph
 | 1. Project Scaffold and Core Infrastructure | 6/6 | Complete   | 2026-04-20 |
 | 2. Mojang Protocol and Instance Management | 8/8 | Complete   | 2026-04-20 |
 | 3. Launcher Process and Offline Launch | 6/6 | Complete   | 2026-04-21 |
-| 4. Microsoft Authentication | 3/10 | In Progress|  |
+| 4. Microsoft Authentication | 5/10 | In Progress|  |
 | 5. Java Runtime Management | 0/? | Not started | - |
 | 6. Fabric and Quilt Modloaders | 0/? | Not started | - |
 | 7. Forge and NeoForge Modloaders | 0/? | Not started | - |
