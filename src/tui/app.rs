@@ -435,6 +435,13 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
         Action::StopInstance { slug } => {
+            // Cancel and clear immediately so the running badge disappears on the
+            // next render. The async launch task will later dispatch
+            // Action::InstanceExited; the arm is idempotent (remove of an absent
+            // slug is a no-op), so the double-path is safe.
+            if let Some(token) = state.running_instances.remove(&slug) {
+                token.cancel();
+            }
             vec![Effect::KillProcess { slug }]
         }
     }
