@@ -16,6 +16,11 @@ use mineltui::tui;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
+    // 0. Load .env (if present) so MINELTUI_MSA_CLIENT_ID and any other
+    //    user-provided overrides are visible to std::env::var lookups below.
+    //    Silent on absence — .env is optional.
+    let _ = dotenvy::dotenv();
+
     // 1. Paths — must succeed before any terminal manipulation.
     let paths = AppPaths::resolve()
         .context("resolving platform paths (no home directory available)")?;

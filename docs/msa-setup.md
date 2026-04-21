@@ -17,7 +17,16 @@ You need to register your own Azure AD app and point mineltui at its client ID v
 
 ## Point mineltui at your app
 
-Set the environment variable before launching:
+Easiest — create a `.env` file in the project root. mineltui auto-loads it at startup via `dotenvy`:
+
+```bash
+echo 'MINELTUI_MSA_CLIENT_ID=11111111-2222-3333-4444-555555555555' > .env
+cargo run --release
+```
+
+`.env` is gitignored by default.
+
+Alternative — export in the shell (no `.env` file):
 
 ```bash
 # Linux / macOS
@@ -31,7 +40,7 @@ $env:MINELTUI_MSA_CLIENT_ID = "11111111-2222-3333-4444-555555555555"
 cargo run --release
 ```
 
-Persist it in your shell rc file (`~/.bashrc`, `~/.zshrc`, etc.) or your Windows user environment if you don't want to re-export it each session.
+Persist the shell export in your rc file (`~/.bashrc`, `~/.zshrc`, etc.) or Windows user environment if you want it across sessions without `.env`.
 
 ## Verify
 
