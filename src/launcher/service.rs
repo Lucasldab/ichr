@@ -22,8 +22,8 @@ use crate::persistence::paths::AppPaths;
 use crate::tasks::job::{JobId, TaskEvent};
 
 use super::argfile::{argfile_path, write_argfile};
-use super::command::compose;
-use super::offline::offline_auth;
+use super::command::{compose, compose_msa};
+use super::offline::{offline_auth, MsaAuth};
 use super::spawn::run_process;
 
 /// Phase 3 Java resolver: env var override, fall back to `"java"` from PATH.
@@ -38,8 +38,14 @@ pub fn resolve_java_bin() -> PathBuf {
     PathBuf::from("java")
 }
 
-/// Launch `slug` in offline mode under `username`. Emits `TaskEvent::Progress`
+/// Launch `slug` using the provided `auth_ctx`. Emits `TaskEvent::Progress`
 /// messages at each step to `tx`.
+///
+/// - `AuthContext::Offline { username }`: identical to the Phase 3 offline path.
+/// - `AuthContext::Msa { account_id }`: resolves live MC tokens via
+///   `account_service` and populates `SubstitutionContext` with real session
+///   fields. Requires `account_service.is_some()`; returns
+///   `AppError::NoActiveAccount` if `None` is passed.
 ///
 /// Returns the play duration in milliseconds on a clean exit.
 /// Returns `AppError::Cancelled` if the `token` is cancelled during the game.
@@ -47,10 +53,12 @@ pub fn resolve_java_bin() -> PathBuf {
 /// where `message` contains the ring-buffered log tail from `spawn::run_process`.
 /// Returns `AppError::VersionNotInstalled { slug }` if the client jar is absent
 /// (short-circuits before anything is spawned).
+#[tracing::instrument(skip_all, fields(slug = %slug))]
 pub async fn launch_instance(
     paths: &AppPaths,
     slug: &str,
-    username: &str,
+    auth_ctx: crate::auth::AuthContext,
+    account_service: Option<&crate::auth::service::AccountService>,
     tx: mpsc::Sender<TaskEvent>,
     token: CancellationToken,
     job_id: JobId,
@@ -77,10 +85,24 @@ pub async fn launch_instance(
 
     // Step 5 — compose the LaunchCommand
     send_progress(&tx, job_id, 25, "composing command").await;
-    let auth = offline_auth(username);
     let ctx = RuleContext::current();
     let java = resolve_java_bin();
-    let cmd = compose(&version, &auth, paths, slug, &ctx, &java)?;
+    let cmd = match auth_ctx {
+        crate::auth::AuthContext::Offline { username } => {
+            let auth = offline_auth(&username);
+            compose(&version, &auth, paths, slug, &ctx, &java)?
+        }
+        crate::auth::AuthContext::Msa { account_id } => {
+            let svc = account_service.ok_or(AppError::NoActiveAccount)?;
+            send_progress(&tx, job_id, 28, "refreshing MSA tokens").await;
+            let tokens = svc
+                .resolve_msa_tokens_for_launch(&account_id)
+                .await
+                .map_err(AppError::Auth)?;
+            let auth = MsaAuth::from_tokens(&tokens);
+            compose_msa(&version, &auth, paths, slug, &ctx, &java)?
+        }
+    };
 
     // Step 6 — probe Java binary is invocable
     send_progress(&tx, job_id, 35, "checking java").await;
@@ -240,7 +262,8 @@ mod tests {
         // client.jar intentionally NOT created
         let (tx, _rx) = mpsc::channel::<TaskEvent>(16);
         let token = CancellationToken::new();
-        let result = launch_instance(&paths, "x", "TestUser", tx, token, JobId(1)).await;
+        let auth_ctx = crate::auth::AuthContext::Offline { username: "TestUser".to_string() };
+        let result = launch_instance(&paths, "x", auth_ctx, None, tx, token, JobId(1)).await;
         assert!(
             matches!(result, Err(AppError::VersionNotInstalled { .. })),
             "expected VersionNotInstalled; got {result:?}"

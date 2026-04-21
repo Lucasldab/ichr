@@ -10,6 +10,7 @@ use tempfile::TempDir;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
+use mineltui::auth::AuthContext;
 use mineltui::error::AppError;
 use mineltui::install::install_version;
 use mineltui::launcher::service::launch_instance;
@@ -70,7 +71,8 @@ async fn test_end_to_end_launch_1_20_4() {
     let result = launch_instance(
         &paths,
         &inst.slug,
-        "TestUser",
+        AuthContext::Offline { username: "TestUser".to_string() },
+        None,
         launch_tx,
         token.clone(),
         JobId(2),
