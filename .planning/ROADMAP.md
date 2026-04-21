@@ -87,7 +87,7 @@ mineltui is a terminal-UI Minecraft Java Edition launcher built in Rust + ratatu
 - [x] 04-05-chain-orchestrator-PLAN.md — run_full_auth + ensure_valid_mc_token composing XBL/XSTS/MC + end-to-end httpmock tests
 - [x] 04-06-account-store-PLAN.md — keyring-first + AES-256-GCM encrypted-file fallback (machine-id key, 0600 perms) + accounts.json metadata persistence
 - [x] 04-07-account-service-PLAN.md — AccountService facade: start_device_code_auth / list / remove / activate / resolve_auth_context_for_launch / resolve_msa_tokens_for_launch
-- [ ] 04-08-launcher-integration-PLAN.md — launch_instance signature change (AuthContext enum + Option<AccountService>), compose_msa, MsaAuth adapter, offline path byte-identical
+- [x] 04-08-launcher-integration-PLAN.md — launch_instance signature change (AuthContext enum + Option<AccountService>), compose_msa, MsaAuth adapter, offline path byte-identical
 - [ ] 04-09-tui-wiring-PLAN.md — AccountsList + AddAccountDeviceCode + AccountAuthFailed views; capital A keybind; 10 new Actions + 4 new Effects; 10 new tui_smoke tests
 - [ ] 04-10-integration-validation-PLAN.md — tests/auth_chain.rs mocked end-to-end + tests/msa_chain_live.rs live smoke (#[ignore]) + VALIDATION.md populate + human checkpoint
 **UI hint**: yes
@@ -199,7 +199,7 @@ Phases execute in numeric order. Phases 3 and 4 have no interdependency after Ph
 | 1. Project Scaffold and Core Infrastructure | 6/6 | Complete   | 2026-04-20 |
 | 2. Mojang Protocol and Instance Management | 8/8 | Complete   | 2026-04-20 |
 | 3. Launcher Process and Offline Launch | 6/6 | Complete   | 2026-04-21 |
-| 4. Microsoft Authentication | 7/10 | In Progress|  |
+| 4. Microsoft Authentication | 8/10 | In Progress|  |
 | 5. Java Runtime Management | 0/? | Not started | - |
 | 6. Fabric and Quilt Modloaders | 0/? | Not started | - |
 | 7. Forge and NeoForge Modloaders | 0/? | Not started | - |
