@@ -456,3 +456,125 @@ fn test_group_cancel_does_not_emit_effect() {
     assert!(effects.is_empty(), "cancel must not emit any Effect");
     assert!(matches!(state.active_view, ActiveView::InstanceList { .. }));
 }
+
+// ---- Phase 3 launch / stop / modal smoke tests (Task 03-05-02) --------------
+
+use tokio_util::sync::CancellationToken;
+
+#[test]
+fn test_enter_on_non_running_emits_launch_effect() {
+    let mut state = AppState {
+        active_view: ActiveView::InstanceList { selected: 0 },
+        instances: vec![make_instance("alpha", "Alpha", None)],
+        ..AppState::default()
+    };
+    let effects = update(&mut state, Action::LaunchInstance { slug: "alpha".into() });
+    assert_eq!(effects.len(), 1);
+    assert!(
+        matches!(&effects[0], Effect::LaunchInstance { slug } if slug == "alpha"),
+        "expected Effect::LaunchInstance(alpha), got {effects:?}"
+    );
+}
+
+#[test]
+fn test_enter_on_running_is_noop() {
+    let mut state = AppState {
+        active_view: ActiveView::InstanceList { selected: 0 },
+        instances: vec![make_instance("alpha", "Alpha", None)],
+        ..AppState::default()
+    };
+    state.running_instances.insert("alpha".into(), CancellationToken::new());
+    let effects = update(&mut state, Action::LaunchInstance { slug: "alpha".into() });
+    assert!(effects.is_empty(), "launching an already-running instance must be a no-op");
+}
+
+#[test]
+fn test_s_on_running_emits_kill_effect() {
+    let mut state = AppState::default();
+    state.running_instances.insert("beta".into(), CancellationToken::new());
+    let effects = update(&mut state, Action::StopInstance { slug: "beta".into() });
+    assert_eq!(effects.len(), 1);
+    assert!(
+        matches!(&effects[0], Effect::KillProcess { slug } if slug == "beta"),
+        "expected Effect::KillProcess(beta), got {effects:?}"
+    );
+}
+
+#[test]
+fn test_launch_failed_transitions_to_modal() {
+    let mut state = AppState::default();
+    state.running_instances.insert("gamma".into(), CancellationToken::new());
+    let effects = update(
+        &mut state,
+        Action::LaunchFailed {
+            slug: "gamma".into(),
+            error: "boom".into(),
+            log_tail: "line1".into(),
+        },
+    );
+    assert!(effects.is_empty(), "LaunchFailed should produce no effects");
+    assert!(
+        !state.running_instances.contains_key("gamma"),
+        "slug must be removed from running_instances after LaunchFailed"
+    );
+    let av = &state.active_view;
+    assert!(
+        matches!(av, ActiveView::LaunchFailedModal { slug, error, .. }
+            if slug == "gamma" && error == "boom"),
+        "expected LaunchFailedModal, got {av:?}"
+    );
+}
+
+#[test]
+fn test_instance_exited_refreshes_list() {
+    let mut state = AppState::default();
+    state.running_instances.insert("delta".into(), CancellationToken::new());
+    let effects = update(
+        &mut state,
+        Action::InstanceExited { slug: "delta".into(), duration_ms: 1234 },
+    );
+    assert!(
+        !state.running_instances.contains_key("delta"),
+        "slug must be removed from running_instances after InstanceExited"
+    );
+    assert!(
+        effects.iter().any(|e| matches!(e, Effect::FetchInstances)),
+        "expected FetchInstances effect after exit"
+    );
+}
+
+#[test]
+fn test_launch_job_started_inserts_token() {
+    let mut state = AppState::default();
+    assert!(!state.running_instances.contains_key("epsilon"));
+    let token = CancellationToken::new();
+    let effects = update(
+        &mut state,
+        Action::LaunchJobStarted { slug: "epsilon".into(), token },
+    );
+    assert!(effects.is_empty(), "LaunchJobStarted must produce no effects");
+    assert!(
+        state.running_instances.contains_key("epsilon"),
+        "LaunchJobStarted must insert slug into running_instances"
+    );
+}
+
+#[test]
+fn test_d_on_running_is_noop() {
+    use mineltui::tui::run::map_event_pub;
+    use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
+
+    let mut state = AppState {
+        active_view: ActiveView::InstanceList { selected: 0 },
+        instances: vec![make_instance("zeta", "Zeta", None)],
+        ..AppState::default()
+    };
+    state.running_instances.insert("zeta".into(), CancellationToken::new());
+
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+    let action = map_event_pub(ev, &state);
+    assert!(
+        action.is_none(),
+        "pressing d on a running instance must return None, got {action:?}"
+    );
+}

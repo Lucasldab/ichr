@@ -20,6 +20,7 @@ use tokio::time::interval;
 use super::app::{update, Action, ActiveView, AppState, CreateStep, Effect, VersionFilter};
 use super::terminal::Tui;
 use super::view::view;
+use crate::launcher;
 use crate::mojang::client::MojangClient;
 use crate::mojang::types::VersionEntry;
 use crate::persistence::paths::AppPaths;
@@ -121,7 +122,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
                     Some(Ok(ev)) => {
                         if let Some(action) = map_event(ev, &state) {
                             let effects = update(&mut state, action);
-                            execute_effects(effects, &paths, Arc::clone(&mojang), &task_manager, &action_tx).await;
+                            execute_effects(effects, &state, &paths, Arc::clone(&mojang), &task_manager, &action_tx).await;
                         }
                     }
                     Some(Err(e)) => {
@@ -135,7 +136,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
                 match maybe_action {
                     Some(action) => {
                         let effects = update(&mut state, action);
-                        execute_effects(effects, &paths, Arc::clone(&mojang), &task_manager, &action_tx).await;
+                        execute_effects(effects, &state, &paths, Arc::clone(&mojang), &task_manager, &action_tx).await;
                     }
                     None => break,
                 }
@@ -155,6 +156,12 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
 }
 
 /// Translate a crossterm event into an `Action` based on the current view context.
+///
+/// `map_event_pub` is the public alias used by integration tests.
+pub fn map_event_pub(ev: CtEvent, state: &AppState) -> Option<Action> {
+    map_event(ev, state)
+}
+
 fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
     // Global: Ctrl+C always quits.
     if let CtEvent::Key(KeyEvent { code: KeyCode::Char('c'), modifiers, .. }) = &ev {
@@ -172,6 +179,7 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         ActiveView::DeleteConfirm { .. } => map_delete_confirm_event(ev),
         ActiveView::RenameInline { .. } => map_rename_inline_event(ev, state),
         ActiveView::GroupInline { .. } => map_group_inline_event(ev, state),
+        ActiveView::LaunchFailedModal { .. } => map_launch_failed_modal_event(ev),
     }
 }
 
@@ -180,6 +188,28 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         CtEvent::Key(KeyEvent { code: KeyCode::Char('q'), .. }) => Some(Action::Quit),
         CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::Quit),
         CtEvent::Key(KeyEvent { code: KeyCode::Char('c'), .. }) => Some(Action::OpenCreateModal),
+        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
+            if let ActiveView::InstanceList { selected } = &state.active_view {
+                if let Some(m) = state.instances.get(*selected) {
+                    if state.running_instances.contains_key(&m.slug) {
+                        // Already running — no-op (T-03-05-01 belt-and-suspenders).
+                        return None;
+                    }
+                    return Some(Action::LaunchInstance { slug: m.slug.clone() });
+                }
+            }
+            None
+        }
+        CtEvent::Key(KeyEvent { code: KeyCode::Char('s'), .. }) => {
+            if let ActiveView::InstanceList { selected } = &state.active_view {
+                if let Some(m) = state.instances.get(*selected) {
+                    if state.running_instances.contains_key(&m.slug) {
+                        return Some(Action::StopInstance { slug: m.slug.clone() });
+                    }
+                }
+            }
+            None
+        }
         CtEvent::Key(KeyEvent { code: KeyCode::Char('r'), .. }) => {
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
@@ -195,6 +225,10 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         CtEvent::Key(KeyEvent { code: KeyCode::Char('d'), .. }) => {
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
+                    // T-03-05-02: block deletion of a running instance.
+                    if state.running_instances.contains_key(&m.slug) {
+                        return None;
+                    }
                     return Some(Action::OpenDeleteConfirm {
                         slug: m.slug.clone(),
                         display_name: m.display_name.clone(),
@@ -222,6 +256,13 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         | CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
             Some(Action::MoveSelection(-1))
         }
+        _ => None,
+    }
+}
+
+fn map_launch_failed_modal_event(ev: CtEvent) -> Option<Action> {
+    match ev {
+        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CloseModal),
         _ => None,
     }
 }
@@ -328,8 +369,12 @@ fn map_group_inline_event(ev: CtEvent, state: &AppState) -> Option<Action> {
 
 /// Execute declarative side-effects. Keeps `update` pure.
 /// Match is exhaustive — no SpawnVersionInstall arm, no dead-code branches.
+///
+/// `state` is the just-updated state (after `update()` ran) — read-only.
+/// Used by Effect::LaunchInstance to look up the instance display_name (username).
 async fn execute_effects(
     effects: Vec<Effect>,
+    state: &AppState,
     paths: &AppPaths,
     mojang: Arc<MojangClient>,
     task_manager: &TaskManager,
@@ -500,6 +545,72 @@ async fn execute_effects(
                         }
                     }
                 });
+            }
+
+            Effect::LaunchInstance { slug } => {
+                // Look up username (display_name) from current state — used as offline username.
+                let username = state
+                    .instances
+                    .iter()
+                    .find(|m| m.slug == slug)
+                    .map(|m| m.display_name.clone())
+                    .unwrap_or_else(|| slug.clone());
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                let job_id = task_manager.next_job_id();
+                let slug_for_task = slug.clone();
+                task_manager.spawn_task(job_id, move |task_tx, token| async move {
+                    let slug = slug_for_task;
+                    // Store the token in state via LaunchJobStarted BEFORE blocking on launch.
+                    let _ = tx
+                        .send(Action::LaunchJobStarted { slug: slug.clone(), token: token.clone() })
+                        .await;
+                    let _ = tx.send(Action::InstanceLaunched { slug: slug.clone() }).await;
+                    let res = launcher::service::launch_instance(
+                        &paths2,
+                        &slug,
+                        &username,
+                        task_tx,
+                        token,
+                        job_id,
+                    )
+                    .await;
+                    match res {
+                        Ok(duration_ms) => {
+                            let _ = tx.send(Action::InstanceExited { slug, duration_ms }).await;
+                        }
+                        Err(crate::error::AppError::Cancelled) => {
+                            let _ = tx
+                                .send(Action::InstanceExited { slug, duration_ms: 0 })
+                                .await;
+                        }
+                        Err(crate::error::AppError::LaunchFailed { code, message }) => {
+                            let _ = tx
+                                .send(Action::LaunchFailed {
+                                    slug,
+                                    error: format!("exit code {code}"),
+                                    log_tail: message,
+                                })
+                                .await;
+                        }
+                        Err(e) => {
+                            let _ = tx
+                                .send(Action::LaunchFailed {
+                                    slug,
+                                    error: e.to_string(),
+                                    log_tail: String::new(),
+                                })
+                                .await;
+                        }
+                    }
+                    Ok(())
+                });
+            }
+
+            Effect::KillProcess { slug } => {
+                if let Some(token) = state.running_instances.get(&slug) {
+                    token.cancel();
+                }
             }
         }
     }
