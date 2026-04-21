@@ -49,6 +49,7 @@ oauth2 = { version = "5", default-features = false, features = ["reqwest", "rust
 keyring = "3.6.3"
 aes-gcm = "0.10.3"
 base64 = "0.22"
+dotenvy = "0.15"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "test-util"] }
