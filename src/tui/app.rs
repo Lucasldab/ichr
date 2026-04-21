@@ -1,4 +1,4 @@
-//! Elm-style app state for Phase 2 + Phase 3.
+//! Elm-style app state for Phase 2 + Phase 3 + Phase 4.
 //!
 //! Phase 1 variants (Quit, Task, Tick) are preserved. Phase 2 adds view
 //! navigation (OpenCreateModal, CloseModal, ConfirmDelete, ...), instance
@@ -7,11 +7,15 @@
 //! Phase 3 adds the launch lifecycle (LaunchInstance, LaunchJobStarted,
 //! InstanceLaunched, InstanceExited, LaunchFailed, StopInstance), the
 //! running_instances map (slug to CancellationToken), and LaunchFailedModal.
+//! Phase 4 adds Microsoft account management (AccountsList, AddAccountDeviceCode,
+//! AccountAuthFailed views) and the MSA launch integration via AuthContext.
 
 use std::collections::HashMap;
+use std::time::Instant;
 
 use tokio_util::sync::CancellationToken;
 
+use crate::auth::{Account, AuthContext};
 use crate::domain::platform::{Arch, OsName};
 use crate::domain::InstanceManifest;
 use crate::mojang::types::VersionEntry;
@@ -41,6 +45,18 @@ pub enum ActiveView {
     /// Launch-failed modal — shown when Action::LaunchFailed is dispatched.
     /// Esc dismisses and returns to InstanceList.
     LaunchFailedModal { slug: String, error: String, log_tail: String },
+    /// AUTH-06 account list view. Entered via `A` from InstanceList.
+    AccountsList { selected: usize },
+    /// AUTH-01 device-code modal. `expires_at` drives the countdown;
+    /// the render loop recomputes "seconds remaining" each frame.
+    AddAccountDeviceCode {
+        user_code: String,
+        verification_uri: String,
+        expires_at: Instant,
+        stage: String,
+    },
+    /// AUTH-02 error modal (e.g., "No Xbox profile — visit xbox.com/profile").
+    AccountAuthFailed { reason: String },
 }
 
 impl Default for ActiveView {
@@ -63,6 +79,14 @@ pub struct AppState {
     /// Tracks slug → CancellationToken for every currently-running launch job.
     /// Populated by Action::LaunchJobStarted; cleared by InstanceExited / LaunchFailed.
     pub running_instances: HashMap<String, CancellationToken>,
+    /// Persisted list of Microsoft accounts.
+    pub accounts: Vec<Account>,
+    /// id of the currently-active account, if any. Drives whether
+    /// Effect::LaunchInstance builds AuthContext::Msa or Offline.
+    pub active_account_id: Option<String>,
+    /// Cancellation token for the currently-active
+    /// start_device_code_auth job. Cleared on Completion/Failure/Cancel.
+    pub add_account_cancel: Option<CancellationToken>,
 }
 
 
@@ -104,6 +128,22 @@ pub enum Action {
     BackspaceGroup,
     SubmitGroup,
     CancelGroupInput,
+
+    // Phase 4: accounts
+    OpenAccounts,
+    CloseAccounts,
+    AccountsLoaded(Vec<Account>),
+    AddAccount,
+    AccountAuthStarted { user_code: String, verification_uri: String, expires_at: Instant },
+    AccountAuthProgress { stage: String },
+    AccountAdded { account: Account },
+    AccountAuthFailed { reason: String },
+    RemoveAccount { id: String },
+    ActivateAccount { id: String },
+    CancelAddAccount,
+    /// Internal — stores the CancellationToken created by execute_effects for
+    /// the device-code auth task into state.add_account_cancel.
+    AddAccountTokenCreated(CancellationToken),
 
     // Phase 3: launch lifecycle
     /// Dispatch when Enter is pressed on a non-running instance row.
@@ -151,10 +191,19 @@ pub enum Effect {
         version_sha1: String,
     },
     SetGroup { slug: String, group: Option<String> },
-    /// Spawn a launch_instance task for the given slug.
-    LaunchInstance { slug: String },
+    /// Spawn a launch_instance task. auth_ctx built by update() from
+    /// state.active_account_id + instance display_name.
+    LaunchInstance { slug: String, auth_ctx: AuthContext },
     /// Cancel the running launch task for the given slug.
     KillProcess { slug: String },
+    /// Spawn the device-code auth task (AccountService::start_device_code_auth).
+    StartDeviceCodeAuth,
+    /// Remove account via AccountService::remove_account, then reload list.
+    RemoveAccount { id: String },
+    /// Activate account via AccountService::activate_account, then reload list.
+    ActivateAccount { id: String },
+    /// Reload the account list from store (AccountService::list_accounts).
+    FetchAccounts,
 }
 
 /// Apply an `Action`, mutate `state`, and return the side-effects to execute.
@@ -210,12 +259,22 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
         Action::MoveSelection(delta) => {
-            if let ActiveView::InstanceList { selected } = &mut state.active_view {
-                let len = state.instances.len() as isize;
-                if len > 0 {
-                    let new_idx = (*selected as isize + delta).rem_euclid(len);
-                    *selected = new_idx as usize;
+            match &mut state.active_view {
+                ActiveView::InstanceList { selected } => {
+                    let len = state.instances.len() as isize;
+                    if len > 0 {
+                        let new_idx = (*selected as isize + delta).rem_euclid(len);
+                        *selected = new_idx as usize;
+                    }
                 }
+                ActiveView::AccountsList { selected } => {
+                    let len = state.accounts.len() as isize;
+                    if len > 0 {
+                        let new_idx = (*selected as isize + delta).rem_euclid(len);
+                        *selected = new_idx as usize;
+                    }
+                }
+                _ => {}
             }
             vec![]
         }
@@ -408,13 +467,106 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
 
+        // Phase 4: accounts
+        Action::OpenAccounts => {
+            state.active_view = ActiveView::AccountsList { selected: 0 };
+            vec![Effect::FetchAccounts]
+        }
+        Action::CloseAccounts => {
+            if let Some(tok) = state.add_account_cancel.take() {
+                tok.cancel();
+            }
+            state.active_view = ActiveView::default();
+            vec![]
+        }
+        Action::AccountsLoaded(list) => {
+            state.active_account_id = list
+                .iter()
+                .find(|a| a.is_active)
+                .map(|a| a.id.clone());
+            state.accounts = list;
+            vec![]
+        }
+        Action::AddAccount => {
+            vec![Effect::StartDeviceCodeAuth]
+        }
+        Action::AccountAuthStarted { user_code, verification_uri, expires_at } => {
+            state.active_view = ActiveView::AddAccountDeviceCode {
+                user_code,
+                verification_uri,
+                expires_at,
+                stage: "waiting for user".into(),
+            };
+            vec![]
+        }
+        Action::AccountAuthProgress { stage } => {
+            if let ActiveView::AddAccountDeviceCode { stage: s, .. } = &mut state.active_view {
+                *s = stage;
+            }
+            vec![]
+        }
+        Action::AccountAdded { account } => {
+            state.add_account_cancel = None;
+            if account.is_active {
+                state.active_account_id = Some(account.id.clone());
+            }
+            if let Some(existing) = state.accounts.iter_mut().find(|a| a.id == account.id) {
+                *existing = account;
+            } else {
+                state.accounts.push(account);
+            }
+            state.active_view = ActiveView::AccountsList { selected: 0 };
+            vec![Effect::FetchAccounts]
+        }
+        Action::AccountAuthFailed { reason } => {
+            state.add_account_cancel = None;
+            state.active_view = ActiveView::AccountAuthFailed { reason };
+            vec![]
+        }
+        Action::RemoveAccount { id } => {
+            state.accounts.retain(|a| a.id != id);
+            if state.active_account_id.as_deref() == Some(id.as_str()) {
+                state.active_account_id = None;
+            }
+            vec![Effect::RemoveAccount { id }]
+        }
+        Action::ActivateAccount { id } => {
+            for a in state.accounts.iter_mut() {
+                a.is_active = a.id == id;
+            }
+            state.active_account_id = Some(id.clone());
+            vec![Effect::ActivateAccount { id }]
+        }
+        Action::CancelAddAccount => {
+            if let Some(tok) = state.add_account_cancel.take() {
+                tok.cancel();
+            }
+            state.active_view = ActiveView::AccountsList { selected: 0 };
+            vec![]
+        }
+        Action::AddAccountTokenCreated(token) => {
+            state.add_account_cancel = Some(token);
+            vec![]
+        }
+
         // Phase 3: launch lifecycle
         Action::LaunchInstance { slug } => {
             if state.running_instances.contains_key(&slug) {
                 // Belt-and-suspenders: already running, no-op (T-03-05-01).
                 vec![]
             } else {
-                vec![Effect::LaunchInstance { slug }]
+                let display_name = state
+                    .instances
+                    .iter()
+                    .find(|m| m.slug == slug)
+                    .map(|m| m.display_name.clone())
+                    .unwrap_or_else(|| slug.clone());
+                let auth_ctx = if let Some(aid) = state.active_account_id.clone() {
+                    AuthContext::Msa { account_id: aid }
+                } else {
+                    AuthContext::Offline { username: display_name }
+                };
+                vec![Effect::LaunchInstance { slug, auth_ctx }]
             }
         }
         Action::LaunchJobStarted { slug, token } => {
@@ -444,5 +596,130 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             }
             vec![Effect::KillProcess { slug }]
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::auth::StorageBackend;
+
+    fn sample_account(id: &str, active: bool) -> Account {
+        Account {
+            id: id.into(),
+            mc_username: format!("P{id}"),
+            mc_uuid: format!("{id:0>8}-0000-4000-8000-000000000000"),
+            mc_token_expires_at: 0,
+            msa_token_expires_at: 0,
+            added_at: 0,
+            last_refreshed_at: 0,
+            is_active: active,
+            storage: StorageBackend::EncryptedFile,
+        }
+    }
+
+    #[test]
+    fn test_open_accounts_fetches_list() {
+        let mut state = AppState::default();
+        let effects = update(&mut state, Action::OpenAccounts);
+        assert!(matches!(state.active_view, ActiveView::AccountsList { selected: 0 }));
+        assert!(matches!(effects.as_slice(), [Effect::FetchAccounts]));
+    }
+
+    #[test]
+    fn test_accounts_loaded_derives_active_id() {
+        let mut state = AppState::default();
+        let list = vec![sample_account("A", false), sample_account("B", true)];
+        let _ = update(&mut state, Action::AccountsLoaded(list));
+        assert_eq!(state.active_account_id.as_deref(), Some("B"));
+        assert_eq!(state.accounts.len(), 2);
+    }
+
+    #[test]
+    fn test_activate_account_sets_active_id_exclusively() {
+        let mut state = AppState::default();
+        state.accounts = vec![sample_account("A", true), sample_account("B", false)];
+        state.active_account_id = Some("A".into());
+        let effects = update(&mut state, Action::ActivateAccount { id: "B".into() });
+        assert_eq!(state.active_account_id.as_deref(), Some("B"));
+        assert!(state.accounts.iter().find(|a| a.id == "B").unwrap().is_active);
+        assert!(!state.accounts.iter().find(|a| a.id == "A").unwrap().is_active);
+        assert!(matches!(effects.as_slice(), [Effect::ActivateAccount { .. }]));
+    }
+
+    #[test]
+    fn test_remove_active_account_clears_active_id() {
+        let mut state = AppState::default();
+        state.accounts = vec![sample_account("A", true)];
+        state.active_account_id = Some("A".into());
+        let _ = update(&mut state, Action::RemoveAccount { id: "A".into() });
+        assert!(state.active_account_id.is_none());
+        assert!(state.accounts.is_empty());
+    }
+
+    #[test]
+    fn test_launch_instance_with_active_account_builds_msa_context() {
+        let mut state = AppState::default();
+        state.instances.push(crate::domain::InstanceManifest::new(
+            "s".into(),
+            "s".into(),
+            "1.21.4".into(),
+        ));
+        state.active_account_id = Some("id-1".into());
+        let effects = update(&mut state, Action::LaunchInstance { slug: "s".into() });
+        match effects.as_slice() {
+            [Effect::LaunchInstance { auth_ctx: AuthContext::Msa { account_id }, .. }] => {
+                assert_eq!(account_id, "id-1");
+            }
+            other => panic!("expected Msa LaunchInstance; got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_launch_instance_without_active_account_builds_offline_context() {
+        let mut state = AppState::default();
+        // new(display_name, slug, mc_version_id)
+        let m = crate::domain::InstanceManifest::new("Pretty".into(), "s".into(), "1.21.4".into());
+        state.instances.push(m);
+        assert!(state.active_account_id.is_none());
+        let effects = update(&mut state, Action::LaunchInstance { slug: "s".into() });
+        match effects.as_slice() {
+            [Effect::LaunchInstance { auth_ctx: AuthContext::Offline { username }, .. }] => {
+                assert_eq!(username, "Pretty");
+            }
+            other => panic!("expected Offline LaunchInstance; got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_account_auth_started_transitions_to_modal() {
+        let mut state = AppState::default();
+        let _ = update(&mut state, Action::AccountAuthStarted {
+            user_code: "ABCD".into(),
+            verification_uri: "https://ms/link".into(),
+            expires_at: std::time::Instant::now() + std::time::Duration::from_secs(900),
+        });
+        assert!(matches!(state.active_view, ActiveView::AddAccountDeviceCode { .. }));
+    }
+
+    #[test]
+    fn test_account_auth_failed_transitions_to_failed_modal() {
+        let mut state = AppState::default();
+        let _ = update(&mut state, Action::AccountAuthFailed { reason: "no license".into() });
+        match &state.active_view {
+            ActiveView::AccountAuthFailed { reason } => assert_eq!(reason, "no license"),
+            other => panic!("expected AccountAuthFailed modal; got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_cancel_add_account_cancels_token_and_returns_to_list() {
+        let mut state = AppState::default();
+        let t = CancellationToken::new();
+        state.add_account_cancel = Some(t.clone());
+        let _ = update(&mut state, Action::CancelAddAccount);
+        assert!(t.is_cancelled());
+        assert!(state.add_account_cancel.is_none());
+        assert!(matches!(state.active_view, ActiveView::AccountsList { selected: 0 }));
     }
 }
