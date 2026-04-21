@@ -6,6 +6,7 @@ pub mod domain;
 pub mod error;
 pub mod install;
 pub mod instance;
+pub mod launcher;
 pub mod mojang;
 pub mod observability;
 pub mod persistence;
