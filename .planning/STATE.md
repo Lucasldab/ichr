@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-08-PLAN.md
-last_updated: "2026-04-21T04:10:04.307Z"
+stopped_at: Completed 04-09-tui-wiring-PLAN.md
+last_updated: "2026-04-21T04:23:01.292Z"
 last_activity: 2026-04-21
 progress:
   total_phases: 12
   completed_phases: 3
   total_plans: 31
-  completed_plans: 29
-  percent: 94
+  completed_plans: 30
+  percent: 97
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 ## Current Position
 
 Phase: 4 (Microsoft Authentication) — EXECUTING
-Plan: 9 of 10
+Plan: 10 of 10
 Status: Ready to execute
 Last activity: 2026-04-21
 
@@ -75,6 +75,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P06 | 25 | 1 tasks | 3 files |
 | Phase 04 P07 | 10 | 1 tasks | 1 files |
 | Phase 04 P08 | 217 | 1 tasks | 6 files |
+| Phase 04 P09 | 45 | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -133,6 +134,8 @@ Recent decisions affecting current work:
 - [Phase 04]: MsaAuth adapter struct lives in offline.rs alongside OfflineAuth — all auth-field production in one place
 - [Phase 04]: compose_msa is a parallel function to compose — avoids conditional branching in the hot path
 - [Phase 04]: account_service injected as Option<&AccountService> — testable without real account store; None returns AppError::NoActiveAccount
+- [Phase 04]: AuthContext built in update() and carried in Effect::LaunchInstance to preserve single-mutation-point invariant
+- [Phase 04]: AddAccountTokenCreated Action used to store CancellationToken into state (not passed via closure)
 
 ### Pending Todos
 
@@ -153,6 +156,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-21T04:10:04.303Z
-Stopped at: Completed 04-08-PLAN.md
+Last session: 2026-04-21T04:23:01.288Z
+Stopped at: Completed 04-09-tui-wiring-PLAN.md
 Resume file: None
