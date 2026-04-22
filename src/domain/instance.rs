@@ -7,6 +7,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::java::types::JavaRuntimeId;
+
 /// Opaque instance identifier. Equal to the slug string for v1.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct InstanceId(pub String);
@@ -67,6 +69,12 @@ pub struct InstanceManifest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group: Option<String>,
 
+    /// Per-instance Java runtime override. When `None`, the launcher uses the
+    /// Mojang-recommended JRE for the Minecraft version. Set by the user via
+    /// the instance settings UI (Phase 5+).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub java_override: Option<JavaRuntimeId>,
+
     #[serde(default)]
     pub total_play_time_ms: u64,
 }
@@ -86,6 +94,7 @@ impl InstanceManifest {
             last_played_at: None,
             notes: None,
             group: None,
+            java_override: None,
             total_play_time_ms: 0,
         }
     }
@@ -102,4 +111,43 @@ pub(crate) fn now_iso8601_utc() -> String {
         .unwrap_or(time::OffsetDateTime::UNIX_EPOCH);
     dt.format(&time::format_description::well_known::Rfc3339)
         .unwrap_or_else(|_| format!("{secs}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_java_override_backward_compat() {
+        // Legacy instance.json without java_override must deserialize to None.
+        let json = r#"{
+            "schema_version": 1,
+            "display_name": "Test",
+            "slug": "test",
+            "mc_version_id": "1.21.4",
+            "created_at": "2026-01-01T00:00:00Z",
+            "total_play_time_ms": 0
+        }"#;
+        let m: InstanceManifest = serde_json::from_str(json).unwrap();
+        assert!(m.java_override.is_none(), "legacy instance should have None java_override");
+    }
+
+    #[test]
+    fn test_java_override_none_not_serialized() {
+        let m = InstanceManifest::new("Test".into(), "test".into(), "1.21.4".into());
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(!json.contains("java_override"), "None override must not appear in JSON: {json}");
+    }
+
+    #[test]
+    fn test_java_override_roundtrip_mojang() {
+        let mut m = InstanceManifest::new("Test".into(), "test".into(), "1.21.4".into());
+        m.java_override = Some(JavaRuntimeId::Mojang { variant: "java-runtime-delta".into() });
+        let json = serde_json::to_string(&m).unwrap();
+        let parsed: InstanceManifest = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            parsed.java_override,
+            Some(JavaRuntimeId::Mojang { variant: "java-runtime-delta".into() })
+        );
+    }
 }
