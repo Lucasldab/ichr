@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-06-java-service-PLAN.md
-last_updated: "2026-04-22T02:48:58.543Z"
+stopped_at: Completed 05-07-launcher-integration-PLAN.md
+last_updated: "2026-04-22T02:59:07.624Z"
 last_activity: 2026-04-22
 progress:
   total_phases: 12
   completed_phases: 4
   total_plans: 40
-  completed_plans: 37
-  percent: 93
+  completed_plans: 38
+  percent: 95
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 ## Current Position
 
 Phase: 5 (Java Runtime Management) — EXECUTING
-Plan: 7 of 9
+Plan: 8 of 9
 Status: Ready to execute
 Last activity: 2026-04-22
 
@@ -82,6 +82,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P04 | 25 | 2 tasks | 2 files |
 | Phase 05 P05 | 15 | 1 tasks | 2 files |
 | Phase 05 P06 | 35 | 1 tasks | 3 files |
+| Phase 05 P07 | 20 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -152,6 +153,9 @@ Recent decisions affecting current work:
 - [Phase 05]: No glob/which crate — PATH split manually; read_dir for common dirs
 - [Phase 05]: tokio::sync::Mutex used for test env serialisation (avoids clippy::await_holding_lock)
 - [Phase 05]: MINELTUI_JAVA is step-1 early-return bypass; production code has zero hardcoded variant strings
+- [Phase 05]: resolve_java_bin() removed; JavaService::resolve_jre_for_launch is the sole Java resolution path in launch_instance
+- [Phase 05]: probe_java() spawn replaced with tokio::fs::try_exists guard post-resolve
+- [Phase 05]: JavaService held as Arc in run.rs, constructed once at startup alongside AccountService
 
 ### Pending Todos
 
@@ -172,6 +176,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-22T02:48:58.540Z
-Stopped at: Completed 05-06-java-service-PLAN.md
+Last session: 2026-04-22T02:59:07.620Z
+Stopped at: Completed 05-07-launcher-integration-PLAN.md
 Resume file: None

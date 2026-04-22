@@ -109,7 +109,7 @@ mineltui is a terminal-UI Minecraft Java Edition launcher built in Rust + ratatu
 - [x] 05-04-adoptium-PLAN.md — AdoptiumClient: fetch latest release for {major,arch,os}, SHA256-verified download, spawn_blocking .tar.gz/.zip extraction with top-level prefix strip
 - [x] 05-05-system-detect-PLAN.md — scan_system_javas: PATH iteration + common dirs scan, dedupe by canonical path, java -version stderr parse, 5s timeout
 - [x] 05-06-java-service-PLAN.md — JavaService facade: resolve_jre_for_launch 5-step precedence (env → override → Mojang → Adoptium → validate) + install_mojang/install_adoptium/list_system_javas/set_override_for_instance + instance::store::set_java_override
-- [ ] 05-07-launcher-integration-PLAN.md — Replace resolve_java_bin stub in launcher/service.rs with JavaService::resolve_jre_for_launch; Phase 3 snapshot regression guard preserved
+- [x] 05-07-launcher-integration-PLAN.md — Replace resolve_java_bin stub in launcher/service.rs with JavaService::resolve_jre_for_launch; Phase 3 snapshot regression guard preserved
 - [ ] 05-08-tui-java-picker-PLAN.md — j keybind on instance list → JavaPickerModal listing Auto + detected system Javas + Manual escape hatch; persist via SetJavaOverride effect (human-verify checkpoint)
 - [ ] 05-09-integration-validation-PLAN.md — tests/jre_live.rs (#[ignore] real Mojang download), 05-VALIDATION.md populate (17 rows), human checkpoint for fresh-data_dir launch → nyquist_compliant flip
 
@@ -209,7 +209,7 @@ Phases execute in numeric order. Phases 3 and 4 have no interdependency after Ph
 | 2. Mojang Protocol and Instance Management | 8/8 | Complete   | 2026-04-20 |
 | 3. Launcher Process and Offline Launch | 6/6 | Complete   | 2026-04-21 |
 | 4. Microsoft Authentication | 10/10 | Complete   | 2026-04-22 |
-| 5. Java Runtime Management | 6/9 | In Progress|  |
+| 5. Java Runtime Management | 7/9 | In Progress|  |
 | 6. Fabric and Quilt Modloaders | 0/? | Not started | - |
 | 7. Forge and NeoForge Modloaders | 0/? | Not started | - |
 | 8. Modrinth Integration | 0/? | Not started | - |
