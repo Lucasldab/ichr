@@ -6,6 +6,7 @@ pub mod auth;
 pub mod domain;
 pub mod error;
 pub mod install;
+pub mod java;
 pub mod instance;
 pub mod launcher;
 pub mod mojang;

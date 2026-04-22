@@ -166,6 +166,37 @@ impl AppPaths {
     pub fn accounts_json_file(&self) -> PathBuf {
         self.config_dir.join("accounts.json")
     }
+
+    /// Convenience alias for `runtime_dir()`.
+    ///
+    /// Phase 1 created `runtime_dir()` as a placeholder; Phase 5 reuses
+    /// the same path for managed JREs rather than nesting deeper.
+    /// See `.planning/phases/05-java-runtime-management/05-RESEARCH.md` §Pattern 6.
+    pub fn jres_dir(&self) -> PathBuf {
+        self.runtime_dir()
+    }
+
+    /// Directory for a specific managed JRE variant: `{runtime_dir}/{variant_id}`.
+    ///
+    /// `variant_id` is either a Mojang component string (e.g. `"java-runtime-delta"`)
+    /// or an Adoptium slug (e.g. `"adoptium-21"`).
+    pub fn jre_dir(&self, variant_id: &str) -> PathBuf {
+        self.runtime_dir().join(variant_id)
+    }
+
+    /// Path to the Java executable within a managed JRE.
+    ///
+    /// Returns `{jre_dir}/{variant_id}/bin/java` on Linux/macOS and
+    /// `{jre_dir}/{variant_id}/bin/java.exe` on Windows.
+    pub fn jre_executable(&self, variant_id: &str) -> PathBuf {
+        let bin = if cfg!(target_os = "windows") { "bin/java.exe" } else { "bin/java" };
+        self.jre_dir(variant_id).join(bin)
+    }
+
+    /// Cached per-variant JRE manifest JSON: `{runtime_dir}/{variant_id}-manifest.json`.
+    pub fn jre_manifest_cache(&self, variant_id: &str) -> PathBuf {
+        self.runtime_dir().join(format!("{variant_id}-manifest.json"))
+    }
 }
 
 /// Convenience: return `true` if `child` starts with `parent` after
@@ -173,6 +204,65 @@ impl AppPaths {
 #[doc(hidden)]
 pub fn path_starts_with(child: &Path, parent: &Path) -> bool {
     child.starts_with(parent)
+}
+
+#[cfg(test)]
+mod jre_paths_tests {
+    use super::*;
+
+    fn test_paths() -> AppPaths {
+        AppPaths::with_roots(
+            PathBuf::from("/data"),
+            PathBuf::from("/config"),
+            PathBuf::from("/cache"),
+        )
+    }
+
+    #[test]
+    fn test_jres_dir_equals_runtime_dir() {
+        let p = test_paths();
+        assert_eq!(p.jres_dir(), PathBuf::from("/data/runtime"));
+        assert_eq!(p.jres_dir(), p.runtime_dir());
+    }
+
+    #[test]
+    fn test_jre_dir_joins_variant() {
+        let p = test_paths();
+        assert_eq!(
+            p.jre_dir("java-runtime-delta"),
+            PathBuf::from("/data/runtime/java-runtime-delta")
+        );
+    }
+
+    #[test]
+    fn test_jre_executable_linux_bin() {
+        let p = test_paths();
+        let exe = p.jre_executable("java-runtime-delta");
+        // On Linux the executable ends with bin/java (no .exe)
+        #[cfg(not(target_os = "windows"))]
+        assert_eq!(exe, PathBuf::from("/data/runtime/java-runtime-delta/bin/java"));
+        #[cfg(target_os = "windows")]
+        assert_eq!(exe, PathBuf::from("/data/runtime/java-runtime-delta/bin/java.exe"));
+    }
+
+    #[test]
+    fn test_jre_executable_adoptium() {
+        let p = test_paths();
+        let exe = p.jre_executable("adoptium-21");
+        #[cfg(not(target_os = "windows"))]
+        assert_eq!(exe, PathBuf::from("/data/runtime/adoptium-21/bin/java"));
+        #[cfg(target_os = "windows")]
+        assert_eq!(exe, PathBuf::from("/data/runtime/adoptium-21/bin/java.exe"));
+    }
+
+    #[test]
+    fn test_jre_manifest_cache() {
+        let p = test_paths();
+        assert_eq!(
+            p.jre_manifest_cache("java-runtime-delta"),
+            PathBuf::from("/data/runtime/java-runtime-delta-manifest.json")
+        );
+    }
 }
 
 #[cfg(test)]
