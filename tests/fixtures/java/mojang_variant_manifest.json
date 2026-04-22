@@ -1,0 +1,16 @@
+{
+  "files": {
+    "bin": { "type": "directory" },
+    "bin/java": {
+      "type": "file",
+      "executable": true,
+      "downloads": {
+        "raw": { "sha1": "__SHA1_OF_FIXTURE_BYTES__", "size": 16, "url": "PLACEHOLDER/bin/java" }
+      }
+    },
+    "legal/LICENSE": {
+      "type": "link",
+      "target": "../java.base/LICENSE"
+    }
+  }
+}
