@@ -43,6 +43,8 @@ md-5 = { version = "0.10", default-features = false }
 sha1 = "0.10"
 sha2 = "0.11"
 zip = { version = "8", default-features = false, features = ["deflate", "zstd"] }
+flate2 = "1.1.9"
+tar = "0.4.45"
 
 # Auth (Phase 4)
 oauth2 = { version = "5", default-features = false, features = ["reqwest", "rustls-tls"] }

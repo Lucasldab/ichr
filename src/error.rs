@@ -50,6 +50,15 @@ pub enum AppError {
     #[error("Java binary not found: checked MINELTUI_JAVA env var and PATH")]
     JavaNotFound,
 
+    #[error("Java major version mismatch: Minecraft requires Java {required}, found Java {found} at {path:?} — {hint}")]
+    JavaMismatch { required: u32, found: u32, path: std::path::PathBuf, hint: String },
+
+    #[error("Failed to download Java runtime ({variant}): {reason}")]
+    JavaDownloadFailed { variant: String, reason: String },
+
+    #[error("Failed to extract Java runtime to {dest:?}: {reason}")]
+    JavaExtractFailed { dest: std::path::PathBuf, reason: String },
+
     #[error("Process spawn failed: {0}")]
     SpawnFailed(String),
 
@@ -61,3 +70,44 @@ pub enum AppError {
 }
 
 pub type Result<T> = std::result::Result<T, AppError>;
+
+#[cfg(test)]
+mod error_display_tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_java_mismatch_display_contains_both_versions() {
+        let e = AppError::JavaMismatch {
+            required: 21,
+            found: 17,
+            path: PathBuf::from("/usr/bin/java"),
+            hint: "Install Java 21".into(),
+        };
+        let s = e.to_string();
+        assert!(s.contains("21"), "expected '21' in: {s}");
+        assert!(s.contains("17"), "expected '17' in: {s}");
+    }
+
+    #[test]
+    fn test_java_download_failed_display() {
+        let e = AppError::JavaDownloadFailed {
+            variant: "adoptium-21".into(),
+            reason: "timeout".into(),
+        };
+        let s = e.to_string();
+        assert!(s.contains("adoptium-21"), "expected variant in: {s}");
+        assert!(s.contains("timeout"), "expected reason in: {s}");
+    }
+
+    #[test]
+    fn test_java_extract_failed_display() {
+        let e = AppError::JavaExtractFailed {
+            dest: PathBuf::from("/tmp/jre"),
+            reason: "corrupt archive".into(),
+        };
+        let s = e.to_string();
+        assert!(s.contains("jre"), "expected dest in: {s}");
+        assert!(s.contains("corrupt archive"), "expected reason in: {s}");
+    }
+}
