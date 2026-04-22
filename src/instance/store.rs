@@ -112,6 +112,21 @@ pub async fn list_instance_manifests(paths: &AppPaths) -> Result<Vec<InstanceMan
     Ok(out)
 }
 
+/// Atomically set or clear the `java_override` field on an instance manifest.
+///
+/// `None` clears the override (field omitted from serialized JSON per serde rules).
+#[tracing::instrument(skip_all, fields(slug))]
+pub async fn set_java_override(
+    paths: &AppPaths,
+    slug: &str,
+    override_id: Option<crate::java::types::JavaRuntimeId>,
+) -> Result<InstanceManifest, AppError> {
+    let mut m = read_instance_manifest(paths, slug).await?;
+    m.java_override = override_id;
+    write_instance_manifest(paths, &m).await?;
+    Ok(m)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
