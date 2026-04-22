@@ -736,6 +736,201 @@ fn test_accounts_loaded_sets_active_id() {
     assert_eq!(state.active_account_id.as_deref(), Some("A"));
 }
 
+// ---- Phase 5 Java picker smoke tests (Task 05-08-01) ------------------------
+
+use mineltui::java::detect::SystemJava;
+use mineltui::tui::app::JavaPickerRow;
+use mineltui::java::types::JavaRuntimeId;
+use std::path::PathBuf;
+
+fn make_system_java(path: &str, major: u32) -> SystemJava {
+    SystemJava { path: PathBuf::from(path), major_version: major }
+}
+
+// (1) j on a running instance is a no-op
+#[test]
+fn test_j_on_running_instance_is_noop() {
+    use mineltui::tui::run::map_event_pub;
+
+    let mut state = AppState {
+        active_view: ActiveView::InstanceList { selected: 0 },
+        instances: vec![make_instance("alpha", "Alpha", None)],
+        ..AppState::default()
+    };
+    state.running_instances.insert("alpha".into(), CancellationToken::new());
+
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+    let action = map_event_pub(ev, &state);
+    assert!(
+        action.is_none(),
+        "j on a running instance must be no-op, got {action:?}"
+    );
+}
+
+// (2) j on a non-running instance dispatches OpenJavaPicker + FetchSystemJavas effect
+#[test]
+fn test_j_on_non_running_opens_java_picker() {
+    use mineltui::tui::run::map_event_pub;
+
+    let state = AppState {
+        active_view: ActiveView::InstanceList { selected: 0 },
+        instances: vec![make_instance("beta", "Beta", None)],
+        ..AppState::default()
+    };
+
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+    let action = map_event_pub(ev, &state).expect("should emit Action");
+    assert!(
+        matches!(&action, Action::OpenJavaPicker { slug } if slug == "beta"),
+        "expected OpenJavaPicker(beta), got {action:?}"
+    );
+
+    // Dispatching it transitions state and emits FetchSystemJavas
+    let mut state2 = state;
+    let effects = update(&mut state2, action);
+    assert!(
+        matches!(&state2.active_view, ActiveView::JavaPickerModal { slug, .. } if slug == "beta"),
+        "expected JavaPickerModal after OpenJavaPicker"
+    );
+    assert!(
+        effects.iter().any(|e| matches!(e, Effect::FetchSystemJavas { slug } if slug == "beta")),
+        "expected FetchSystemJavas effect"
+    );
+}
+
+// (3) JavaPickerOptionsLoaded populates modal and resets selected to 0
+#[test]
+fn test_java_picker_options_loaded_populates_modal() {
+    let mut state = AppState {
+        active_view: ActiveView::JavaPickerModal {
+            slug: "gamma".into(),
+            options: vec![JavaPickerRow::Auto, JavaPickerRow::Manual],
+            selected: 1,
+        },
+        ..AppState::default()
+    };
+
+    let new_options = vec![
+        JavaPickerRow::Auto,
+        JavaPickerRow::Detected(make_system_java("/usr/bin/java", 21)),
+        JavaPickerRow::Manual,
+    ];
+    let _ = update(&mut state, Action::JavaPickerOptionsLoaded {
+        slug: "gamma".into(),
+        options: new_options,
+    });
+
+    match &state.active_view {
+        ActiveView::JavaPickerModal { options, selected, .. } => {
+            assert_eq!(options.len(), 3, "options must be replaced");
+            assert_eq!(*selected, 0, "selected must reset to 0");
+        }
+        other => panic!("expected JavaPickerModal, got {other:?}"),
+    }
+}
+
+// (4) JavaPickerMove wraps around
+#[test]
+fn test_java_picker_move_wraps_around() {
+    let mut state = AppState {
+        active_view: ActiveView::JavaPickerModal {
+            slug: "delta".into(),
+            options: vec![
+                JavaPickerRow::Auto,
+                JavaPickerRow::Detected(make_system_java("/usr/bin/java", 21)),
+                JavaPickerRow::Manual,
+            ],
+            selected: 0,
+        },
+        ..AppState::default()
+    };
+
+    // Move +1 three times: 0 -> 1 -> 2 -> 0 (wrap)
+    let _ = update(&mut state, Action::JavaPickerMove(1));
+    let _ = update(&mut state, Action::JavaPickerMove(1));
+    let _ = update(&mut state, Action::JavaPickerMove(1));
+
+    match &state.active_view {
+        ActiveView::JavaPickerModal { selected, .. } => {
+            assert_eq!(*selected, 0, "three +1 moves on 3 options must wrap back to 0");
+        }
+        other => panic!("expected JavaPickerModal, got {other:?}"),
+    }
+}
+
+// (5) Enter on Auto row emits SetJavaOverride with override_id: None
+#[test]
+fn test_java_picker_enter_on_auto_dispatches_set_override_none() {
+    let mut state = AppState {
+        active_view: ActiveView::JavaPickerModal {
+            slug: "epsilon".into(),
+            options: vec![
+                JavaPickerRow::Auto,
+                JavaPickerRow::Detected(make_system_java("/usr/bin/java", 21)),
+                JavaPickerRow::Manual,
+            ],
+            selected: 0, // Auto selected
+        },
+        ..AppState::default()
+    };
+
+    let effects = update(&mut state, Action::JavaPickerSelect);
+    assert!(
+        effects.iter().any(|e| matches!(e, Effect::SetJavaOverride { override_id: None, slug } if slug == "epsilon")),
+        "expected SetJavaOverride with None, got {effects:?}"
+    );
+    assert!(
+        matches!(state.active_view, ActiveView::InstanceList { .. }),
+        "modal must close after select"
+    );
+}
+
+// (6) Enter on Detected row emits SetJavaOverride with Some(System{...})
+#[test]
+fn test_java_picker_enter_on_detected_dispatches_set_override_system() {
+    let mut state = AppState {
+        active_view: ActiveView::JavaPickerModal {
+            slug: "zeta".into(),
+            options: vec![
+                JavaPickerRow::Auto,
+                JavaPickerRow::Detected(make_system_java("/usr/lib/jvm/java-21/bin/java", 21)),
+                JavaPickerRow::Manual,
+            ],
+            selected: 1, // Detected selected
+        },
+        ..AppState::default()
+    };
+
+    let effects = update(&mut state, Action::JavaPickerSelect);
+    let found = effects.iter().any(|e| {
+        matches!(e, Effect::SetJavaOverride {
+            slug,
+            override_id: Some(JavaRuntimeId::System { path, major_version: 21 }),
+        } if slug == "zeta" && path == &PathBuf::from("/usr/lib/jvm/java-21/bin/java"))
+    });
+    assert!(found, "expected SetJavaOverride with System{{path,21}}, got {effects:?}");
+}
+
+// (7) Esc returns to InstanceList with no Effect
+#[test]
+fn test_java_picker_esc_returns_to_instance_list() {
+    let mut state = AppState {
+        active_view: ActiveView::JavaPickerModal {
+            slug: "eta".into(),
+            options: vec![JavaPickerRow::Auto, JavaPickerRow::Manual],
+            selected: 0,
+        },
+        ..AppState::default()
+    };
+
+    let effects = update(&mut state, Action::JavaPickerCancel);
+    assert!(effects.is_empty(), "Esc must emit no effects");
+    assert!(
+        matches!(state.active_view, ActiveView::InstanceList { .. }),
+        "Esc must return to InstanceList"
+    );
+}
+
 // (10) MoveSelection in AccountsList updates selected index
 #[test]
 fn test_move_selection_in_accounts_list() {

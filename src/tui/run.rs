@@ -17,7 +17,7 @@ use ratatui::crossterm::event::{Event as CtEvent, EventStream, KeyCode, KeyEvent
 use tokio::sync::mpsc;
 use tokio::time::interval;
 
-use super::app::{update, Action, ActiveView, AppState, CreateStep, Effect, VersionFilter};
+use super::app::{update, Action, ActiveView, AppState, CreateStep, Effect, JavaPickerRow, VersionFilter};
 use super::terminal::Tui;
 use super::view::view;
 use crate::auth::service::{AccountAuthEvent, AccountService};
@@ -213,6 +213,9 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         ActiveView::AccountsList { .. } => map_accounts_list_event(ev, state),
         ActiveView::AddAccountDeviceCode { .. } => map_add_account_device_code_event(ev),
         ActiveView::AccountAuthFailed { .. } => map_account_auth_failed_event(ev),
+        ActiveView::JavaPickerModal { .. } => {
+            super::views::java_picker_modal::map_java_picker_event(ev)
+        }
     }
 }
 
@@ -286,14 +289,21 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         {
             Some(Action::OpenAccounts)
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Down, .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
-            Some(Action::MoveSelection(1))
+        CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
+            // `j` on a non-running instance opens the Java picker.
+            // On a running instance it is a no-op (can't change java mid-game).
+            if let ActiveView::InstanceList { selected } = &state.active_view {
+                if let Some(m) = state.instances.get(*selected) {
+                    if !state.running_instances.contains_key(&m.slug) {
+                        return Some(Action::OpenJavaPicker { slug: m.slug.clone() });
+                    }
+                }
+            }
+            None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Up, .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
-            Some(Action::MoveSelection(-1))
-        }
+        CtEvent::Key(KeyEvent { code: KeyCode::Down, .. }) => Some(Action::MoveSelection(1)),
+        CtEvent::Key(KeyEvent { code: KeyCode::Up, .. }) => Some(Action::MoveSelection(-1)),
+        CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => Some(Action::MoveSelection(-1)),
         _ => None,
     }
 }
@@ -781,6 +791,41 @@ async fn execute_effects(
                         }
                         Err(e) => {
                             let _ = tx.send(Action::ServiceErrored(e.to_string())).await;
+                        }
+                    }
+                });
+            }
+
+            Effect::FetchSystemJavas { slug } => {
+                let svc = Arc::clone(&java_service);
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    let system_javas = svc.list_system_javas().await;
+                    let mut options = vec![JavaPickerRow::Auto];
+                    for sj in system_javas {
+                        options.push(JavaPickerRow::Detected(sj));
+                    }
+                    options.push(JavaPickerRow::Manual);
+                    let _ = tx.send(Action::JavaPickerOptionsLoaded { slug, options }).await;
+                });
+            }
+
+            Effect::SetJavaOverride { slug, override_id } => {
+                let svc = Arc::clone(&java_service);
+                let paths = paths.clone();
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match svc.set_override_for_instance(&paths, &slug, override_id).await {
+                        Ok(()) => {
+                            let _ = tx.send(Action::JavaOverrideSet { slug }).await;
+                        }
+                        Err(e) => {
+                            let _ = tx
+                                .send(Action::JavaOverrideFailed {
+                                    slug,
+                                    reason: e.to_string(),
+                                })
+                                .await;
                         }
                     }
                 });

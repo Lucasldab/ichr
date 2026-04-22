@@ -12,6 +12,7 @@ use super::views::{
     delete_confirm::render_delete_confirm,
     download_pane::render_download_pane,
     instance_list::{render_group_inline_overlay, render_instance_list},
+    java_picker_modal::render_java_picker_modal,
     launch_failed_modal::render_launch_failed_modal,
     version_picker::render_version_picker,
 };
@@ -45,6 +46,7 @@ pub fn view(state: &AppState, f: &mut Frame) {
         ActiveView::AccountsList { .. } => render_accounts_list(f, main, state),
         ActiveView::AddAccountDeviceCode { .. } => render_add_account_device_code(f, main, state),
         ActiveView::AccountAuthFailed { .. } => render_account_auth_failed(f, main, state),
+        ActiveView::JavaPickerModal { .. } => render_java_picker_modal(f, main, state),
     }
 
     render_download_pane(f, dl, state);

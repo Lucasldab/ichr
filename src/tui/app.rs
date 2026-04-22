@@ -1,4 +1,4 @@
-//! Elm-style app state for Phase 2 + Phase 3 + Phase 4.
+//! Elm-style app state for Phase 2 + Phase 3 + Phase 4 + Phase 5.
 //!
 //! Phase 1 variants (Quit, Task, Tick) are preserved. Phase 2 adds view
 //! navigation (OpenCreateModal, CloseModal, ConfirmDelete, ...), instance
@@ -9,6 +9,8 @@
 //! running_instances map (slug to CancellationToken), and LaunchFailedModal.
 //! Phase 4 adds Microsoft account management (AccountsList, AddAccountDeviceCode,
 //! AccountAuthFailed views) and the MSA launch integration via AuthContext.
+//! Phase 5 adds the Java picker modal (JavaPickerModal view, OpenJavaPicker,
+//! JavaPickerOptionsLoaded, etc.) for per-instance java_override management.
 
 use std::collections::HashMap;
 use std::time::Instant;
@@ -18,6 +20,8 @@ use tokio_util::sync::CancellationToken;
 use crate::auth::{Account, AuthContext};
 use crate::domain::platform::{Arch, OsName};
 use crate::domain::InstanceManifest;
+use crate::java::detect::SystemJava;
+use crate::java::types::JavaRuntimeId;
 use crate::mojang::types::VersionEntry;
 use crate::tasks::{JobId, TaskEvent};
 
@@ -57,6 +61,24 @@ pub enum ActiveView {
     },
     /// AUTH-02 error modal (e.g., "No Xbox profile — visit xbox.com/profile").
     AccountAuthFailed { reason: String },
+    /// Java picker modal. `options` is populated after FetchSystemJavas completes.
+    /// `selected` is the highlighted row index (0 = Auto).
+    JavaPickerModal {
+        slug: String,
+        options: Vec<JavaPickerRow>,
+        selected: usize,
+    },
+}
+
+/// A row in the Java picker modal.
+#[derive(Debug, Clone)]
+pub enum JavaPickerRow {
+    /// Use the auto-resolve logic (clears java_override).
+    Auto,
+    /// A working system Java detected on the host.
+    Detected(SystemJava),
+    /// Escape hatch: user edits instance.json manually.
+    Manual,
 }
 
 impl Default for ActiveView {
@@ -145,6 +167,22 @@ pub enum Action {
     /// the device-code auth task into state.add_account_cancel.
     AddAccountTokenCreated(CancellationToken),
 
+    // Phase 5: Java picker
+    /// Open the Java picker for a specific instance (dispatched by `j` keybind).
+    OpenJavaPicker { slug: String },
+    /// Async result: detected system Javas are ready to populate the modal.
+    JavaPickerOptionsLoaded { slug: String, options: Vec<JavaPickerRow> },
+    /// Move the picker selection up/down (wrapping).
+    JavaPickerMove(isize),
+    /// Confirm the highlighted picker row.
+    JavaPickerSelect,
+    /// Dismiss the picker without mutating anything.
+    JavaPickerCancel,
+    /// Effect completed: java_override was written successfully.
+    JavaOverrideSet { slug: String },
+    /// Effect failed: java_override write returned an error.
+    JavaOverrideFailed { slug: String, reason: String },
+
     // Phase 3: launch lifecycle
     /// Dispatch when Enter is pressed on a non-running instance row.
     LaunchInstance { slug: String },
@@ -204,6 +242,10 @@ pub enum Effect {
     ActivateAccount { id: String },
     /// Reload the account list from store (AccountService::list_accounts).
     FetchAccounts,
+    /// Fetch detected system Javas then dispatch JavaPickerOptionsLoaded.
+    FetchSystemJavas { slug: String },
+    /// Atomically write (or clear) java_override on the instance manifest.
+    SetJavaOverride { slug: String, override_id: Option<JavaRuntimeId> },
 }
 
 /// Apply an `Action`, mutate `state`, and return the side-effects to execute.
@@ -586,6 +628,72 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             state.active_view = ActiveView::LaunchFailedModal { slug, error, log_tail };
             vec![]
         }
+        // Phase 5: Java picker
+        Action::OpenJavaPicker { slug } => {
+            // Block picker for running instances (can't change java mid-game).
+            if state.running_instances.contains_key(&slug) {
+                return vec![];
+            }
+            state.active_view = ActiveView::JavaPickerModal {
+                slug: slug.clone(),
+                options: vec![JavaPickerRow::Auto, JavaPickerRow::Manual],
+                selected: 0,
+            };
+            vec![Effect::FetchSystemJavas { slug }]
+        }
+        Action::JavaPickerOptionsLoaded { slug, options } => {
+            if let ActiveView::JavaPickerModal { slug: modal_slug, options: ref mut opts, selected } =
+                &mut state.active_view
+            {
+                if *modal_slug == slug {
+                    *opts = options;
+                    *selected = 0;
+                }
+            }
+            vec![]
+        }
+        Action::JavaPickerMove(delta) => {
+            if let ActiveView::JavaPickerModal { options, selected, .. } = &mut state.active_view {
+                let len = options.len() as isize;
+                if len > 0 {
+                    let new_idx = (*selected as isize + delta).rem_euclid(len);
+                    *selected = new_idx as usize;
+                }
+            }
+            vec![]
+        }
+        Action::JavaPickerSelect => {
+            if let ActiveView::JavaPickerModal { slug, options, selected } = state.active_view.clone() {
+                let override_id = match options.get(selected) {
+                    Some(JavaPickerRow::Auto) => None,
+                    Some(JavaPickerRow::Detected(sj)) => Some(JavaRuntimeId::System {
+                        path: sj.path.clone(),
+                        major_version: sj.major_version,
+                    }),
+                    Some(JavaPickerRow::Manual) | None => {
+                        // Manual row: just close, no mutation.
+                        state.active_view = ActiveView::default();
+                        return vec![];
+                    }
+                };
+                state.active_view = ActiveView::default();
+                return vec![Effect::SetJavaOverride { slug, override_id }];
+            }
+            vec![]
+        }
+        Action::JavaPickerCancel => {
+            state.active_view = ActiveView::default();
+            vec![]
+        }
+        Action::JavaOverrideSet { .. } => {
+            vec![Effect::FetchInstances]
+        }
+        Action::JavaOverrideFailed { reason, .. } => {
+            state.last_error = Some(reason);
+            state.active_view = ActiveView::default();
+            vec![Effect::FetchInstances]
+        }
+
         Action::StopInstance { slug } => {
             // Cancel and clear immediately so the running badge disappears on the
             // next render. The async launch task will later dispatch
@@ -637,9 +745,11 @@ mod tests {
 
     #[test]
     fn test_activate_account_sets_active_id_exclusively() {
-        let mut state = AppState::default();
-        state.accounts = vec![sample_account("A", true), sample_account("B", false)];
-        state.active_account_id = Some("A".into());
+        let mut state = AppState {
+            accounts: vec![sample_account("A", true), sample_account("B", false)],
+            active_account_id: Some("A".into()),
+            ..AppState::default()
+        };
         let effects = update(&mut state, Action::ActivateAccount { id: "B".into() });
         assert_eq!(state.active_account_id.as_deref(), Some("B"));
         assert!(state.accounts.iter().find(|a| a.id == "B").unwrap().is_active);
@@ -649,9 +759,11 @@ mod tests {
 
     #[test]
     fn test_remove_active_account_clears_active_id() {
-        let mut state = AppState::default();
-        state.accounts = vec![sample_account("A", true)];
-        state.active_account_id = Some("A".into());
+        let mut state = AppState {
+            accounts: vec![sample_account("A", true)],
+            active_account_id: Some("A".into()),
+            ..AppState::default()
+        };
         let _ = update(&mut state, Action::RemoveAccount { id: "A".into() });
         assert!(state.active_account_id.is_none());
         assert!(state.accounts.is_empty());
