@@ -12,7 +12,7 @@ mineltui is a terminal-UI Minecraft Java Edition launcher built in Rust + ratatu
 - [x] **Phase 1: Project Scaffold and Core Infrastructure** - Compiling binary with platform paths, domain types, task system, and TUI skeleton (completed 2026-04-20)
 - [x] **Phase 2: Mojang Protocol and Instance Management** - Instance CRUD, version manifest, file download pipeline, and asset install (completed 2026-04-20)
 - [x] **Phase 3: Launcher Process and Offline Launch** - JVM arg composition, classpath, natives, process spawn, offline mode (completed 2026-04-21)
-- [ ] **Phase 4: Microsoft Authentication** - Device-code OAuth, full MSA→XSTS→MC chain, token storage, multi-account
+- [x] **Phase 4: Microsoft Authentication** - Device-code OAuth, full MSA→XSTS→MC chain, token storage, multi-account (completed 2026-04-22)
 - [ ] **Phase 5: Java Runtime Management** - Auto-download Mojang/Adoptium JREs, system detection, per-instance selection
 - [ ] **Phase 6: Fabric and Quilt Modloaders** - Install Fabric and Quilt per instance, modloader version switching
 - [ ] **Phase 7: Forge and NeoForge Modloaders** - Subprocess-driven JVM processor pipeline for Forge and NeoForge
@@ -89,7 +89,7 @@ mineltui is a terminal-UI Minecraft Java Edition launcher built in Rust + ratatu
 - [x] 04-07-account-service-PLAN.md — AccountService facade: start_device_code_auth / list / remove / activate / resolve_auth_context_for_launch / resolve_msa_tokens_for_launch
 - [x] 04-08-launcher-integration-PLAN.md — launch_instance signature change (AuthContext enum + Option<AccountService>), compose_msa, MsaAuth adapter, offline path byte-identical
 - [x] 04-09-tui-wiring-PLAN.md — AccountsList + AddAccountDeviceCode + AccountAuthFailed views; capital A keybind; 10 new Actions + 4 new Effects; 10 new tui_smoke tests
-- [ ] 04-10-integration-validation-PLAN.md — tests/auth_chain.rs mocked end-to-end + tests/msa_chain_live.rs live smoke (#[ignore]) + VALIDATION.md populate + human checkpoint
+- [x] 04-10-integration-validation-PLAN.md — tests/auth_chain.rs mocked end-to-end + tests/msa_chain_live.rs live smoke (#[ignore]) + VALIDATION.md populate + human checkpoint
 **UI hint**: yes
 
 ### Phase 5: Java Runtime Management
@@ -102,7 +102,16 @@ mineltui is a terminal-UI Minecraft Java Edition launcher built in Rust + ratatu
   3. System-installed Java runtimes in PATH and common locations are detected and listed as selectable options per instance
   4. User can override the Java runtime for a specific instance and the selection persists in instance config
   5. Launcher validates the selected Java major version against MC requirements before launch; mismatches produce a clear error, not a silent crash
-**Plans**: TBD
+**Plans**: 9 plans
+- [x] 05-01-java-scaffold-PLAN.md — Cargo deps (flate2, tar), AppError Java variants, JavaRuntimeId enum, AppPaths jre_* accessors, InstanceManifest.java_override field, src/java/ module skeleton
+- [ ] 05-02-pure-mapping-PLAN.md — Pure platform-key mapping (Mojang + Adoptium), parse_java_major, validate_java_major — no I/O
+- [ ] 05-03-mojang-jre-PLAN.md — MojangJreClient: fetch all.json, select variant, fetch per-variant manifest, stream+SHA1-verify files, honor executable flag + unix symlinks, atomic .tmp rename
+- [ ] 05-04-adoptium-PLAN.md — AdoptiumClient: fetch latest release for {major,arch,os}, SHA256-verified download, spawn_blocking .tar.gz/.zip extraction with top-level prefix strip
+- [ ] 05-05-system-detect-PLAN.md — scan_system_javas: PATH iteration + common dirs scan, dedupe by canonical path, java -version stderr parse, 5s timeout
+- [ ] 05-06-java-service-PLAN.md — JavaService facade: resolve_jre_for_launch 5-step precedence (env → override → Mojang → Adoptium → validate) + install_mojang/install_adoptium/list_system_javas/set_override_for_instance + instance::store::set_java_override
+- [ ] 05-07-launcher-integration-PLAN.md — Replace resolve_java_bin stub in launcher/service.rs with JavaService::resolve_jre_for_launch; Phase 3 snapshot regression guard preserved
+- [ ] 05-08-tui-java-picker-PLAN.md — j keybind on instance list → JavaPickerModal listing Auto + detected system Javas + Manual escape hatch; persist via SetJavaOverride effect (human-verify checkpoint)
+- [ ] 05-09-integration-validation-PLAN.md — tests/jre_live.rs (#[ignore] real Mojang download), 05-VALIDATION.md populate (17 rows), human checkpoint for fresh-data_dir launch → nyquist_compliant flip
 
 ### Phase 6: Fabric and Quilt Modloaders
 **Goal**: Users can install Fabric Loader or Quilt Loader on any instance, select loader versions, switch between loaders, and see installer errors surfaced clearly — validating the modloader install abstraction before tackling Forge.
@@ -199,8 +208,8 @@ Phases execute in numeric order. Phases 3 and 4 have no interdependency after Ph
 | 1. Project Scaffold and Core Infrastructure | 6/6 | Complete   | 2026-04-20 |
 | 2. Mojang Protocol and Instance Management | 8/8 | Complete   | 2026-04-20 |
 | 3. Launcher Process and Offline Launch | 6/6 | Complete   | 2026-04-21 |
-| 4. Microsoft Authentication | 9/10 | In Progress|  |
-| 5. Java Runtime Management | 0/? | Not started | - |
+| 4. Microsoft Authentication | 10/10 | Complete   | 2026-04-22 |
+| 5. Java Runtime Management | 1/9 | In Progress|  |
 | 6. Fabric and Quilt Modloaders | 0/? | Not started | - |
 | 7. Forge and NeoForge Modloaders | 0/? | Not started | - |
 | 8. Modrinth Integration | 0/? | Not started | - |

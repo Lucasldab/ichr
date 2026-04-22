@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-09-tui-wiring-PLAN.md
-last_updated: "2026-04-21T04:23:01.292Z"
-last_activity: 2026-04-21
+stopped_at: Completed 05-01-java-scaffold-PLAN.md
+last_updated: "2026-04-22T02:12:17.092Z"
+last_activity: 2026-04-22
 progress:
   total_phases: 12
-  completed_phases: 3
-  total_plans: 31
-  completed_plans: 30
-  percent: 97
+  completed_phases: 4
+  total_plans: 40
+  completed_plans: 32
+  percent: 80
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-20)
 
 **Core value:** A user can create an instance, install a modloader and mods, and launch a working modded Minecraft — entirely from the TUI.
-**Current focus:** Phase 4 — Microsoft Authentication
+**Current focus:** Phase 5 — Java Runtime Management
 
 ## Current Position
 
-Phase: 4 (Microsoft Authentication) — EXECUTING
-Plan: 10 of 10
+Phase: 5 (Java Runtime Management) — EXECUTING
+Plan: 2 of 9
 Status: Ready to execute
-Last activity: 2026-04-21
+Last activity: 2026-04-22
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -76,6 +76,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P07 | 10 | 1 tasks | 1 files |
 | Phase 04 P08 | 217 | 1 tasks | 6 files |
 | Phase 04 P09 | 45 | 3 tasks | 9 files |
+| Phase 05 P01 | 15 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -136,6 +137,8 @@ Recent decisions affecting current work:
 - [Phase 04]: account_service injected as Option<&AccountService> — testable without real account store; None returns AppError::NoActiveAccount
 - [Phase 04]: AuthContext built in update() and carried in Effect::LaunchInstance to preserve single-mutation-point invariant
 - [Phase 04]: AddAccountTokenCreated Action used to store CancellationToken into state (not passed via closure)
+- [Phase 05]: JavaRuntimeId placed in src/java/types.rs to keep java module self-contained
+- [Phase 05]: jres_dir() aliases runtime_dir() per research Pattern 6 — same on-disk path, semantic clarity
 
 ### Pending Todos
 
@@ -156,6 +159,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-21T04:23:01.288Z
-Stopped at: Completed 04-09-tui-wiring-PLAN.md
+Last session: 2026-04-22T02:12:17.089Z
+Stopped at: Completed 05-01-java-scaffold-PLAN.md
 Resume file: None
