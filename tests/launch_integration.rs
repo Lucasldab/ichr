@@ -11,8 +11,11 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use mineltui::auth::AuthContext;
+use mineltui::domain::instance::InstanceManifest;
 use mineltui::error::AppError;
 use mineltui::install::install_version;
+use mineltui::java::service::JavaService;
+use mineltui::java::types::JavaRuntimeId;
 use mineltui::launcher::service::launch_instance;
 use mineltui::mojang::client::MojangClient;
 use mineltui::mojang::types::VersionEntry;
@@ -67,12 +70,15 @@ async fn test_end_to_end_launch_1_20_4() {
         cancel.cancel();
     });
 
+    let java_service = JavaService::new().expect("JavaService::new");
+
     let (launch_tx, _launch_rx) = mpsc::channel::<TaskEvent>(256);
     let result = launch_instance(
         &paths,
         &inst.slug,
         AuthContext::Offline { username: "TestUser".to_string() },
         None,
+        &java_service,
         launch_tx,
         token.clone(),
         JobId(2),
@@ -104,5 +110,95 @@ async fn test_end_to_end_launch_1_20_4() {
         "log file must contain a known Minecraft boot signal from {signals:?}; \
          first 500 bytes: {}",
         contents.chars().take(500).collect::<String>()
+    );
+}
+
+/// Regression test: launch_instance returns JavaMismatch BEFORE spawning any
+/// process when the instance's java_override has a major version that does not
+/// meet the version JSON's requirement.
+#[tokio::test]
+async fn test_launch_fails_early_on_java_mismatch() {
+    use mineltui::instance::store::write_instance_manifest;
+    use mineltui::mojang::types::{AssetIndex, VersionDownloads, VersionJson, JavaVersion};
+
+    let td = TempDir::new().unwrap();
+    let paths = paths_in(&td);
+
+    // Create a fake java binary that is "on disk" so the System override path exists.
+    let fake_java = td.path().join("java8");
+    std::fs::write(&fake_java, b"#!/bin/sh\nexec true\n").unwrap();
+
+    // Write instance manifest with System override claiming Java 8.
+    let mut manifest = InstanceManifest::new("mismatch".into(), "mismatch".into(), "1.21.4".into());
+    manifest.java_override = Some(JavaRuntimeId::System {
+        path: fake_java.clone(),
+        major_version: 8,
+    });
+    write_instance_manifest(&paths, &manifest).await.unwrap();
+
+    // Create a minimal client.jar so the VersionNotInstalled check passes.
+    let version_dir = paths.versions_dir().join("1.21.4");
+    tokio::fs::create_dir_all(&version_dir).await.unwrap();
+    tokio::fs::write(paths.version_jar("1.21.4"), b"fake").await.unwrap();
+
+    // Write a minimal version JSON requiring Java 21.
+    let version = VersionJson {
+        id: "1.21.4".into(),
+        version_type: "release".into(),
+        main_class: "net.minecraft.client.main.Main".into(),
+        asset_index: AssetIndex {
+            id: "17".into(),
+            sha1: "aaaa".into(),
+            size: 0,
+            total_size: 0,
+            url: "http://example.com/assets.json".into(),
+        },
+        assets: "17".into(),
+        downloads: VersionDownloads::default(),
+        libraries: vec![],
+        java_version: Some(JavaVersion {
+            component: "java-runtime-delta".into(),
+            major_version: 21,
+        }),
+        logging: None,
+        compliance_level: None,
+        minimum_launcher_version: None,
+        release_time: "2024-12-03T00:00:00Z".into(),
+        time: "2024-12-03T00:00:00Z".into(),
+        arguments: None,
+        minecraft_arguments: None,
+        inherits_from: None,
+    };
+    let version_json_path = paths.version_json("1.21.4");
+    tokio::fs::write(&version_json_path, serde_json::to_string(&version).unwrap()).await.unwrap();
+
+    let java_service = JavaService::new().expect("JavaService::new");
+
+    // Ensure MINELTUI_JAVA is not set — we want the System override path taken.
+    let _prior = std::env::var("MINELTUI_JAVA").ok();
+    std::env::remove_var("MINELTUI_JAVA");
+
+    let (tx, _rx) = mpsc::channel::<TaskEvent>(16);
+    let token = CancellationToken::new();
+    let result = launch_instance(
+        &paths,
+        "mismatch",
+        AuthContext::Offline { username: "TestUser".to_string() },
+        None,
+        &java_service,
+        tx,
+        token,
+        JobId(1),
+    )
+    .await;
+
+    // Restore MINELTUI_JAVA if it was set.
+    if let Some(v) = _prior {
+        std::env::set_var("MINELTUI_JAVA", v);
+    }
+
+    assert!(
+        matches!(result, Err(AppError::JavaMismatch { required: 21, found: 8, .. })),
+        "expected JavaMismatch{{required:21,found:8}}; got: {result:?}"
     );
 }

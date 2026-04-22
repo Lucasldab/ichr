@@ -21,6 +21,7 @@ use super::app::{update, Action, ActiveView, AppState, CreateStep, Effect, Versi
 use super::terminal::Tui;
 use super::view::view;
 use crate::auth::service::{AccountAuthEvent, AccountService};
+use crate::java::service::JavaService;
 use crate::launcher;
 use crate::mojang::client::MojangClient;
 use crate::mojang::types::VersionEntry;
@@ -76,6 +77,10 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
         .build()
         .map_err(|e| anyhow::anyhow!("reqwest for auth: {e}"))?;
     let account_service = Arc::new(AccountService::new(&paths, http_for_auth));
+
+    // Build the JavaService (owns Mojang JRE + Adoptium clients; constructed once).
+    let java_service = Arc::new(JavaService::new().map_err(|e| anyhow::anyhow!("JavaService::new: {e}"))?);
+
 
     // Build the task plumbing. TaskEvents arrive on task_rx; we convert each
     // into an Action::Task and forward to the event loop via action_tx.
@@ -147,7 +152,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
                     Some(Ok(ev)) => {
                         if let Some(action) = map_event(ev, &state) {
                             let effects = update(&mut state, action);
-                            execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), &task_manager, &action_tx).await;
+                            execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), &task_manager, &action_tx).await;
                         }
                     }
                     Some(Err(e)) => {
@@ -161,7 +166,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
                 match maybe_action {
                     Some(action) => {
                         let effects = update(&mut state, action);
-                        execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), &task_manager, &action_tx).await;
+                        execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), &task_manager, &action_tx).await;
                     }
                     None => break,
                 }
@@ -451,12 +456,14 @@ fn map_group_inline_event(ev: CtEvent, state: &AppState) -> Option<Action> {
 ///
 /// `state` is the just-updated state (after `update()` ran) — read-only.
 /// Used by Effect::LaunchInstance to look up the instance display_name (username).
+#[allow(clippy::too_many_arguments)]
 async fn execute_effects(
     effects: Vec<Effect>,
     state: &AppState,
     paths: &AppPaths,
     mojang: Arc<MojangClient>,
     account_service: Arc<AccountService>,
+    java_service: Arc<JavaService>,
     task_manager: &TaskManager,
     action_tx: &mpsc::Sender<Action>,
 ) {
@@ -630,6 +637,7 @@ async fn execute_effects(
             Effect::LaunchInstance { slug, auth_ctx } => {
                 let paths2 = paths.clone();
                 let svc = Arc::clone(&account_service);
+                let java_svc = Arc::clone(&java_service);
                 let tx = action_tx.clone();
                 let job_id = task_manager.next_job_id();
                 let slug_for_task = slug.clone();
@@ -645,6 +653,7 @@ async fn execute_effects(
                         &slug,
                         auth_ctx,
                         Some(svc.as_ref()),
+                        java_svc.as_ref(),
                         task_tx,
                         token,
                         job_id,

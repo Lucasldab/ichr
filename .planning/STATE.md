@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-05-system-detect-PLAN.md
-last_updated: "2026-04-22T02:36:40.147Z"
+stopped_at: Completed 05-06-java-service-PLAN.md
+last_updated: "2026-04-22T02:48:58.543Z"
 last_activity: 2026-04-22
 progress:
   total_phases: 12
   completed_phases: 4
   total_plans: 40
-  completed_plans: 36
-  percent: 90
+  completed_plans: 37
+  percent: 93
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 ## Current Position
 
 Phase: 5 (Java Runtime Management) — EXECUTING
-Plan: 6 of 9
+Plan: 7 of 9
 Status: Ready to execute
 Last activity: 2026-04-22
 
@@ -81,6 +81,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P03 | 18 | 2 tasks | 4 files |
 | Phase 05 P04 | 25 | 2 tasks | 2 files |
 | Phase 05 P05 | 15 | 1 tasks | 2 files |
+| Phase 05 P06 | 35 | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -149,6 +150,8 @@ Recent decisions affecting current work:
 - [Phase 05]: AdoptiumClient::new_with_base_url() added to avoid env-var races in parallel tests
 - [Phase 05]: sha256_hex uses iter().fold() because sha2 0.11 Array lacks LowerHex
 - [Phase 05]: No glob/which crate — PATH split manually; read_dir for common dirs
+- [Phase 05]: tokio::sync::Mutex used for test env serialisation (avoids clippy::await_holding_lock)
+- [Phase 05]: MINELTUI_JAVA is step-1 early-return bypass; production code has zero hardcoded variant strings
 
 ### Pending Todos
 
@@ -169,6 +172,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-22T02:36:40.144Z
-Stopped at: Completed 05-05-system-detect-PLAN.md
+Last session: 2026-04-22T02:48:58.540Z
+Stopped at: Completed 05-06-java-service-PLAN.md
 Resume file: None
