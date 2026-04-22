@@ -1,0 +1,18 @@
+{
+  "linux": {
+    "java-runtime-delta": [
+      {
+        "manifest": { "sha1": "aaaa1234aaaa1234aaaa1234aaaa1234aaaa1234", "size": 100, "url": "PLACEHOLDER/manifest-delta.json" },
+        "version":  { "name": "21.0.7", "released": "2025-05-19T00:00:00Z" },
+        "availability": { "group": 1, "progress": 100 }
+      }
+    ],
+    "java-runtime-epsilon": [
+      {
+        "manifest": { "sha1": "bbbb5678bbbb5678bbbb5678bbbb5678bbbb5678", "size": 100, "url": "PLACEHOLDER/manifest-epsilon.json" },
+        "version":  { "name": "25.0.1", "released": "2026-02-01T00:00:00Z" },
+        "availability": { "group": 1, "progress": 100 }
+      }
+    ]
+  }
+}

@@ -104,7 +104,7 @@ mineltui is a terminal-UI Minecraft Java Edition launcher built in Rust + ratatu
   5. Launcher validates the selected Java major version against MC requirements before launch; mismatches produce a clear error, not a silent crash
 **Plans**: 9 plans
 - [x] 05-01-java-scaffold-PLAN.md — Cargo deps (flate2, tar), AppError Java variants, JavaRuntimeId enum, AppPaths jre_* accessors, InstanceManifest.java_override field, src/java/ module skeleton
-- [ ] 05-02-pure-mapping-PLAN.md — Pure platform-key mapping (Mojang + Adoptium), parse_java_major, validate_java_major — no I/O
+- [x] 05-02-pure-mapping-PLAN.md — Pure platform-key mapping (Mojang + Adoptium), parse_java_major, validate_java_major — no I/O
 - [ ] 05-03-mojang-jre-PLAN.md — MojangJreClient: fetch all.json, select variant, fetch per-variant manifest, stream+SHA1-verify files, honor executable flag + unix symlinks, atomic .tmp rename
 - [ ] 05-04-adoptium-PLAN.md — AdoptiumClient: fetch latest release for {major,arch,os}, SHA256-verified download, spawn_blocking .tar.gz/.zip extraction with top-level prefix strip
 - [ ] 05-05-system-detect-PLAN.md — scan_system_javas: PATH iteration + common dirs scan, dedupe by canonical path, java -version stderr parse, 5s timeout
@@ -209,7 +209,7 @@ Phases execute in numeric order. Phases 3 and 4 have no interdependency after Ph
 | 2. Mojang Protocol and Instance Management | 8/8 | Complete   | 2026-04-20 |
 | 3. Launcher Process and Offline Launch | 6/6 | Complete   | 2026-04-21 |
 | 4. Microsoft Authentication | 10/10 | Complete   | 2026-04-22 |
-| 5. Java Runtime Management | 1/9 | In Progress|  |
+| 5. Java Runtime Management | 2/9 | In Progress|  |
 | 6. Fabric and Quilt Modloaders | 0/? | Not started | - |
 | 7. Forge and NeoForge Modloaders | 0/? | Not started | - |
 | 8. Modrinth Integration | 0/? | Not started | - |
