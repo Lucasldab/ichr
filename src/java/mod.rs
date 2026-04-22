@@ -7,5 +7,4 @@ pub mod detect;
 pub mod mapping;
 pub mod mojang_jre;
 pub mod types;
-// Populated by plan 05-06:
-// pub mod service;     // 05-06
+pub mod service;
