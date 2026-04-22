@@ -18,6 +18,7 @@ fn sample_manifest() -> InstanceManifest {
         last_played_at: Some("2026-04-21T12:00:00Z".to_string()),
         notes: Some("Test notes".to_string()),
         group: Some("survival".to_string()),
+        java_override: None,
         total_play_time_ms: 3600000,
     }
 }
@@ -41,6 +42,7 @@ fn test_instance_manifest_omits_none_on_serialize() {
         last_played_at: None,
         notes: None,
         group: None,
+        java_override: None,
         total_play_time_ms: 0,
     };
     let json = serde_json::to_string(&m).expect("serialize");
@@ -159,6 +161,7 @@ async fn test_write_then_read_instance_manifest_round_trip() {
         last_played_at: None,
         notes: None,
         group: None,
+        java_override: None,
         total_play_time_ms: 0,
     };
     write_instance_manifest(&paths, &m).await.unwrap();
@@ -180,6 +183,7 @@ async fn test_list_instance_manifests_skips_invalid_and_sorts_by_last_played_des
         last_played_at: last_played.map(|s| s.to_string()),
         notes: None,
         group: None,
+        java_override: None,
         total_play_time_ms: 0,
     };
 
@@ -217,6 +221,7 @@ async fn test_write_is_atomic_no_partial_file_visible() {
         last_played_at: None,
         notes: None,
         group: None,
+        java_override: None,
         total_play_time_ms: 0,
     };
     write_instance_manifest(&paths, &m).await.unwrap();
