@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-03-mojang-jre-PLAN.md
-last_updated: "2026-04-22T02:22:14.339Z"
+stopped_at: Completed 05-04-adoptium-PLAN.md
+last_updated: "2026-04-22T02:32:51.336Z"
 last_activity: 2026-04-22
 progress:
   total_phases: 12
   completed_phases: 4
   total_plans: 40
-  completed_plans: 34
-  percent: 85
+  completed_plans: 35
+  percent: 88
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 ## Current Position
 
 Phase: 5 (Java Runtime Management) — EXECUTING
-Plan: 4 of 9
+Plan: 5 of 9
 Status: Ready to execute
 Last activity: 2026-04-22
 
@@ -79,6 +79,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P01 | 15 | 2 tasks | 8 files |
 | Phase 05 P02 | 12 | 2 tasks | 2 files |
 | Phase 05 P03 | 18 | 2 tasks | 4 files |
+| Phase 05 P04 | 25 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -144,6 +145,8 @@ Recent decisions affecting current work:
 - [Phase 05]: Redundant guard pattern replaced with literal match arm (Other("x86")) per clippy::redundant_guards
 - [Phase 05]: adoptium_arch_str falls back to x64 for unknown architectures rather than panicking
 - [Phase 05]: DEFAULT_MOJANG_JRE_ALL_URL pinned with inline hash-rotation comment; MINELTUI_JRE_ALL_URL env var for runtime override
+- [Phase 05]: AdoptiumClient::new_with_base_url() added to avoid env-var races in parallel tests
+- [Phase 05]: sha256_hex uses iter().fold() because sha2 0.11 Array lacks LowerHex
 
 ### Pending Todos
 
@@ -164,6 +167,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-22T02:22:14.335Z
-Stopped at: Completed 05-03-mojang-jre-PLAN.md
+Last session: 2026-04-22T02:32:51.333Z
+Stopped at: Completed 05-04-adoptium-PLAN.md
 Resume file: None
