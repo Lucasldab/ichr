@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 05-07-launcher-integration-PLAN.md
-last_updated: "2026-04-22T02:59:07.624Z"
-last_activity: 2026-04-22
+status: ready-to-execute
+stopped_at: Phase 6 planned (9 plans across 7 waves) — Phase 5 plan 9 (live smoke) parked as 05-HUMAN-UAT.md
+last_updated: "2026-04-26T00:00:00.000Z"
+last_activity: 2026-04-26
 progress:
   total_phases: 12
   completed_phases: 4
-  total_plans: 40
+  total_plans: 49
   completed_plans: 38
-  percent: 95
+  percent: 78
 ---
 
 # Project State
@@ -21,16 +21,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-20)
 
 **Core value:** A user can create an instance, install a modloader and mods, and launch a working modded Minecraft — entirely from the TUI.
-**Current focus:** Phase 5 — Java Runtime Management
+**Current focus:** Phase 6 — Fabric and Quilt Modloaders (planned)
 
 ## Current Position
 
-Phase: 5 (Java Runtime Management) — EXECUTING
-Plan: 8 of 9
-Status: Ready to execute
-Last activity: 2026-04-22
+Phase: 6 (Fabric and Quilt Modloaders) — IN PROGRESS
+Plans: 9 across 7 waves
+Status: Plan 06-01 complete
+Outstanding from Phase 5: 05-HUMAN-UAT.md (live smoke test parked)
+Last activity: 2026-04-26
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [#░░░░░░░░░] 11%
 
 ## Performance Metrics
 
@@ -83,6 +84,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P05 | 15 | 1 tasks | 2 files |
 | Phase 05 P06 | 35 | 1 tasks | 3 files |
 | Phase 05 P07 | 20 | 2 tasks | 3 files |
+| Phase 06 P01 | 15 | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -156,6 +158,9 @@ Recent decisions affecting current work:
 - [Phase 05]: resolve_java_bin() removed; JavaService::resolve_jre_for_launch is the sole Java resolution path in launch_instance
 - [Phase 05]: probe_java() spawn replaced with tokio::fs::try_exists guard post-resolve
 - [Phase 05]: JavaService held as Arc in run.rs, constructed once at startup alongside AccountService
+- [Phase 06]: LoaderLibrary lives in types.rs as a single canonical type shared by Fabric and Quilt clients — no per-loader duplication
+- [Phase 06]: is_safe_maven_segment explicitly rejects .. sentinel in addition to charset check — dots are in [A-Za-z0-9._-] so .. passes charset alone
+- [Phase 06]: LoaderService stub struct defined in service.rs (not just doc-comment) because mod.rs re-exports it and crate must compile
 
 ### Pending Todos
 
@@ -176,6 +181,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-22T02:59:07.620Z
-Stopped at: Completed 05-07-launcher-integration-PLAN.md
+Last session: 2026-04-26T00:00:00Z
+Stopped at: Completed 06-01-loader-scaffold-PLAN.md
 Resume file: None
