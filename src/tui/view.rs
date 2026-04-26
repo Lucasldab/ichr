@@ -47,6 +47,12 @@ pub fn view(state: &AppState, f: &mut Frame) {
         ActiveView::AddAccountDeviceCode { .. } => render_add_account_device_code(f, main, state),
         ActiveView::AccountAuthFailed { .. } => render_account_auth_failed(f, main, state),
         ActiveView::JavaPickerModal { .. } => render_java_picker_modal(f, main, state),
+        // Phase 6: loader modals — renderers wired in 06-07.
+        ActiveView::LoaderPickerModal { .. }
+        | ActiveView::LoaderVersionPickerModal { .. }
+        | ActiveView::LoaderInstallProgressModal { .. }
+        | ActiveView::LoaderInstallFailedModal { .. }
+        | ActiveView::LoaderSwitchConfirm { .. } => {}
     }
 
     render_download_pane(f, dl, state);
