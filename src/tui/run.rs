@@ -22,6 +22,8 @@ use super::terminal::Tui;
 use super::view::view;
 use crate::auth::service::{AccountAuthEvent, AccountService};
 use crate::java::service::JavaService;
+use crate::loader::service::LoaderService;
+use crate::loader::types::LoaderType;
 use crate::launcher;
 use crate::mojang::client::MojangClient;
 use crate::mojang::types::VersionEntry;
@@ -80,7 +82,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
 
     // Build the JavaService (owns Mojang JRE + Adoptium clients; constructed once).
     let java_service = Arc::new(JavaService::new().map_err(|e| anyhow::anyhow!("JavaService::new: {e}"))?);
-
+    let loader_service = Arc::new(LoaderService::new().map_err(|e| anyhow::anyhow!("LoaderService::new: {e}"))?);
 
     // Build the task plumbing. TaskEvents arrive on task_rx; we convert each
     // into an Action::Task and forward to the event loop via action_tx.
@@ -152,7 +154,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
                     Some(Ok(ev)) => {
                         if let Some(action) = map_event(ev, &state) {
                             let effects = update(&mut state, action);
-                            execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), &task_manager, &action_tx).await;
+                            execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), &task_manager, &action_tx).await;
                         }
                     }
                     Some(Err(e)) => {
@@ -166,7 +168,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
                 match maybe_action {
                     Some(action) => {
                         let effects = update(&mut state, action);
-                        execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), &task_manager, &action_tx).await;
+                        execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), &task_manager, &action_tx).await;
                     }
                     None => break,
                 }
@@ -216,12 +218,22 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         ActiveView::JavaPickerModal { .. } => {
             super::views::java_picker_modal::map_java_picker_event(ev)
         }
-        // Phase 6: loader modals — event mappers wired in 06-07/06-08.
-        ActiveView::LoaderPickerModal { .. }
-        | ActiveView::LoaderVersionPickerModal { .. }
-        | ActiveView::LoaderInstallProgressModal { .. }
-        | ActiveView::LoaderInstallFailedModal { .. }
-        | ActiveView::LoaderSwitchConfirm { .. } => None,
+        // Phase 6: loader modals — event mappers wired in 06-08.
+        ActiveView::LoaderPickerModal { .. } => {
+            super::views::loader_picker_modal::map_loader_picker_event(ev)
+        }
+        ActiveView::LoaderVersionPickerModal { .. } => {
+            super::views::loader_version_picker_modal::map_loader_version_picker_event(ev)
+        }
+        ActiveView::LoaderInstallProgressModal { .. } => {
+            super::views::loader_install_progress_modal::map_loader_install_progress_event(ev, state)
+        }
+        ActiveView::LoaderInstallFailedModal { .. } => {
+            super::views::loader_install_failed_modal::map_loader_install_failed_event(ev)
+        }
+        ActiveView::LoaderSwitchConfirm { .. } => {
+            super::views::loader_switch_confirm::map_loader_switch_confirm_event(ev)
+        }
     }
 }
 
@@ -302,6 +314,22 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
                 if let Some(m) = state.instances.get(*selected) {
                     if !state.running_instances.contains_key(&m.slug) {
                         return Some(Action::OpenJavaPicker { slug: m.slug.clone() });
+                    }
+                }
+            }
+            None
+        }
+        CtEvent::Key(KeyEvent { code: KeyCode::Char('L'), modifiers, .. })
+            if !modifiers.contains(KeyModifiers::CONTROL) =>
+        {
+            // `L` (uppercase) opens the loader picker for a non-running instance
+            // with no install already in flight (T-06-20).
+            if let ActiveView::InstanceList { selected } = &state.active_view {
+                if let Some(m) = state.instances.get(*selected) {
+                    if !state.running_instances.contains_key(&m.slug)
+                        && !state.running_loader_installs.contains_key(&m.slug)
+                    {
+                        return Some(Action::OpenLoaderPicker { slug: m.slug.clone() });
                     }
                 }
             }
@@ -480,6 +508,7 @@ async fn execute_effects(
     mojang: Arc<MojangClient>,
     account_service: Arc<AccountService>,
     java_service: Arc<JavaService>,
+    loader_service: Arc<LoaderService>,
     task_manager: &TaskManager,
     action_tx: &mpsc::Sender<Action>,
 ) {
@@ -837,12 +866,141 @@ async fn execute_effects(
                 });
             }
 
-            // Phase 6: loader effects — wired in 06-08.
-            Effect::FetchLoaderVersions { .. }
-            | Effect::InstallLoader { .. }
-            | Effect::CancelLoaderInstall { .. }
-            | Effect::RemoveLoader { .. } => {
-                // Stubs: runtime wiring lands in plan 06-08.
+            Effect::FetchLoaderVersions { slug, loader_type } => {
+                let svc = Arc::clone(&loader_service);
+                let mc_version = state
+                    .instances
+                    .iter()
+                    .find(|m| m.slug == slug)
+                    .map(|m| m.mc_version_id.clone())
+                    .unwrap_or_default();
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match svc.list_loader_versions(loader_type, &mc_version).await {
+                        Ok(versions) => {
+                            let _ = tx
+                                .send(Action::LoaderVersionsLoaded { slug, loader: loader_type, versions })
+                                .await;
+                        }
+                        Err(e) => {
+                            let _ = tx
+                                .send(Action::LoaderInstallFailed {
+                                    slug,
+                                    loader: loader_type,
+                                    version: String::new(),
+                                    error: e.to_string(),
+                                    log_tail: String::new(),
+                                })
+                                .await;
+                        }
+                    }
+                });
+            }
+
+            Effect::InstallLoader { slug, loader_type, mc_version, loader_version } => {
+                let svc = Arc::clone(&loader_service);
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                let job_id = task_manager.next_job_id();
+                let slug_for_task = slug.clone();
+                let loader_version_for_task = loader_version.clone();
+
+                // Forwarder: install_loader emits TaskEvent::Progress through `lt_tx`.
+                // We translate each Progress into Action::LoaderInstallProgress.
+                let (lt_tx, mut lt_rx) = mpsc::channel::<TaskEvent>(64);
+                {
+                    let tx_fwd = tx.clone();
+                    let slug_fwd = slug.clone();
+                    tokio::spawn(async move {
+                        while let Some(evt) = lt_rx.recv().await {
+                            if let TaskEvent::Progress { pct, msg, .. } = evt {
+                                let _ = tx_fwd
+                                    .send(Action::LoaderInstallProgress {
+                                        slug: slug_fwd.clone(),
+                                        pct,
+                                        step_label: msg,
+                                        bytes_done: 0,
+                                        bytes_total: 0,
+                                    })
+                                    .await;
+                            }
+                        }
+                    });
+                }
+
+                task_manager.spawn_task(job_id, move |_task_tx, token| async move {
+                    let slug = slug_for_task;
+                    let _ = tx
+                        .send(Action::LoaderInstallStarted { slug: slug.clone(), token: token.clone() })
+                        .await;
+
+                    let res = svc
+                        .install_loader(
+                            &paths2,
+                            &slug,
+                            &mc_version,
+                            loader_type,
+                            &loader_version_for_task,
+                            lt_tx,
+                            token,
+                            job_id,
+                        )
+                        .await;
+
+                    match res {
+                        Ok(()) => {
+                            let _ = tx.send(Action::LoaderInstalled { slug }).await;
+                        }
+                        Err(crate::loader::error::LoaderError::Cancelled) => {
+                            // Treat cancellation as a clean completion for UI purposes:
+                            // the CancelLoaderInstall handler in update() already moved
+                            // the active view back to InstanceList.
+                            let _ = tx.send(Action::LoaderInstalled { slug }).await;
+                        }
+                        Err(e) => {
+                            let _ = tx
+                                .send(Action::LoaderInstallFailed {
+                                    slug,
+                                    loader: loader_type,
+                                    version: loader_version_for_task,
+                                    error: e.to_string(),
+                                    log_tail: String::new(),
+                                })
+                                .await;
+                        }
+                    }
+                    Ok(())
+                });
+            }
+
+            Effect::CancelLoaderInstall { slug: _ } => {
+                // The token.cancel() already happened in update() — this arm is a
+                // no-op hook for symmetry with KillProcess. The install task
+                // observes the cancellation token and returns LoaderError::Cancelled.
+            }
+
+            Effect::RemoveLoader { slug } => {
+                let svc = Arc::clone(&loader_service);
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match svc.remove_loader(&paths2, &slug).await {
+                        Ok(()) => {
+                            let _ = tx.send(Action::LoaderInstalled { slug }).await;
+                        }
+                        Err(e) => {
+                            let _ = tx
+                                .send(Action::LoaderInstallFailed {
+                                    slug,
+                                    loader: LoaderType::Fabric, // placeholder — remove failure modal copy doesn't depend on type
+                                    version: String::new(),
+                                    error: e.to_string(),
+                                    log_tail: String::new(),
+                                })
+                                .await;
+                        }
+                    }
+                });
             }
         }
     }
