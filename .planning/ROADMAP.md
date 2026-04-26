@@ -122,7 +122,16 @@ mineltui is a terminal-UI Minecraft Java Edition launcher built in Rust + ratatu
   2. User can install Quilt Loader on an instance using the Quilt meta API; the Quilt library list is correctly merged into the instance manifest
   3. User can switch the loader or loader version on an existing instance
   4. When a modloader installation fails, the TUI surfaces captured stdout/stderr from the installer process with a clear error message
-**Plans**: TBD
+**Plans**: 9 plans
+- [ ] 06-01-loader-scaffold-PLAN.md — lib.rs + loader/ module skeleton + LoaderType/LoaderError/LoaderInfo + maven path-traversal-safe coord parser
+- [ ] 06-02-domain-loader-field-PLAN.md — InstanceManifest.loader: Option<LoaderInfo> with forward-compat tests
+- [ ] 06-03-fabric-client-PLAN.md — FabricMetaClient: list/profile fetch + LoaderLibrary with sha1/sha256 + httpmock unit tests
+- [ ] 06-04-quilt-client-PLAN.md — QuiltMetaClient: v3 API + is_quilt_stable + no-hash library invariant
+- [ ] 06-05-loader-service-PLAN.md — LoaderService 4-step install pipeline + idempotent re-attach + remove + switch + cancellation
+- [ ] 06-06-tui-state-PLAN.md — 5 ActiveView + 19 Action + 4 Effect variants + LoaderPickerRow + update arms (pure)
+- [ ] 06-07-tui-views-PLAN.md — 5 new view files (picker / version-picker / progress / failed / switch confirm) + view.rs dispatch + views/mod.rs
+- [ ] 06-08-tui-wiring-PLAN.md — run.rs LoaderService Arc + 4 effect arms + L keybind + instance_list status cell + 11 tui_smoke tests
+- [ ] 06-09-integration-validation-PLAN.md — tests/loader_live.rs (#[ignore] Fabric+Quilt live) + 06-VALIDATION.md fill + 06-HUMAN-UAT.md + nyquist checkpoint
 **UI hint**: yes
 
 ### Phase 7: Forge and NeoForge Modloaders
@@ -210,7 +219,7 @@ Phases execute in numeric order. Phases 3 and 4 have no interdependency after Ph
 | 3. Launcher Process and Offline Launch | 6/6 | Complete   | 2026-04-21 |
 | 4. Microsoft Authentication | 10/10 | Complete   | 2026-04-22 |
 | 5. Java Runtime Management | 7/9 | In Progress|  |
-| 6. Fabric and Quilt Modloaders | 0/? | Not started | - |
+| 6. Fabric and Quilt Modloaders | 0/9 | Not started | - |
 | 7. Forge and NeoForge Modloaders | 0/? | Not started | - |
 | 8. Modrinth Integration | 0/? | Not started | - |
 | 9. CurseForge Integration | 0/? | Not started | - |
