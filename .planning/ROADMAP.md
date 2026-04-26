@@ -127,7 +127,7 @@ mineltui is a terminal-UI Minecraft Java Edition launcher built in Rust + ratatu
 - [x] 06-02-domain-loader-field-PLAN.md — InstanceManifest.loader: Option<LoaderInfo> with forward-compat tests
 - [x] 06-03-fabric-client-PLAN.md — FabricMetaClient: list/profile fetch + LoaderLibrary with sha1/sha256 + httpmock unit tests
 - [x] 06-04-quilt-client-PLAN.md — QuiltMetaClient: v3 API + is_quilt_stable + no-hash library invariant
-- [ ] 06-05-loader-service-PLAN.md — LoaderService 4-step install pipeline + idempotent re-attach + remove + switch + cancellation
+- [x] 06-05-loader-service-PLAN.md — LoaderService 4-step install pipeline + idempotent re-attach + remove + switch + cancellation
 - [ ] 06-06-tui-state-PLAN.md — 5 ActiveView + 19 Action + 4 Effect variants + LoaderPickerRow + update arms (pure)
 - [ ] 06-07-tui-views-PLAN.md — 5 new view files (picker / version-picker / progress / failed / switch confirm) + view.rs dispatch + views/mod.rs
 - [ ] 06-08-tui-wiring-PLAN.md — run.rs LoaderService Arc + 4 effect arms + L keybind + instance_list status cell + 11 tui_smoke tests
@@ -219,7 +219,7 @@ Phases execute in numeric order. Phases 3 and 4 have no interdependency after Ph
 | 3. Launcher Process and Offline Launch | 6/6 | Complete   | 2026-04-21 |
 | 4. Microsoft Authentication | 10/10 | Complete   | 2026-04-22 |
 | 5. Java Runtime Management | 7/9 | In Progress|  |
-| 6. Fabric and Quilt Modloaders | 0/9 | Not started | - |
+| 6. Fabric and Quilt Modloaders | 5/9 | In Progress|  |
 | 7. Forge and NeoForge Modloaders | 0/? | Not started | - |
 | 8. Modrinth Integration | 0/? | Not started | - |
 | 9. CurseForge Integration | 0/? | Not started | - |

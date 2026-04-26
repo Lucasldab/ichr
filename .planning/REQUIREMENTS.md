@@ -45,12 +45,12 @@ Requirements for initial release. Each maps to a roadmap phase.
 
 ### Modloaders
 
-- [ ] **LOAD-01**: User can install Fabric Loader on an instance (select loader version; JSON manifest merge)
+- [x] **LOAD-01**: User can install Fabric Loader on an instance (select loader version; JSON manifest merge)
 - [x] **LOAD-02**: User can install Quilt Loader on an instance
 - [ ] **LOAD-03**: User can install Forge on an instance (runs installer JAR via tokio subprocess; streams progress)
 - [ ] **LOAD-04**: User can install NeoForge on an instance (same subprocess flow, NeoForge-specific endpoints)
-- [ ] **LOAD-05**: User can switch loader or loader version on an existing instance
-- [ ] **LOAD-06**: Launcher surfaces installer subprocess failures with captured stdout/stderr.
+- [x] **LOAD-05**: User can switch loader or loader version on an existing instance
+- [x] **LOAD-06**: Launcher surfaces installer subprocess failures with captured stdout/stderr.
   - **Note (Phase 6 substitution for Fabric/Quilt):** Fabric and Quilt are pure-HTTP loaders with no installer subprocess. For these loaders the requirement is realized by `LoaderError::Display` populating the failure modal headline plus the HTTP/IO error detail populating the `log_tail` field — capturing the spirit of "surface failures with detail" without literal stdout/stderr. Literal subprocess stdout/stderr capture lives in Phase 7 for Forge/NeoForge.
 
 ### Mod Management
@@ -194,10 +194,10 @@ Which phases cover which requirements. Populated during roadmap creation.
 | JAVA-03 | Phase 5 | Complete |
 | JAVA-04 | Phase 5 | Complete |
 | JAVA-05 | Phase 5 | Complete |
-| LOAD-01 | Phase 6 | Pending |
+| LOAD-01 | Phase 6 | Complete |
 | LOAD-02 | Phase 6 | Complete |
-| LOAD-05 | Phase 6 | Pending |
-| LOAD-06 | Phase 6 | Pending |
+| LOAD-05 | Phase 6 | Complete |
+| LOAD-06 | Phase 6 | Complete |
 | LOAD-03 | Phase 7 | Pending |
 | LOAD-04 | Phase 7 | Pending |
 | MOD-01 | Phase 8 | Pending |
