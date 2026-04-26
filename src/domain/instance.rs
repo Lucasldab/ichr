@@ -8,6 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::java::types::JavaRuntimeId;
+use crate::loader::types::LoaderInfo;
 
 /// Opaque instance identifier. Equal to the slug string for v1.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -75,6 +76,13 @@ pub struct InstanceManifest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub java_override: Option<JavaRuntimeId>,
 
+    /// Active modloader for this instance. `None` = vanilla.
+    /// Written last by `LoaderService::install_loader` (atomicity invariant
+    /// per 06-RESEARCH.md Pitfall 7) so a partial install never leaves an
+    /// `instance.loader` pointing at a missing version JSON.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loader: Option<LoaderInfo>,
+
     #[serde(default)]
     pub total_play_time_ms: u64,
 }
@@ -95,6 +103,7 @@ impl InstanceManifest {
             notes: None,
             group: None,
             java_override: None,
+            loader: None,
             total_play_time_ms: 0,
         }
     }
@@ -149,5 +158,56 @@ mod tests {
             parsed.java_override,
             Some(JavaRuntimeId::Mojang { variant: "java-runtime-delta".into() })
         );
+    }
+
+    #[test]
+    fn test_loader_field_backward_compat() {
+        // Legacy instance.json without `loader` must deserialize to None.
+        let json = r#"{
+            "schema_version": 1,
+            "display_name": "Test",
+            "slug": "test",
+            "mc_version_id": "1.21.4",
+            "created_at": "2026-01-01T00:00:00Z",
+            "total_play_time_ms": 0
+        }"#;
+        let m: InstanceManifest = serde_json::from_str(json).unwrap();
+        assert!(m.loader.is_none(), "legacy instance should have None loader");
+    }
+
+    #[test]
+    fn test_loader_none_not_serialized() {
+        let m = InstanceManifest::new("Test".into(), "test".into(), "1.21.4".into());
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(!json.contains("loader"), "None loader must not appear in JSON: {json}");
+    }
+
+    #[test]
+    fn test_loader_field_roundtrip_fabric() {
+        let mut m = InstanceManifest::new("Test".into(), "test".into(), "1.21.4".into());
+        m.loader = Some(LoaderInfo {
+            kind: ModloaderKind::Fabric,
+            version: "0.16.9".into(),
+            version_id: "fabric-loader-0.16.9-1.21.4".into(),
+        });
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(json.contains("\"kind\":\"fabric\""), "fabric kind should serialize snake_case: {json}");
+        assert!(json.contains("\"version_id\":\"fabric-loader-0.16.9-1.21.4\""), "version_id missing: {json}");
+        let parsed: InstanceManifest = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.loader, m.loader);
+    }
+
+    #[test]
+    fn test_loader_field_roundtrip_quilt() {
+        let mut m = InstanceManifest::new("Test".into(), "test".into(), "1.21.4".into());
+        m.loader = Some(LoaderInfo {
+            kind: ModloaderKind::Quilt,
+            version: "0.30.0-beta.7".into(),
+            version_id: "quilt-loader-0.30.0-beta.7-1.21.4".into(),
+        });
+        let json = serde_json::to_string(&m).unwrap();
+        let parsed: InstanceManifest = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.loader, m.loader);
+        assert!(json.contains("\"kind\":\"quilt\""), "quilt kind missing: {json}");
     }
 }
