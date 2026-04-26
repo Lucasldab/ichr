@@ -949,3 +949,187 @@ fn test_move_selection_in_accounts_list() {
         _ => panic!("view changed unexpectedly"),
     }
 }
+
+// ========================================================================
+// Phase 6: Loader picker / install / switch
+// ========================================================================
+
+use mineltui::loader::types::LoaderType;
+
+fn key_l() -> CtEvent {
+    CtEvent::Key(KeyEvent::new(KeyCode::Char('L'), KeyModifiers::NONE))
+}
+
+fn state_with_one_instance(slug: &str, mc: &str) -> AppState {
+    let mut s = AppState::default();
+    s.instances.push(InstanceManifest::new(slug.into(), slug.into(), mc.into()));
+    s
+}
+
+#[test]
+#[allow(non_snake_case)]
+fn test_uppercase_L_on_instance_list_opens_loader_picker() {
+    let s = state_with_one_instance("ti", "1.21.4");
+    let action = map_event_pub(key_l(), &s);
+    match action {
+        Some(Action::OpenLoaderPicker { slug }) => assert_eq!(slug, "ti"),
+        other => panic!("expected OpenLoaderPicker; got {other:?}"),
+    }
+}
+
+#[test]
+#[allow(non_snake_case)]
+fn test_uppercase_L_on_running_instance_is_noop() {
+    let mut s = state_with_one_instance("ti", "1.21.4");
+    s.running_instances.insert("ti".into(), CancellationToken::new());
+    let action = map_event_pub(key_l(), &s);
+    assert!(action.is_none(), "L on a running instance should be no-op");
+}
+
+#[test]
+#[allow(non_snake_case)]
+fn test_uppercase_L_blocked_when_loader_install_in_flight() {
+    let mut s = state_with_one_instance("ti", "1.21.4");
+    s.running_loader_installs.insert("ti".into(), CancellationToken::new());
+    let action = map_event_pub(key_l(), &s);
+    assert!(action.is_none(), "L during in-flight install should be no-op");
+}
+
+#[test]
+fn test_loader_picker_select_quilt_emits_fetch_effect() {
+    let mut s = state_with_one_instance("ti", "1.21.4");
+    let _ = update(&mut s, Action::OpenLoaderPicker { slug: "ti".into() });
+    let _ = update(&mut s, Action::LoaderPickerMove(2)); // Quilt at index 2
+    let effects = update(&mut s, Action::LoaderPickerSelect);
+    match effects.as_slice() {
+        [Effect::FetchLoaderVersions { loader_type: LoaderType::Quilt, .. }] => {}
+        other => panic!("expected FetchLoaderVersions(Quilt); got {other:?}"),
+    }
+}
+
+#[test]
+fn test_loader_install_progress_action_updates_modal_fields() {
+    let mut s = AppState {
+        active_view: ActiveView::LoaderInstallProgressModal {
+            slug: "ti".into(),
+            loader: LoaderType::Fabric,
+            version: "0.16.9".into(),
+            step_label: "init".into(),
+            step_index: 1,
+            step_total: 4,
+            bytes_done: 0,
+            bytes_total: 0,
+            cancel_token_key: "ti".into(),
+        },
+        ..AppState::default()
+    };
+    let _ = update(&mut s, Action::LoaderInstallProgress {
+        slug: "ti".into(),
+        pct: 42,
+        step_label: "Downloading loader libraries".into(),
+        bytes_done: 100,
+        bytes_total: 200,
+    });
+    if let ActiveView::LoaderInstallProgressModal { step_label, bytes_done, bytes_total, .. } = &s.active_view {
+        assert_eq!(step_label, "Downloading loader libraries");
+        assert_eq!(*bytes_done, 100);
+        assert_eq!(*bytes_total, 200);
+    } else {
+        panic!("expected progress modal")
+    }
+}
+
+#[test]
+fn test_loader_installed_clears_token_and_emits_fetch_instances() {
+    let mut s = AppState::default();
+    s.running_loader_installs.insert("ti".into(), CancellationToken::new());
+    let effects = update(&mut s, Action::LoaderInstalled { slug: "ti".into() });
+    assert!(s.running_loader_installs.is_empty());
+    assert!(matches!(s.active_view, ActiveView::InstanceList { .. }));
+    assert!(effects.iter().any(|e| matches!(e, Effect::FetchInstances)));
+}
+
+#[test]
+fn test_loader_install_failed_routes_to_failed_modal() {
+    let mut s = AppState::default();
+    s.running_loader_installs.insert("ti".into(), CancellationToken::new());
+    let _ = update(&mut s, Action::LoaderInstallFailed {
+        slug: "ti".into(),
+        loader: LoaderType::Quilt,
+        version: "0.30.0-beta.7".into(),
+        error: "no network".into(),
+        log_tail: "GET ...".into(),
+    });
+    assert!(s.running_loader_installs.is_empty());
+    assert!(matches!(s.active_view, ActiveView::LoaderInstallFailedModal { .. }));
+}
+
+#[test]
+fn test_dismiss_loader_install_failed_returns_to_list() {
+    let mut s = AppState {
+        active_view: ActiveView::LoaderInstallFailedModal {
+            slug: "ti".into(),
+            loader: LoaderType::Fabric,
+            version: "0.16.9".into(),
+            error: "x".into(),
+            log_tail: "y".into(),
+        },
+        ..AppState::default()
+    };
+    let _ = update(&mut s, Action::DismissLoaderInstallFailed);
+    assert!(matches!(s.active_view, ActiveView::InstanceList { .. }));
+}
+
+#[test]
+fn test_confirm_loader_switch_to_none_emits_remove_effect() {
+    let mut s = state_with_one_instance("ti", "1.21.4");
+    s.active_view = ActiveView::LoaderSwitchConfirm {
+        slug: "ti".into(),
+        from_loader: Some("fabric:0.16.9".into()),
+        to_loader: "none".into(),
+        type_switch: false,
+    };
+    let effects = update(&mut s, Action::ConfirmLoaderSwitch);
+    assert!(matches!(effects.as_slice(), [Effect::RemoveLoader { .. }]));
+}
+
+#[test]
+fn test_confirm_loader_switch_to_quilt_emits_install_effect() {
+    let mut s = state_with_one_instance("ti", "1.21.4");
+    s.active_view = ActiveView::LoaderSwitchConfirm {
+        slug: "ti".into(),
+        from_loader: Some("fabric:0.16.9".into()),
+        to_loader: "quilt:0.30.0-beta.7".into(),
+        type_switch: true,
+    };
+    let effects = update(&mut s, Action::ConfirmLoaderSwitch);
+    match effects.as_slice() {
+        [Effect::InstallLoader { loader_type: LoaderType::Quilt, loader_version, .. }] => {
+            assert_eq!(loader_version, "0.30.0-beta.7");
+        }
+        other => panic!("expected Effect::InstallLoader(Quilt); got {other:?}"),
+    }
+}
+
+#[test]
+fn test_cancel_loader_install_cancels_token_and_returns_to_list() {
+    let mut s = AppState::default();
+    let t = CancellationToken::new();
+    s.running_loader_installs.insert("ti".into(), t.clone());
+    s.active_view = ActiveView::LoaderInstallProgressModal {
+        slug: "ti".into(),
+        loader: LoaderType::Fabric,
+        version: "0.16.9".into(),
+        step_label: "downloading".into(),
+        step_index: 2,
+        step_total: 4,
+        bytes_done: 0,
+        bytes_total: 0,
+        cancel_token_key: "ti".into(),
+    };
+    let effects = update(&mut s, Action::CancelLoaderInstall { slug: "ti".into() });
+    assert!(t.is_cancelled());
+    assert!(s.running_loader_installs.is_empty());
+    assert!(matches!(s.active_view, ActiveView::InstanceList { .. }));
+    assert!(matches!(effects.as_slice(), [Effect::CancelLoaderInstall { .. }]));
+}
