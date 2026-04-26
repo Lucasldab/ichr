@@ -129,8 +129,8 @@ mineltui is a terminal-UI Minecraft Java Edition launcher built in Rust + ratatu
 - [x] 06-04-quilt-client-PLAN.md — QuiltMetaClient: v3 API + is_quilt_stable + no-hash library invariant
 - [x] 06-05-loader-service-PLAN.md — LoaderService 4-step install pipeline + idempotent re-attach + remove + switch + cancellation
 - [x] 06-06-tui-state-PLAN.md — 5 ActiveView + 19 Action + 4 Effect variants + LoaderPickerRow + update arms (pure)
-- [ ] 06-07-tui-views-PLAN.md — 5 new view files (picker / version-picker / progress / failed / switch confirm) + view.rs dispatch + views/mod.rs
-- [ ] 06-08-tui-wiring-PLAN.md — run.rs LoaderService Arc + 4 effect arms + L keybind + instance_list status cell + 11 tui_smoke tests
+- [x] 06-07-tui-views-PLAN.md — 5 new view files (picker / version-picker / progress / failed / switch confirm) + view.rs dispatch + views/mod.rs
+- [x] 06-08-tui-wiring-PLAN.md — run.rs LoaderService Arc + 4 effect arms + L keybind + instance_list status cell + 11 tui_smoke tests
 - [ ] 06-09-integration-validation-PLAN.md — tests/loader_live.rs (#[ignore] Fabric+Quilt live) + 06-VALIDATION.md fill + 06-HUMAN-UAT.md + nyquist checkpoint
 **UI hint**: yes
 
