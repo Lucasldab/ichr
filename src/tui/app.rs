@@ -22,6 +22,7 @@ use crate::domain::platform::{Arch, OsName};
 use crate::domain::InstanceManifest;
 use crate::java::detect::SystemJava;
 use crate::java::types::JavaRuntimeId;
+use crate::loader::types::{LoaderType, LoaderVersionEntry};
 use crate::mojang::types::VersionEntry;
 use crate::tasks::{JobId, TaskEvent};
 
@@ -68,6 +69,48 @@ pub enum ActiveView {
         options: Vec<JavaPickerRow>,
         selected: usize,
     },
+    /// Phase 6: choose between None / Fabric / Quilt for an instance.
+    LoaderPickerModal {
+        slug: String,
+        selected: usize,
+    },
+    /// Phase 6: choose a specific loader version after the user picks Fabric or Quilt.
+    LoaderVersionPickerModal {
+        slug: String,
+        loader: LoaderType,
+        versions: Vec<LoaderVersionEntry>,
+        filter_stable_only: bool,
+        search: String,
+        selected: usize,
+        current_version: Option<String>,
+    },
+    /// Phase 6: live progress modal during install.
+    LoaderInstallProgressModal {
+        slug: String,
+        loader: LoaderType,
+        version: String,
+        step_label: String,
+        step_index: usize,
+        step_total: usize,
+        bytes_done: u64,
+        bytes_total: u64,
+        cancel_token_key: String,
+    },
+    /// Phase 6: error modal when install fails (mirrors LaunchFailedModal).
+    LoaderInstallFailedModal {
+        slug: String,
+        loader: LoaderType,
+        version: String,
+        error: String,
+        log_tail: String,
+    },
+    /// Phase 6: inline confirm overlay when switching loader (mirrors DeleteConfirm).
+    LoaderSwitchConfirm {
+        slug: String,
+        from_loader: Option<String>,
+        to_loader: String,
+        type_switch: bool,
+    },
 }
 
 /// A row in the Java picker modal.
@@ -79,6 +122,17 @@ pub enum JavaPickerRow {
     Detected(SystemJava),
     /// Escape hatch: user edits instance.json manually.
     Manual,
+}
+
+/// A row in the loader picker modal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LoaderPickerRow {
+    /// No loader (vanilla — clears installed loader if any).
+    None,
+    /// Open the Fabric version picker.
+    Fabric,
+    /// Open the Quilt version picker.
+    Quilt,
 }
 
 impl Default for ActiveView {
@@ -101,6 +155,10 @@ pub struct AppState {
     /// Tracks slug → CancellationToken for every currently-running launch job.
     /// Populated by Action::LaunchJobStarted; cleared by InstanceExited / LaunchFailed.
     pub running_instances: HashMap<String, CancellationToken>,
+    /// Tracks slug → CancellationToken for in-progress loader installs.
+    /// Populated by Action::LoaderInstallStarted; cleared by
+    /// LoaderInstalled / LoaderInstallFailed (mirrors `running_instances`).
+    pub running_loader_installs: HashMap<String, CancellationToken>,
     /// Persisted list of Microsoft accounts.
     pub accounts: Vec<Account>,
     /// id of the currently-active account, if any. Drives whether
@@ -246,6 +304,19 @@ pub enum Effect {
     FetchSystemJavas { slug: String },
     /// Atomically write (or clear) java_override on the instance manifest.
     SetJavaOverride { slug: String, override_id: Option<JavaRuntimeId> },
+    /// Phase 6: fetch the list of loader versions for a given LoaderType.
+    FetchLoaderVersions { slug: String, loader_type: LoaderType },
+    /// Phase 6: spawn the install_loader pipeline.
+    InstallLoader {
+        slug: String,
+        loader_type: LoaderType,
+        mc_version: String,
+        loader_version: String,
+    },
+    /// Phase 6: cancel the running install for the given slug.
+    CancelLoaderInstall { slug: String },
+    /// Phase 6: remove the active loader from an instance.
+    RemoveLoader { slug: String },
 }
 
 /// Apply an `Action`, mutate `state`, and return the side-effects to execute.

@@ -216,6 +216,12 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         ActiveView::JavaPickerModal { .. } => {
             super::views::java_picker_modal::map_java_picker_event(ev)
         }
+        // Phase 6: loader modals — event mappers wired in 06-07/06-08.
+        ActiveView::LoaderPickerModal { .. }
+        | ActiveView::LoaderVersionPickerModal { .. }
+        | ActiveView::LoaderInstallProgressModal { .. }
+        | ActiveView::LoaderInstallFailedModal { .. }
+        | ActiveView::LoaderSwitchConfirm { .. } => None,
     }
 }
 
@@ -829,6 +835,14 @@ async fn execute_effects(
                         }
                     }
                 });
+            }
+
+            // Phase 6: loader effects — wired in 06-08.
+            Effect::FetchLoaderVersions { .. }
+            | Effect::InstallLoader { .. }
+            | Effect::CancelLoaderInstall { .. }
+            | Effect::RemoveLoader { .. } => {
+                // Stubs: runtime wiring lands in plan 06-08.
             }
         }
     }
