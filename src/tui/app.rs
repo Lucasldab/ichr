@@ -241,6 +241,47 @@ pub enum Action {
     /// Effect failed: java_override write returned an error.
     JavaOverrideFailed { slug: String, reason: String },
 
+    // Phase 6: Loader picker
+    /// Open the loader type picker for a specific instance (dispatched by `L` keybind).
+    OpenLoaderPicker { slug: String },
+    /// Move the loader picker selection up/down (wrapping over 3 rows: None/Fabric/Quilt).
+    LoaderPickerMove(isize),
+    /// Confirm the highlighted loader picker row.
+    LoaderPickerSelect,
+    /// Dismiss the loader picker without mutating anything.
+    LoaderPickerCancel,
+    /// Async result: loader versions list fetched and ready to display.
+    LoaderVersionsLoaded { slug: String, loader: LoaderType, versions: Vec<LoaderVersionEntry> },
+    /// Move the loader version picker selection up/down (wrapping over filtered list).
+    LoaderVersionPickerMove(isize),
+    /// Toggle stable-only filter in the loader version picker.
+    ToggleStableFilter,
+    /// Type a character into the version search box.
+    LoaderVersionTypeSearch(char),
+    /// Delete the last character from the version search box.
+    LoaderVersionBackspaceSearch,
+    /// Confirm the highlighted loader version (install or switch).
+    LoaderVersionSelect,
+    /// Dismiss the loader version picker and return to loader picker.
+    LoaderVersionPickerCancel,
+    /// Internal — emitted by execute_effects inside the spawned task body BEFORE
+    /// calling install_loader. Inserts the CancellationToken into running_loader_installs.
+    LoaderInstallStarted { slug: String, token: CancellationToken },
+    /// Progress update from the install task — updates the progress modal fields.
+    LoaderInstallProgress { slug: String, pct: u8, step_label: String, bytes_done: u64, bytes_total: u64 },
+    /// Install completed successfully — clears running token, refreshes instances.
+    LoaderInstalled { slug: String },
+    /// Install failed — clears running token, transitions to failed modal.
+    LoaderInstallFailed { slug: String, loader: LoaderType, version: String, error: String, log_tail: String },
+    /// Cancel a running loader install (Esc on progress modal).
+    CancelLoaderInstall { slug: String },
+    /// Dismiss the loader install failed modal (Esc).
+    DismissLoaderInstallFailed,
+    /// Confirm the loader switch (y/Y in switch confirm modal).
+    ConfirmLoaderSwitch,
+    /// Cancel the loader switch (n/Esc in switch confirm modal).
+    CancelLoaderSwitch,
+
     // Phase 3: launch lifecycle
     /// Dispatch when Enter is pressed on a non-running instance row.
     LaunchInstance { slug: String },
@@ -317,6 +358,43 @@ pub enum Effect {
     CancelLoaderInstall { slug: String },
     /// Phase 6: remove the active loader from an instance.
     RemoveLoader { slug: String },
+}
+
+/// Format a loader for the status cell or switch dialog: "fabric:0.16.9".
+fn loader_label_short(kind: crate::domain::instance::ModloaderKind, version: &str) -> String {
+    use crate::domain::instance::ModloaderKind;
+    let kind_str = match kind {
+        ModloaderKind::Fabric => "fabric",
+        ModloaderKind::Quilt => "quilt",
+        ModloaderKind::Forge => "forge",
+        ModloaderKind::NeoForge => "neoforge",
+        ModloaderKind::Vanilla => "vanilla",
+    };
+    format!("{kind_str}:{version}")
+}
+
+/// Apply the current LoaderVersionPickerModal filter+search to its `versions`,
+/// returning indices (into the original list) of visible rows. Quilt with
+/// `filter_stable_only=true` shows all versions but the renderer adds `(beta)`
+/// suffix per UI-SPEC §Open Question 3 lock-in. For Fabric, `filter_stable_only`
+/// hides unstable versions.
+pub fn loader_versions_visible_indices(
+    versions: &[LoaderVersionEntry],
+    loader: LoaderType,
+    filter_stable_only: bool,
+    search: &str,
+) -> Vec<usize> {
+    let s_lc = search.to_ascii_lowercase();
+    versions
+        .iter()
+        .enumerate()
+        .filter(|(_, v)| match loader {
+            LoaderType::Fabric => !filter_stable_only || v.stable,
+            LoaderType::Quilt => true, // see UI-SPEC §Loader Version Picker (Quilt)
+        })
+        .filter(|(_, v)| s_lc.is_empty() || v.version.to_ascii_lowercase().contains(&s_lc))
+        .map(|(i, _)| i)
+        .collect()
 }
 
 /// Apply an `Action`, mutate `state`, and return the side-effects to execute.
@@ -765,6 +843,352 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![Effect::FetchInstances]
         }
 
+        // Phase 6: Loader picker arms
+        Action::OpenLoaderPicker { slug } => {
+            // T-06-16: block picker if instance is running.
+            if state.running_instances.contains_key(&slug) {
+                return vec![];
+            }
+            state.active_view = ActiveView::LoaderPickerModal { slug, selected: 0 };
+            vec![]
+        }
+        Action::LoaderPickerMove(delta) => {
+            if let ActiveView::LoaderPickerModal { selected, .. } = &mut state.active_view {
+                const ROWS: isize = 3; // None / Fabric / Quilt
+                let new_idx = (*selected as isize + delta).rem_euclid(ROWS);
+                *selected = new_idx as usize;
+            }
+            vec![]
+        }
+        Action::LoaderPickerSelect => {
+            let (slug, selected) = match &state.active_view {
+                ActiveView::LoaderPickerModal { slug, selected } => (slug.clone(), *selected),
+                _ => return vec![],
+            };
+            match selected {
+                0 => {
+                    // None row: if instance has a loader → open switch confirm to "none".
+                    // Otherwise it's already vanilla — no-op.
+                    let has_loader = state.instances.iter()
+                        .find(|m| m.slug == slug)
+                        .and_then(|m| m.loader.as_ref())
+                        .is_some();
+                    if has_loader {
+                        let from_label = state.instances.iter()
+                            .find(|m| m.slug == slug)
+                            .and_then(|m| m.loader.as_ref())
+                            .map(|l| loader_label_short(l.kind, &l.version));
+                        state.active_view = ActiveView::LoaderSwitchConfirm {
+                            slug,
+                            from_loader: from_label,
+                            to_loader: "none".into(),
+                            type_switch: false,
+                        };
+                    }
+                    vec![]
+                }
+                1 => {
+                    // Fabric row
+                    let current_version = state.instances.iter()
+                        .find(|m| m.slug == slug)
+                        .and_then(|m| m.loader.as_ref())
+                        .filter(|l| l.kind == crate::domain::instance::ModloaderKind::Fabric)
+                        .map(|l| l.version.clone());
+                    state.active_view = ActiveView::LoaderVersionPickerModal {
+                        slug: slug.clone(),
+                        loader: LoaderType::Fabric,
+                        versions: vec![],
+                        filter_stable_only: true,
+                        search: String::new(),
+                        selected: 0,
+                        current_version,
+                    };
+                    vec![Effect::FetchLoaderVersions { slug, loader_type: LoaderType::Fabric }]
+                }
+                2 => {
+                    // Quilt row — show all by default (Open Question 3 lock)
+                    let current_version = state.instances.iter()
+                        .find(|m| m.slug == slug)
+                        .and_then(|m| m.loader.as_ref())
+                        .filter(|l| l.kind == crate::domain::instance::ModloaderKind::Quilt)
+                        .map(|l| l.version.clone());
+                    state.active_view = ActiveView::LoaderVersionPickerModal {
+                        slug: slug.clone(),
+                        loader: LoaderType::Quilt,
+                        versions: vec![],
+                        filter_stable_only: false,
+                        search: String::new(),
+                        selected: 0,
+                        current_version,
+                    };
+                    vec![Effect::FetchLoaderVersions { slug, loader_type: LoaderType::Quilt }]
+                }
+                _ => vec![],
+            }
+        }
+        Action::LoaderPickerCancel => {
+            state.active_view = ActiveView::default();
+            vec![]
+        }
+        Action::LoaderVersionsLoaded { slug, loader, versions } => {
+            if let ActiveView::LoaderVersionPickerModal {
+                slug: modal_slug,
+                loader: modal_loader,
+                versions: ref mut v,
+                selected,
+                ..
+            } = &mut state.active_view
+            {
+                if *modal_slug == slug && *modal_loader == loader {
+                    *v = versions;
+                    *selected = 0;
+                }
+            }
+            vec![]
+        }
+        Action::LoaderVersionPickerMove(delta) => {
+            if let ActiveView::LoaderVersionPickerModal {
+                versions,
+                loader,
+                filter_stable_only,
+                search,
+                selected,
+                ..
+            } = &mut state.active_view
+            {
+                let visible = loader_versions_visible_indices(
+                    versions,
+                    *loader,
+                    *filter_stable_only,
+                    search,
+                );
+                let len = visible.len() as isize;
+                if len > 0 {
+                    let new_idx = (*selected as isize + delta).rem_euclid(len);
+                    *selected = new_idx as usize;
+                }
+            }
+            vec![]
+        }
+        Action::ToggleStableFilter => {
+            if let ActiveView::LoaderVersionPickerModal { filter_stable_only, selected, .. } =
+                &mut state.active_view
+            {
+                *filter_stable_only = !*filter_stable_only;
+                *selected = 0;
+            }
+            vec![]
+        }
+        Action::LoaderVersionTypeSearch(c) => {
+            if let ActiveView::LoaderVersionPickerModal { search, selected, .. } =
+                &mut state.active_view
+            {
+                search.push(c);
+                *selected = 0;
+            }
+            vec![]
+        }
+        Action::LoaderVersionBackspaceSearch => {
+            if let ActiveView::LoaderVersionPickerModal { search, selected, .. } =
+                &mut state.active_view
+            {
+                search.pop();
+                *selected = 0;
+            }
+            vec![]
+        }
+        Action::LoaderVersionSelect => {
+            let (slug, loader_type, versions, filter_stable_only, search, selected, current_version) =
+                match &state.active_view {
+                    ActiveView::LoaderVersionPickerModal {
+                        slug, loader, versions, filter_stable_only, search, selected, current_version,
+                    } => (
+                        slug.clone(),
+                        *loader,
+                        versions.clone(),
+                        *filter_stable_only,
+                        search.clone(),
+                        *selected,
+                        current_version.clone(),
+                    ),
+                    _ => return vec![],
+                };
+            let visible = loader_versions_visible_indices(&versions, loader_type, filter_stable_only, &search);
+            let real_idx = match visible.get(selected) {
+                Some(&i) => i,
+                None => return vec![], // empty list — no-op
+            };
+            let chosen = &versions[real_idx];
+            let chosen_version = chosen.version.clone();
+
+            // Same version already installed — no-op.
+            if current_version.as_deref() == Some(&chosen_version) {
+                return vec![];
+            }
+
+            // Get mc_version from instances.
+            let mc_version = state.instances.iter()
+                .find(|m| m.slug == slug)
+                .map(|m| m.mc_version_id.clone())
+                .unwrap_or_default();
+
+            if current_version.is_some() {
+                // Different version / switching — show confirm dialog.
+                let loader_kind = match loader_type {
+                    LoaderType::Fabric => crate::domain::instance::ModloaderKind::Fabric,
+                    LoaderType::Quilt => crate::domain::instance::ModloaderKind::Quilt,
+                };
+                let from_label = current_version
+                    .as_deref()
+                    .map(|v| loader_label_short(loader_kind, v));
+                let to_label = loader_label_short(loader_kind, &chosen_version);
+                // type_switch is false because we are in the version picker for a specific type.
+                state.active_view = ActiveView::LoaderSwitchConfirm {
+                    slug,
+                    from_loader: from_label,
+                    to_loader: to_label,
+                    type_switch: false,
+                };
+                vec![]
+            } else {
+                // No existing loader — emit install effect and show progress.
+                state.active_view = ActiveView::LoaderInstallProgressModal {
+                    slug: slug.clone(),
+                    loader: loader_type,
+                    version: chosen_version.clone(),
+                    step_label: "Fetching meta".into(),
+                    step_index: 1,
+                    step_total: 4,
+                    bytes_done: 0,
+                    bytes_total: 0,
+                    cancel_token_key: slug.clone(),
+                };
+                vec![Effect::InstallLoader {
+                    slug,
+                    loader_type,
+                    mc_version,
+                    loader_version: chosen_version,
+                }]
+            }
+        }
+        Action::LoaderVersionPickerCancel => {
+            // Return to the loader picker (select the row matching the current loader type).
+            let (slug, loader) = match &state.active_view {
+                ActiveView::LoaderVersionPickerModal { slug, loader, .. } => {
+                    (slug.clone(), *loader)
+                }
+                _ => {
+                    state.active_view = ActiveView::default();
+                    return vec![];
+                }
+            };
+            let row = match loader {
+                LoaderType::Fabric => 1,
+                LoaderType::Quilt => 2,
+            };
+            state.active_view = ActiveView::LoaderPickerModal { slug, selected: row };
+            vec![]
+        }
+        Action::LoaderInstallStarted { slug, token } => {
+            state.running_loader_installs.insert(slug, token);
+            vec![]
+        }
+        Action::LoaderInstallProgress { slug, pct, step_label, bytes_done, bytes_total } => {
+            if let ActiveView::LoaderInstallProgressModal {
+                slug: modal_slug,
+                step_label: ref mut sl,
+                bytes_done: ref mut bd,
+                bytes_total: ref mut bt,
+                step_index: ref mut si,
+                ..
+            } = &mut state.active_view
+            {
+                if *modal_slug == slug {
+                    *sl = step_label;
+                    *bd = bytes_done;
+                    *bt = bytes_total;
+                    // pct drives step_index: 0-33% = step 1, 34-66% = step 2, 67-99% = step 3, 100% = step 4
+                    *si = match pct {
+                        0..=33 => 1,
+                        34..=66 => 2,
+                        67..=99 => 3,
+                        _ => 4,
+                    };
+                }
+            }
+            vec![]
+        }
+        Action::LoaderInstalled { slug } => {
+            state.running_loader_installs.remove(&slug);
+            state.active_view = ActiveView::default();
+            vec![Effect::FetchInstances]
+        }
+        Action::LoaderInstallFailed { slug, loader, version, error, log_tail } => {
+            state.running_loader_installs.remove(&slug);
+            state.active_view = ActiveView::LoaderInstallFailedModal {
+                slug,
+                loader,
+                version,
+                error,
+                log_tail,
+            };
+            vec![]
+        }
+        Action::CancelLoaderInstall { slug } => {
+            if let Some(token) = state.running_loader_installs.remove(&slug) {
+                token.cancel();
+            }
+            state.active_view = ActiveView::default();
+            vec![Effect::CancelLoaderInstall { slug }]
+        }
+        Action::DismissLoaderInstallFailed => {
+            state.active_view = ActiveView::default();
+            vec![]
+        }
+        Action::ConfirmLoaderSwitch => {
+            let (slug, to_loader) = match &state.active_view {
+                ActiveView::LoaderSwitchConfirm { slug, to_loader, .. } => {
+                    (slug.clone(), to_loader.clone())
+                }
+                _ => return vec![],
+            };
+            state.active_view = ActiveView::default();
+            if to_loader == "none" {
+                return vec![Effect::RemoveLoader { slug }];
+            }
+            // Parse "kind:version" format.
+            let (kind_str, loader_version) = match to_loader.split_once(':') {
+                Some(parts) => parts,
+                None => return vec![],
+            };
+            let loader_type = match kind_str {
+                "fabric" => LoaderType::Fabric,
+                "quilt" => LoaderType::Quilt,
+                _ => return vec![],
+            };
+            let mc_version = state.instances.iter()
+                .find(|m| m.slug == slug)
+                .map(|m| m.mc_version_id.clone())
+                .unwrap_or_default();
+            let loader_version = loader_version.to_string();
+            state.active_view = ActiveView::LoaderInstallProgressModal {
+                slug: slug.clone(),
+                loader: loader_type,
+                version: loader_version.clone(),
+                step_label: "Fetching meta".into(),
+                step_index: 1,
+                step_total: 4,
+                bytes_done: 0,
+                bytes_total: 0,
+                cancel_token_key: slug.clone(),
+            };
+            vec![Effect::InstallLoader { slug, loader_type, mc_version, loader_version }]
+        }
+        Action::CancelLoaderSwitch => {
+            state.active_view = ActiveView::default();
+            vec![]
+        }
+
         Action::StopInstance { slug } => {
             // Cancel and clear immediately so the running badge disappears on the
             // next render. The async launch task will later dispatch
@@ -904,5 +1328,229 @@ mod tests {
         assert!(t.is_cancelled());
         assert!(state.add_account_cancel.is_none());
         assert!(matches!(state.active_view, ActiveView::AccountsList { selected: 0 }));
+    }
+
+    // ── Phase 6: Loader picker tests ──────────────────────────────────────────
+
+    fn fab_versions(n: usize) -> Vec<LoaderVersionEntry> {
+        (0..n).map(|i| LoaderVersionEntry {
+            version: format!("0.16.{i}"),
+            stable: i % 2 == 0,
+            build: Some(500 + i as u32),
+        }).collect()
+    }
+
+    fn vanilla_state_with(slug: &str, mc: &str) -> AppState {
+        let mut s = AppState::default();
+        s.instances.push(crate::domain::InstanceManifest::new(slug.into(), slug.into(), mc.into()));
+        s
+    }
+
+    #[test]
+    fn test_open_loader_picker_sets_active_view() {
+        let mut s = vanilla_state_with("ti", "1.21.4");
+        let _ = update(&mut s, Action::OpenLoaderPicker { slug: "ti".into() });
+        assert!(matches!(s.active_view, ActiveView::LoaderPickerModal { selected: 0, .. }));
+    }
+
+    #[test]
+    fn test_open_loader_picker_blocks_running_instance() {
+        let mut s = vanilla_state_with("ti", "1.21.4");
+        s.running_instances.insert("ti".into(), CancellationToken::new());
+        let _ = update(&mut s, Action::OpenLoaderPicker { slug: "ti".into() });
+        // No transition — instance is running
+        assert!(matches!(s.active_view, ActiveView::InstanceList { .. }));
+    }
+
+    #[test]
+    fn test_loader_picker_move_wraps_three_rows() {
+        let mut s = vanilla_state_with("ti", "1.21.4");
+        let _ = update(&mut s, Action::OpenLoaderPicker { slug: "ti".into() });
+        let _ = update(&mut s, Action::LoaderPickerMove(1));
+        let _ = update(&mut s, Action::LoaderPickerMove(1));
+        let _ = update(&mut s, Action::LoaderPickerMove(1));
+        // 3 rows total → moves wrap back to 0
+        if let ActiveView::LoaderPickerModal { selected, .. } = s.active_view {
+            assert_eq!(selected, 0);
+        } else { panic!("wrong view"); }
+    }
+
+    #[test]
+    fn test_loader_picker_select_fabric_emits_fetch_effect() {
+        let mut s = vanilla_state_with("ti", "1.21.4");
+        let _ = update(&mut s, Action::OpenLoaderPicker { slug: "ti".into() });
+        let _ = update(&mut s, Action::LoaderPickerMove(1)); // Fabric (index 1)
+        let effects = update(&mut s, Action::LoaderPickerSelect);
+        assert!(matches!(
+            effects.as_slice(),
+            [Effect::FetchLoaderVersions { loader_type: LoaderType::Fabric, .. }]
+        ));
+        assert!(matches!(s.active_view, ActiveView::LoaderVersionPickerModal { loader: LoaderType::Fabric, .. }));
+    }
+
+    #[test]
+    fn test_loader_picker_select_none_with_no_loader_is_noop() {
+        let mut s = vanilla_state_with("ti", "1.21.4");
+        let _ = update(&mut s, Action::OpenLoaderPicker { slug: "ti".into() });
+        // selected = 0 = None
+        let effects = update(&mut s, Action::LoaderPickerSelect);
+        assert!(effects.is_empty());
+    }
+
+    #[test]
+    fn test_loader_versions_loaded_replaces_versions() {
+        let mut s = vanilla_state_with("ti", "1.21.4");
+        s.active_view = ActiveView::LoaderVersionPickerModal {
+            slug: "ti".into(), loader: LoaderType::Fabric,
+            versions: vec![], filter_stable_only: true,
+            search: String::new(), selected: 0, current_version: None,
+        };
+        let _ = update(&mut s, Action::LoaderVersionsLoaded {
+            slug: "ti".into(), loader: LoaderType::Fabric, versions: fab_versions(3),
+        });
+        if let ActiveView::LoaderVersionPickerModal { versions, selected, .. } = &s.active_view {
+            assert_eq!(versions.len(), 3);
+            assert_eq!(*selected, 0);
+        } else { panic!() }
+    }
+
+    #[test]
+    fn test_toggle_stable_filter_flips_bool() {
+        let mut s = vanilla_state_with("ti", "1.21.4");
+        s.active_view = ActiveView::LoaderVersionPickerModal {
+            slug: "ti".into(), loader: LoaderType::Fabric,
+            versions: fab_versions(2), filter_stable_only: true,
+            search: String::new(), selected: 0, current_version: None,
+        };
+        let _ = update(&mut s, Action::ToggleStableFilter);
+        if let ActiveView::LoaderVersionPickerModal { filter_stable_only, .. } = &s.active_view {
+            assert!(!filter_stable_only);
+        } else { panic!() }
+    }
+
+    #[test]
+    fn test_loader_version_select_no_current_emits_install_effect() {
+        let mut s = vanilla_state_with("ti", "1.21.4");
+        s.active_view = ActiveView::LoaderVersionPickerModal {
+            slug: "ti".into(), loader: LoaderType::Fabric,
+            versions: fab_versions(3), filter_stable_only: false,
+            search: String::new(), selected: 0, current_version: None,
+        };
+        let effects = update(&mut s, Action::LoaderVersionSelect);
+        match effects.as_slice() {
+            [Effect::InstallLoader { loader_type: LoaderType::Fabric, mc_version, loader_version, .. }] => {
+                assert_eq!(mc_version, "1.21.4");
+                assert_eq!(loader_version, "0.16.0");
+            }
+            other => panic!("expected InstallLoader, got {other:?}"),
+        }
+        assert!(matches!(s.active_view, ActiveView::LoaderInstallProgressModal { .. }));
+    }
+
+    #[test]
+    fn test_loader_install_started_inserts_token() {
+        let mut s = AppState::default();
+        let t = CancellationToken::new();
+        let _ = update(&mut s, Action::LoaderInstallStarted { slug: "ti".into(), token: t.clone() });
+        assert!(s.running_loader_installs.contains_key("ti"));
+        assert!(!t.is_cancelled());
+    }
+
+    #[test]
+    fn test_loader_installed_clears_token_and_returns_to_list() {
+        let mut s = AppState::default();
+        s.running_loader_installs.insert("ti".into(), CancellationToken::new());
+        let effects = update(&mut s, Action::LoaderInstalled { slug: "ti".into() });
+        assert!(s.running_loader_installs.is_empty());
+        assert!(matches!(s.active_view, ActiveView::InstanceList { .. }));
+        assert!(matches!(effects.as_slice(), [Effect::FetchInstances]));
+    }
+
+    #[test]
+    fn test_loader_install_failed_routes_to_failed_modal() {
+        let mut s = AppState::default();
+        s.running_loader_installs.insert("ti".into(), CancellationToken::new());
+        let _ = update(&mut s, Action::LoaderInstallFailed {
+            slug: "ti".into(), loader: LoaderType::Fabric, version: "0.16.9".into(),
+            error: "network".into(), log_tail: "GET ...".into(),
+        });
+        assert!(s.running_loader_installs.is_empty());
+        assert!(matches!(s.active_view, ActiveView::LoaderInstallFailedModal { .. }));
+    }
+
+    #[test]
+    fn test_cancel_loader_install_cancels_token() {
+        let mut s = AppState::default();
+        let t = CancellationToken::new();
+        s.running_loader_installs.insert("ti".into(), t.clone());
+        let effects = update(&mut s, Action::CancelLoaderInstall { slug: "ti".into() });
+        assert!(t.is_cancelled());
+        assert!(s.running_loader_installs.is_empty());
+        assert!(matches!(effects.as_slice(), [Effect::CancelLoaderInstall { .. }]));
+    }
+
+    #[test]
+    fn test_dismiss_loader_install_failed_returns_to_list() {
+        let mut s = AppState {
+            active_view: ActiveView::LoaderInstallFailedModal {
+                slug: "ti".into(), loader: LoaderType::Fabric, version: "0.16.9".into(),
+                error: "x".into(), log_tail: "y".into(),
+            },
+            ..AppState::default()
+        };
+        let _ = update(&mut s, Action::DismissLoaderInstallFailed);
+        assert!(matches!(s.active_view, ActiveView::InstanceList { .. }));
+    }
+
+    #[test]
+    fn test_confirm_loader_switch_emits_remove_when_to_none() {
+        let mut s = vanilla_state_with("ti", "1.21.4");
+        s.active_view = ActiveView::LoaderSwitchConfirm {
+            slug: "ti".into(), from_loader: Some("fabric:0.16.9".into()),
+            to_loader: "none".into(), type_switch: false,
+        };
+        let effects = update(&mut s, Action::ConfirmLoaderSwitch);
+        assert!(matches!(effects.as_slice(), [Effect::RemoveLoader { .. }]));
+        assert!(matches!(s.active_view, ActiveView::InstanceList { .. }));
+    }
+
+    #[test]
+    fn test_confirm_loader_switch_emits_install_for_to_loader() {
+        let mut s = vanilla_state_with("ti", "1.21.4");
+        s.active_view = ActiveView::LoaderSwitchConfirm {
+            slug: "ti".into(), from_loader: Some("fabric:0.16.8".into()),
+            to_loader: "fabric:0.16.9".into(), type_switch: false,
+        };
+        let effects = update(&mut s, Action::ConfirmLoaderSwitch);
+        match effects.as_slice() {
+            [Effect::InstallLoader { loader_type: LoaderType::Fabric, loader_version, mc_version, .. }] => {
+                assert_eq!(loader_version, "0.16.9");
+                assert_eq!(mc_version, "1.21.4");
+            }
+            other => panic!("expected InstallLoader, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_loader_versions_visible_indices_quilt_shows_all_when_filter_on() {
+        // Open Question 3 lock: Quilt always shows all versions; UI suffix renders (beta)
+        let versions = vec![
+            LoaderVersionEntry { version: "0.30.0-beta.7".into(), stable: false, build: Some(120) },
+            LoaderVersionEntry { version: "0.27.2".into(), stable: true, build: Some(50) },
+        ];
+        let visible = loader_versions_visible_indices(&versions, LoaderType::Quilt, true, "");
+        assert_eq!(visible, vec![0, 1], "Quilt always shows all (per UI-SPEC Open Q3)");
+    }
+
+    #[test]
+    fn test_loader_versions_visible_indices_fabric_filters_unstable() {
+        let versions = vec![
+            LoaderVersionEntry { version: "0.16.9".into(), stable: true, build: Some(509) },
+            LoaderVersionEntry { version: "0.17.0-beta.1".into(), stable: false, build: Some(600) },
+        ];
+        let visible = loader_versions_visible_indices(&versions, LoaderType::Fabric, true, "");
+        assert_eq!(visible, vec![0]);
+        let all = loader_versions_visible_indices(&versions, LoaderType::Fabric, false, "");
+        assert_eq!(all, vec![0, 1]);
     }
 }
