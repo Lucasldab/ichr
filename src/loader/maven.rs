@@ -10,9 +10,11 @@
 
 use crate::loader::error::LoaderError;
 
-/// Returns true iff every byte of `s` is in `[A-Za-z0-9._-]` and `s` is non-empty.
+/// Returns true iff every byte of `s` is in `[A-Za-z0-9._-]`, `s` is non-empty,
+/// and `s` is not the path-traversal sentinel `..`.
 fn is_safe_maven_segment(s: &str) -> bool {
     !s.is_empty()
+        && s != ".."
         && s.bytes().all(|b| {
             b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-'
         })
