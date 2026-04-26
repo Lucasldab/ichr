@@ -9,6 +9,7 @@ pub mod install;
 pub mod java;
 pub mod instance;
 pub mod launcher;
+pub mod loader;
 pub mod mojang;
 pub mod observability;
 pub mod persistence;
