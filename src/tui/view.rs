@@ -14,6 +14,11 @@ use super::views::{
     instance_list::{render_group_inline_overlay, render_instance_list},
     java_picker_modal::render_java_picker_modal,
     launch_failed_modal::render_launch_failed_modal,
+    loader_install_failed_modal::render_loader_install_failed_modal,
+    loader_install_progress_modal::render_loader_install_progress_modal,
+    loader_picker_modal::render_loader_picker_modal,
+    loader_switch_confirm::render_loader_switch_confirm,
+    loader_version_picker_modal::render_loader_version_picker_modal,
     version_picker::render_version_picker,
 };
 
@@ -47,12 +52,17 @@ pub fn view(state: &AppState, f: &mut Frame) {
         ActiveView::AddAccountDeviceCode { .. } => render_add_account_device_code(f, main, state),
         ActiveView::AccountAuthFailed { .. } => render_account_auth_failed(f, main, state),
         ActiveView::JavaPickerModal { .. } => render_java_picker_modal(f, main, state),
-        // Phase 6: loader modals — renderers wired in 06-07.
-        ActiveView::LoaderPickerModal { .. }
-        | ActiveView::LoaderVersionPickerModal { .. }
-        | ActiveView::LoaderInstallProgressModal { .. }
-        | ActiveView::LoaderInstallFailedModal { .. }
-        | ActiveView::LoaderSwitchConfirm { .. } => {}
+        ActiveView::LoaderPickerModal { .. } => render_loader_picker_modal(f, main, state),
+        ActiveView::LoaderVersionPickerModal { .. } => {
+            render_loader_version_picker_modal(f, main, state)
+        }
+        ActiveView::LoaderInstallProgressModal { .. } => {
+            render_loader_install_progress_modal(f, main, state)
+        }
+        ActiveView::LoaderInstallFailedModal { .. } => {
+            render_loader_install_failed_modal(f, main, state)
+        }
+        ActiveView::LoaderSwitchConfirm { .. } => render_loader_switch_confirm(f, main, state),
     }
 
     render_download_pane(f, dl, state);
