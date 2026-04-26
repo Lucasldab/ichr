@@ -130,6 +130,13 @@ impl QuiltMetaClient {
             .collect())
     }
 
+    /// Borrow the underlying reqwest client for library downloads.
+    /// Reusing this client preserves connection pooling and respects the
+    /// same timeouts as meta API calls.
+    pub(crate) fn http(&self) -> &reqwest::Client {
+        &self.http
+    }
+
     #[tracing::instrument(skip_all, fields(game_version, loader_version))]
     pub async fn fetch_profile(
         &self,
