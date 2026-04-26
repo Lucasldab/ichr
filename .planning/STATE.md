@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 
 Phase: 6 (Fabric and Quilt Modloaders) — IN PROGRESS
 Plans: 9 across 7 waves
-Status: Plan 06-03 complete
+Status: Plan 06-04 complete
 Outstanding from Phase 5: 05-HUMAN-UAT.md (live smoke test parked)
 Last activity: 2026-04-26
 
@@ -86,6 +86,7 @@ Progress: [#░░░░░░░░░] 11%
 | Phase 05 P07 | 20 | 2 tasks | 3 files |
 | Phase 06 P01 | 15 | 3 tasks | 8 files |
 | Phase 06 P03 | 2min | 1 tasks | 1 files |
+| Phase 06 P04 | 10min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -164,6 +165,8 @@ Recent decisions affecting current work:
 - [Phase 06]: LoaderService stub struct defined in service.rs (not just doc-comment) because mod.rs re-exports it and crate must compile
 - [Phase 06-03]: FabricProfile returns raw_bytes (Vec<u8>) verbatim alongside parsed fields so 06-05 can atomic_write without re-serializing (preserves inheritsFrom, arguments, mainClass)
 - [Phase 06-03]: FabricMetaClient dual-constructor pattern: new() reads MINELTUI_FABRIC_META_BASE_URL env var, new_with_base_url() injects test URL without env mutation
+- [Phase 06-04]: Quilt stable derivation: case-insensitive contains check for beta/rc/pre substrings; is_quilt_stable exported pub for 06-05 switch test
+- [Phase 06-04]: QuiltMetaClient mirrors FabricMetaClient constructor pattern; Quilt no-hash invariant enforced by serde #[serde(default)] on all LoaderLibrary hash fields
 
 ### Pending Todos
 
@@ -184,6 +187,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-26T12:07:48Z
-Stopped at: Completed 06-03-fabric-client-PLAN.md
+Last session: 2026-04-26T07:51:45Z
+Stopped at: Completed 06-04-quilt-client-PLAN.md
 Resume file: None
