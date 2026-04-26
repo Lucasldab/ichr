@@ -32,6 +32,16 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
             };
             let last_col = if state.running_instances.contains_key(&m.slug) {
                 Cell::from("running").style(Style::default().add_modifier(Modifier::BOLD))
+            } else if let Some(loader) = &m.loader {
+                let kind = match loader.kind {
+                    crate::domain::instance::ModloaderKind::Fabric => "fabric",
+                    crate::domain::instance::ModloaderKind::Quilt => "quilt",
+                    crate::domain::instance::ModloaderKind::Forge => "forge",
+                    crate::domain::instance::ModloaderKind::NeoForge => "neoforge",
+                    crate::domain::instance::ModloaderKind::Vanilla => "vanilla",
+                };
+                let n = loader.version.len().min(6);
+                Cell::from(format!("{kind}:{}", &loader.version[..n]))
             } else {
                 Cell::from(m.last_played_at.clone().unwrap_or_default())
             };
@@ -54,7 +64,7 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
         ],
     )
     .header(Row::new(vec!["Name", "MC Version", "Group", "Last played"]))
-    .block(Block::default().borders(Borders::ALL).title("Instances (c/r/x/d/g/Enter/s/A)"));
+    .block(Block::default().borders(Borders::ALL).title("Instances (c/r/x/d/g/Enter/s/A/L)"));
     f.render_widget(table, table_area);
 
     // Active-account footer row.
