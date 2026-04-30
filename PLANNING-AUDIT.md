@@ -1,7 +1,7 @@
 # Planning Audit — mineltui v1.0 milestone
 
 Generated: 2026-04-30  
-Branch: `autonomous/20260430-025339`  
+Branch: `prior-branch`  
 Run ID: 20260430-055339-mineltui
 
 ---
@@ -34,7 +34,7 @@ Two files are modified but uncommitted:
 
 ### `.planning/STATE.md` (modified, not staged)
 
-The working tree reflects the actual project state; HEAD contains stale/inflated numbers from the last autonomous session. Key deltas:
+The working tree reflects the actual project state; HEAD contains stale/inflated numbers from the last earlier session. Key deltas:
 
 | Field | HEAD (committed) | Working tree (accurate) |
 |-------|-----------------|------------------------|
@@ -44,13 +44,13 @@ The working tree reflects the actual project state; HEAD contains stale/inflated
 | `completed_plans` | 48 | 46 |
 | `percent` | 98% | 94% |
 
-**Root cause:** The previous autonomous session wrote `status: completed` and counted Phase 6 as a completed phase before the HUMAN-UAT checkpoint was satisfied. The next session (2026-04-27) corrected this in STATE.md but did not commit the correction.
+**Root cause:** The previous earlier session wrote `status: completed` and counted Phase 6 as a completed phase before the HUMAN-UAT checkpoint was satisfied. The next session (2026-04-27) corrected this in STATE.md but did not commit the correction.
 
 **Blocker:** The uncommitted STATE.md correction is accurate and must be committed before any GSD workflow proceeds, otherwise `/gsd-execute-phase` and state readers will resume from a false "completed" baseline and skip Phase 8 planning.
 
 ### `chat_history.json` (untracked)
 
-A session artifact (likely Claude Code conversation export). Contains no planning data. Safe to gitignore or delete; not part of the project.
+A session artifact (likely session export). Contains no planning data. Safe to gitignore or delete; not part of the project.
 
 ---
 
