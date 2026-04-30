@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: Completed 06-08-tui-wiring-PLAN.md
-last_updated: "2026-04-26T00:25:00Z"
-last_activity: 2026-04-26
+status: ready-to-plan
+stopped_at: Resumed 2026-04-27 — skipping Phase 7, routing to /gsd-plan-phase 8 (Modrinth Integration); P5/P6 HUMAN-UAT still parked
+last_updated: "2026-04-27T00:00:00Z"
+last_activity: 2026-04-27
 progress:
   total_phases: 12
-  completed_phases: 5
+  completed_phases: 4
   total_plans: 49
-  completed_plans: 48
-  percent: 98
+  completed_plans: 46
+  percent: 94
 ---
 
 # Project State
@@ -21,17 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-20)
 
 **Core value:** A user can create an instance, install a modloader and mods, and launch a working modded Minecraft — entirely from the TUI.
-**Current focus:** Phase 6 — Fabric and Quilt Modloaders (planned)
+**Current focus:** Phase 8 — Modrinth Integration (next to plan; Phase 7 deferred to ship-fast Modrinth path first)
 
 ## Current Position
 
-Phase: 6 (Fabric and Quilt Modloaders) — IN PROGRESS
-Plans: 9 across 7 waves
-Status: Plan 06-08 complete
-Outstanding from Phase 5: 05-HUMAN-UAT.md (live smoke test parked)
+Phase: 6 (Fabric and Quilt Modloaders) — PARKED with HUMAN-UAT debt
+Plans: 9/9 (8 auto complete; 06-09 Task 3 nyquist gate awaiting human smoke)
+Status: 06-VALIDATION.md still draft / nyquist_compliant: false; 06-HUMAN-UAT.md status: partial
+Outstanding HUMAN-UAT: 05-HUMAN-UAT.md (Phase 5 live smoke), 06-HUMAN-UAT.md (Phase 6 9-check smoke)
+Next: Phase 7 (Forge/NeoForge) — depends on Phase 5 + Phase 6 (both parked but not blocking phase 7 planning)
 Last activity: 2026-04-26
-
-Progress: [█████████░] 94%
 
 ## Performance Metrics
 
@@ -198,6 +197,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-26T00:25:00Z
-Stopped at: Completed 06-08-tui-wiring-PLAN.md
+Last session: 2026-04-27
+Stopped at: Resumed; user chose ship-fast — skipping Phase 7, routing to /gsd-plan-phase 8 (Modrinth Integration)
 Resume file: None
