@@ -25,7 +25,7 @@ use crate::java::types::JavaRuntimeId;
 use crate::loader::types::{LoaderInfo, LoaderType, LoaderVersionEntry};
 use crate::mods::dep_resolve::ResolvedDepGraph;
 use crate::mods::types::{
-    InstalledModRow, ModBrowserFetchState, ModrinthProjectDetail, ModrinthSearchHit,
+    DepKind, InstalledModRow, ModBrowserFetchState, ModrinthProjectDetail, ModrinthSearchHit,
     ModrinthVersion, ModrinthVersionEntry, ResolvedDep,
 };
 use crate::mojang::types::VersionEntry;
@@ -399,6 +399,109 @@ pub enum Action {
     InstanceRenamed { slug: String, new_name: String },
     InstanceCloned { source_slug: String, new_slug: String },
     ServiceErrored(String),
+
+    // ── Phase 8 (Modrinth Integration) — see UI-SPEC §Keybind Contract ──
+    // Mod browser
+    /// `M` keybind on InstanceList — opens the Modrinth mod browser for the
+    /// given instance. Pitfall 8 guard: silent no-op if a previous mod install
+    /// for this slug is still in flight (`state.running_mod_jobs.contains_key`).
+    OpenModBrowser { slug: String },
+    /// Async result: search results loaded for the open ModBrowser.
+    ModBrowserSearchLoaded { slug: String, hits: Vec<ModrinthSearchHit> },
+    /// Move the highlighted row in the ModBrowser results list (saturating).
+    ModBrowserMove(isize),
+    /// Enter on a ModBrowser row — opens the version picker for the selected mod.
+    ModBrowserOpenVersions,
+    /// `v` in ModBrowser — cycles MC filter (None ↔ Some("any")) and re-emits search.
+    ToggleModMcFilter,
+    /// `l` in ModBrowser — cycles loader filter (None ↔ Some("any")) and re-emits search.
+    ToggleModLoaderFilter,
+    /// Backspace in ModBrowser search input — pops last char, re-emits search if empty.
+    ModBrowserBackspaceSearch,
+    /// Esc in ModBrowser — returns to InstanceList.
+    ModBrowserCancel,
+    /// Printable char into ModBrowser search input. j/k disambiguation lives in the
+    /// keymap (08-08): when search is empty, j/k navigate; otherwise they type.
+    ModBrowserTypeSearch(char),
+    /// Async result: project detail (right-pane preview) loaded.
+    ModDetailLoaded { slug: String, detail: ModrinthProjectDetail },
+
+    // Version picker
+    /// Async result: per-project version list loaded for the open version picker.
+    ModVersionsLoaded { slug: String, versions: Vec<ModrinthVersionEntry> },
+    /// Move the highlighted version row (saturating).
+    ModVersionPickerMove(isize),
+    /// Enter on a version row — fires `Effect::ResolveModDependencies`.
+    ModVersionPickerSelect,
+    /// Esc on the version picker — returns to ModBrowser (preserves user's place).
+    ModVersionPickerCancel,
+
+    // Dep-confirm modal
+    /// Async result: BFS dep resolution finished — opens DepConfirmModal.
+    ModDepsResolved {
+        slug: String,
+        project_id: String,
+        project_title: String,
+        version_id: String,
+        version_label: String,
+        graph: Box<ResolvedDepGraph>,
+    },
+    /// `y`/`Y` on DepConfirmModal — fires `Effect::InstallModWithDeps` IFF
+    /// `has_conflict == false`.
+    ConfirmModInstall,
+    /// `n`/`Esc` on DepConfirmModal — returns to ModVersionPickerModal per
+    /// UI-SPEC line 597 (preserves user's place).
+    CancelModInstall,
+
+    // Install lifecycle
+    /// Internal — emitted by execute_effects inside the spawned task body BEFORE
+    /// the install begins. Inserts the CancellationToken into running_mod_jobs.
+    /// Mirrors `LoaderInstallStarted`.
+    ModInstallStarted {
+        slug: String,
+        project_id: String,
+        token: CancellationToken,
+    },
+    /// Install completed successfully — clears running_mod_jobs row AND walks the
+    /// open ModBrowser results (if any) to stamp `already_installed = true` for
+    /// the matching `project_id` (Pitfall 10 fix).
+    ModInstalled { slug: String, project_id: String },
+    /// Install failed — clears running_mod_jobs row, transitions to the failed modal.
+    ModInstallFailed {
+        slug: String,
+        mod_title: String,
+        version_label: String,
+        error: String,
+        log_tail: String,
+    },
+    /// Esc on ModInstallFailedModal — returns to whichever view triggered the install
+    /// (ModBrowser → ModBrowser, anything else → InstalledModsList).
+    DismissModInstallFailed,
+
+    // Installed mods list
+    /// `m` keybind on InstanceList — opens the per-instance Installed Mods List.
+    /// Also emits `Effect::FetchInstalledMods` to populate the rows.
+    OpenInstalledMods { slug: String },
+    /// Async result: installed-mods ledger rows loaded for the open list.
+    InstalledModsLoaded { slug: String, mods: Vec<InstalledModRow> },
+    /// Move the highlighted row in the InstalledModsList (saturating).
+    InstalledModsMove(isize),
+    /// `e` keybind on InstalledModsList — fires `Effect::ToggleModEnabledEff`
+    /// for the highlighted row (renames `.jar` ↔ `.jar.disabled`).
+    ToggleModEnabled,
+    /// Async result: toggle finished — flip the `enabled` field on the matching row.
+    ModToggled { slug: String, mod_id: String, enabled: bool },
+    /// `x` keybind on InstalledModsList — opens the uninstall confirm overlay.
+    OpenUninstallModConfirm,
+    /// `y`/`Y` on UninstallModConfirm — fires `Effect::UninstallMod` and returns
+    /// to InstalledModsList immediately (responsive UX; row removed by ModUninstalled).
+    ConfirmUninstallMod,
+    /// `n`/`Esc` on UninstallModConfirm — returns to InstalledModsList.
+    CancelUninstallMod,
+    /// Async result: uninstall finished — remove the matching row from the list.
+    ModUninstalled { slug: String, mod_id: String },
+    /// Esc on InstalledModsList — returns to InstanceList.
+    CloseInstalledMods,
 }
 
 /// Effects requested by `update()`. NOTE: there is deliberately NO
@@ -1327,6 +1430,772 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![Effect::InstallLoader { slug, loader_type, mc_version, loader_version }]
         }
         Action::CancelLoaderSwitch => {
+            state.active_view = ActiveView::default();
+            vec![]
+        }
+
+        // ── Phase 8 (Modrinth Integration) — pure update() arms ──
+        // All arms below mutate AppState and (optionally) emit Effects. NO arm
+        // performs HTTP, file I/O, or task spawning — those live in 08-08 run.rs.
+
+        Action::OpenModBrowser { slug } => {
+            // Pitfall 8 (08-RESEARCH.md §Pitfall 8): silent no-op if a previous
+            // mod install for this instance is still in flight. The user is not
+            // shown an error — just nothing happens. Tested by
+            // `test_open_mod_browser_blocked_when_install_in_flight`.
+            if state.running_mod_jobs.contains_key(&slug) {
+                return vec![];
+            }
+            let (mc, loader) = state
+                .instances
+                .iter()
+                .find(|m| m.slug == slug)
+                .map(|m| (Some(m.mc_version_id.clone()), m.loader.clone()))
+                .unwrap_or((None, None));
+            state.active_view = ActiveView::ModBrowser {
+                slug: slug.clone(),
+                search: String::new(),
+                mc_filter_override: None,
+                loader_filter_override: None,
+                results: Vec::new(),
+                selected: 0,
+                fetch_state: ModBrowserFetchState::Loading,
+                selected_detail: None,
+            };
+            vec![Effect::SearchModrinth {
+                slug,
+                query: String::new(),
+                mc,
+                loader,
+            }]
+        }
+
+        Action::ModBrowserSearchLoaded { slug, hits } => {
+            if let ActiveView::ModBrowser {
+                slug: cur_slug,
+                results,
+                selected,
+                fetch_state,
+                ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug {
+                    let new_len = hits.len();
+                    *results = hits;
+                    *fetch_state = ModBrowserFetchState::Ready;
+                    *selected = (*selected).min(new_len.saturating_sub(1));
+                }
+            }
+            vec![]
+        }
+
+        Action::ModBrowserMove(delta) => {
+            if let ActiveView::ModBrowser { results, selected, .. } = &mut state.active_view {
+                let len = results.len();
+                if len > 0 {
+                    let new_idx = (*selected as isize + delta)
+                        .clamp(0, len as isize - 1) as usize;
+                    *selected = new_idx;
+                }
+            }
+            vec![]
+        }
+
+        Action::ModBrowserOpenVersions => {
+            // Capture (slug, project_id, project_title) from the highlighted row.
+            let captured = match &state.active_view {
+                ActiveView::ModBrowser { slug, results, selected, .. } => {
+                    results.get(*selected).map(|hit| {
+                        (slug.clone(), hit.project_id.clone(), hit.title.clone())
+                    })
+                }
+                _ => None,
+            };
+            let Some((slug, project_id, project_title)) = captured else {
+                return vec![];
+            };
+            // Look up MC + loader from the instance for the version-list query.
+            let (mc, loader) = state
+                .instances
+                .iter()
+                .find(|m| m.slug == slug)
+                .map(|m| (Some(m.mc_version_id.clone()), m.loader.clone()))
+                .unwrap_or((None, None));
+            // Transition to the version picker; rows are filled by ModVersionsLoaded.
+            state.active_view = ActiveView::ModVersionPickerModal {
+                slug: slug.clone(),
+                project_id: project_id.clone(),
+                project_title: project_title.clone(),
+                versions: Vec::new(),
+                selected: 0,
+            };
+            vec![Effect::ListModVersions {
+                slug,
+                project_id,
+                project_title,
+                mc,
+                loader,
+            }]
+        }
+
+        Action::ToggleModMcFilter => {
+            // Cycle: None ↔ Some("any"). Re-emit search with the new filter.
+            let captured = match &mut state.active_view {
+                ActiveView::ModBrowser {
+                    slug,
+                    search,
+                    mc_filter_override,
+                    loader_filter_override,
+                    ..
+                } => {
+                    *mc_filter_override = match mc_filter_override.as_deref() {
+                        None => Some("any".to_string()),
+                        Some(_) => None,
+                    };
+                    Some((
+                        slug.clone(),
+                        search.clone(),
+                        mc_filter_override.clone(),
+                        loader_filter_override.clone(),
+                    ))
+                }
+                _ => None,
+            };
+            let Some((slug, query, mc_override, loader_override)) = captured else {
+                return vec![];
+            };
+            // Resolve effective MC: override "any" -> no filter, else instance MC.
+            let inst = state.instances.iter().find(|m| m.slug == slug);
+            let mc = match mc_override.as_deref() {
+                Some("any") => None,
+                _ => inst.map(|m| m.mc_version_id.clone()),
+            };
+            let loader = match loader_override.as_deref() {
+                Some("any") => None,
+                _ => inst.and_then(|m| m.loader.clone()),
+            };
+            vec![Effect::SearchModrinth { slug, query, mc, loader }]
+        }
+
+        Action::ToggleModLoaderFilter => {
+            let captured = match &mut state.active_view {
+                ActiveView::ModBrowser {
+                    slug,
+                    search,
+                    mc_filter_override,
+                    loader_filter_override,
+                    ..
+                } => {
+                    *loader_filter_override = match loader_filter_override.as_deref() {
+                        None => Some("any".to_string()),
+                        Some(_) => None,
+                    };
+                    Some((
+                        slug.clone(),
+                        search.clone(),
+                        mc_filter_override.clone(),
+                        loader_filter_override.clone(),
+                    ))
+                }
+                _ => None,
+            };
+            let Some((slug, query, mc_override, loader_override)) = captured else {
+                return vec![];
+            };
+            let inst = state.instances.iter().find(|m| m.slug == slug);
+            let mc = match mc_override.as_deref() {
+                Some("any") => None,
+                _ => inst.map(|m| m.mc_version_id.clone()),
+            };
+            let loader = match loader_override.as_deref() {
+                Some("any") => None,
+                _ => inst.and_then(|m| m.loader.clone()),
+            };
+            vec![Effect::SearchModrinth { slug, query, mc, loader }]
+        }
+
+        Action::ModBrowserBackspaceSearch => {
+            let captured = match &mut state.active_view {
+                ActiveView::ModBrowser {
+                    slug,
+                    search,
+                    mc_filter_override,
+                    loader_filter_override,
+                    ..
+                } => {
+                    search.pop();
+                    Some((
+                        slug.clone(),
+                        search.clone(),
+                        mc_filter_override.clone(),
+                        loader_filter_override.clone(),
+                    ))
+                }
+                _ => None,
+            };
+            let Some((slug, query, mc_override, loader_override)) = captured else {
+                return vec![];
+            };
+            let inst = state.instances.iter().find(|m| m.slug == slug);
+            let mc = match mc_override.as_deref() {
+                Some("any") => None,
+                _ => inst.map(|m| m.mc_version_id.clone()),
+            };
+            let loader = match loader_override.as_deref() {
+                Some("any") => None,
+                _ => inst.and_then(|m| m.loader.clone()),
+            };
+            vec![Effect::SearchModrinth { slug, query, mc, loader }]
+        }
+
+        Action::ModBrowserCancel => {
+            state.active_view = ActiveView::default();
+            vec![]
+        }
+
+        Action::ModBrowserTypeSearch(c) => {
+            // The j/k disambiguation lives in the keymap (08-08); the update arm
+            // unconditionally appends. Re-emit the search with the new query.
+            let captured = match &mut state.active_view {
+                ActiveView::ModBrowser {
+                    slug,
+                    search,
+                    mc_filter_override,
+                    loader_filter_override,
+                    ..
+                } => {
+                    search.push(c);
+                    Some((
+                        slug.clone(),
+                        search.clone(),
+                        mc_filter_override.clone(),
+                        loader_filter_override.clone(),
+                    ))
+                }
+                _ => None,
+            };
+            let Some((slug, query, mc_override, loader_override)) = captured else {
+                return vec![];
+            };
+            let inst = state.instances.iter().find(|m| m.slug == slug);
+            let mc = match mc_override.as_deref() {
+                Some("any") => None,
+                _ => inst.map(|m| m.mc_version_id.clone()),
+            };
+            let loader = match loader_override.as_deref() {
+                Some("any") => None,
+                _ => inst.and_then(|m| m.loader.clone()),
+            };
+            vec![Effect::SearchModrinth { slug, query, mc, loader }]
+        }
+
+        Action::ModDetailLoaded { slug, detail } => {
+            if let ActiveView::ModBrowser { slug: cur_slug, selected_detail, .. } =
+                &mut state.active_view
+            {
+                if *cur_slug == slug {
+                    *selected_detail = Some(detail);
+                }
+            }
+            vec![]
+        }
+
+        Action::ModVersionsLoaded { slug, versions } => {
+            if let ActiveView::ModVersionPickerModal {
+                slug: cur_slug,
+                versions: ref mut v,
+                selected,
+                ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug {
+                    *v = versions;
+                    *selected = 0;
+                }
+            }
+            vec![]
+        }
+
+        Action::ModVersionPickerMove(delta) => {
+            if let ActiveView::ModVersionPickerModal { versions, selected, .. } =
+                &mut state.active_view
+            {
+                let len = versions.len();
+                if len > 0 {
+                    let new_idx = (*selected as isize + delta)
+                        .clamp(0, len as isize - 1) as usize;
+                    *selected = new_idx;
+                }
+            }
+            vec![]
+        }
+
+        Action::ModVersionPickerSelect => {
+            // Capture selected version, then emit ResolveModDependencies. Stay on
+            // the version picker until ModDepsResolved arrives.
+            let captured = match &state.active_view {
+                ActiveView::ModVersionPickerModal {
+                    slug,
+                    project_id,
+                    project_title,
+                    versions,
+                    selected,
+                } => versions.get(*selected).map(|v| {
+                    (
+                        slug.clone(),
+                        project_id.clone(),
+                        project_title.clone(),
+                        v.version_id.clone(),
+                        v.version_label.clone(),
+                    )
+                }),
+                _ => None,
+            };
+            let Some((slug, project_id, project_title, version_id, version_label)) = captured
+            else {
+                return vec![];
+            };
+            // mc + loader for the dep-resolve query come from the instance.
+            let inst = state.instances.iter().find(|m| m.slug == slug);
+            let mc = inst.map(|m| m.mc_version_id.clone()).unwrap_or_default();
+            let loader = inst.and_then(|m| m.loader.clone());
+            vec![Effect::ResolveModDependencies {
+                slug,
+                project_id,
+                project_title,
+                version_id,
+                version_label,
+                mc,
+                loader,
+            }]
+        }
+
+        Action::ModVersionPickerCancel => {
+            // Return to ModBrowser preserving captured slug. Clear other context;
+            // the browser will re-fetch via SearchModrinth on next user input.
+            let captured = match &state.active_view {
+                ActiveView::ModVersionPickerModal { slug, .. } => Some(slug.clone()),
+                _ => None,
+            };
+            let Some(slug) = captured else {
+                state.active_view = ActiveView::default();
+                return vec![];
+            };
+            // Mirror Phase 6's LoaderVersionPickerCancel: re-open browser cleanly.
+            // Issue OpenModBrowser semantics inline (without the Pitfall 8 guard,
+            // since cancelling a version-pick means there's no install in flight).
+            let (mc, loader) = state
+                .instances
+                .iter()
+                .find(|m| m.slug == slug)
+                .map(|m| (Some(m.mc_version_id.clone()), m.loader.clone()))
+                .unwrap_or((None, None));
+            state.active_view = ActiveView::ModBrowser {
+                slug: slug.clone(),
+                search: String::new(),
+                mc_filter_override: None,
+                loader_filter_override: None,
+                results: Vec::new(),
+                selected: 0,
+                fetch_state: ModBrowserFetchState::Loading,
+                selected_detail: None,
+            };
+            vec![Effect::SearchModrinth {
+                slug,
+                query: String::new(),
+                mc,
+                loader,
+            }]
+        }
+
+        Action::ModDepsResolved {
+            slug,
+            project_id,
+            project_title,
+            version_id,
+            version_label,
+            graph,
+        } => {
+            let total_bytes = graph.total_new_bytes;
+            let total_files = graph.total_new_files;
+            let has_conflict = graph
+                .deps
+                .iter()
+                .any(|d| matches!(d.kind, DepKind::Incompatible));
+            let deps: Vec<ResolvedDep> = graph.deps.clone();
+            let root_version = Box::new(graph.root.clone());
+            state.active_view = ActiveView::DepConfirmModal {
+                slug,
+                project_id,
+                project_title,
+                version_id,
+                version_label,
+                deps,
+                total_bytes,
+                total_files,
+                has_conflict,
+                root_version,
+            };
+            vec![]
+        }
+
+        Action::ConfirmModInstall => {
+            let captured = match &state.active_view {
+                ActiveView::DepConfirmModal {
+                    slug,
+                    project_id,
+                    project_title,
+                    has_conflict,
+                    root_version,
+                    deps: _,
+                    ..
+                } => {
+                    if *has_conflict {
+                        // T-08-07-04 mitigation: y is a no-op when has_conflict.
+                        return vec![];
+                    }
+                    Some((
+                        slug.clone(),
+                        project_id.clone(),
+                        project_title.clone(),
+                        root_version.clone(),
+                    ))
+                }
+                _ => None,
+            };
+            let Some((slug, _project_id, project_title, root_version)) = captured else {
+                return vec![];
+            };
+            // Rebuild the graph from the modal's stored fields. We only need
+            // root + deps + totals for the installer; capture those by cloning.
+            let (deps, total_new_bytes, total_new_files) = match &state.active_view {
+                ActiveView::DepConfirmModal { deps, total_bytes, total_files, .. } => (
+                    deps.clone(),
+                    *total_bytes,
+                    *total_files,
+                ),
+                _ => (Vec::new(), 0u64, 0usize),
+            };
+            let graph = Box::new(ResolvedDepGraph {
+                root: (*root_version).clone(),
+                deps,
+                total_new_bytes,
+                total_new_files,
+            });
+            // project_slug is NOT stored on the modal; the InstallModWithDeps
+            // effect arm in 08-08 will look it up from the root_version.
+            // We pass the project_id-as-slug placeholder; 08-08 will resolve.
+            let project_slug = root_version.project_id.clone();
+            // Stay on the modal until ModInstallStarted arrives (then 08-08
+            // transitions to ModBrowser per UI-SPEC §11 background install).
+            vec![Effect::InstallModWithDeps {
+                slug,
+                project_slug,
+                project_title,
+                root_version,
+                graph,
+            }]
+        }
+
+        Action::CancelModInstall => {
+            // Per UI-SPEC line 597 — return to ModVersionPickerModal preserving
+            // slug/project context. We do not have the original versions list cached
+            // here; transition to the picker with empty versions and selected=0.
+            // (08-08 may choose to re-fetch via ListModVersions; the spec only
+            // requires the user lands back on the version picker.)
+            let captured = match &state.active_view {
+                ActiveView::DepConfirmModal {
+                    slug,
+                    project_id,
+                    project_title,
+                    ..
+                } => Some((slug.clone(), project_id.clone(), project_title.clone())),
+                _ => None,
+            };
+            let Some((slug, project_id, project_title)) = captured else {
+                state.active_view = ActiveView::default();
+                return vec![];
+            };
+            state.active_view = ActiveView::ModVersionPickerModal {
+                slug: slug.clone(),
+                project_id: project_id.clone(),
+                project_title: project_title.clone(),
+                versions: Vec::new(),
+                selected: 0,
+            };
+            // mc/loader from the instance for the re-fetch.
+            let inst = state.instances.iter().find(|m| m.slug == slug);
+            let mc = inst.map(|m| m.mc_version_id.clone());
+            let loader = inst.and_then(|m| m.loader.clone());
+            vec![Effect::ListModVersions {
+                slug,
+                project_id,
+                project_title,
+                mc,
+                loader,
+            }]
+        }
+
+        Action::ModInstallStarted { slug, project_id: _, token } => {
+            state.running_mod_jobs.insert(slug.clone(), token);
+            // Transition active_view back to ModBrowser so the user can browse
+            // more while the install runs in the background (UI-SPEC §11).
+            // mc/loader from the instance.
+            let (mc, loader) = state
+                .instances
+                .iter()
+                .find(|m| m.slug == slug)
+                .map(|m| (Some(m.mc_version_id.clone()), m.loader.clone()))
+                .unwrap_or((None, None));
+            state.active_view = ActiveView::ModBrowser {
+                slug: slug.clone(),
+                search: String::new(),
+                mc_filter_override: None,
+                loader_filter_override: None,
+                results: Vec::new(),
+                selected: 0,
+                fetch_state: ModBrowserFetchState::Loading,
+                selected_detail: None,
+            };
+            vec![Effect::SearchModrinth {
+                slug,
+                query: String::new(),
+                mc,
+                loader,
+            }]
+        }
+
+        Action::ModInstalled { slug, project_id } => {
+            state.running_mod_jobs.remove(&slug);
+            // Pitfall 10 (08-RESEARCH.md §Pitfall 10): if the user is still in
+            // the ModBrowser for this instance, walk results and stamp
+            // already_installed = true on every hit matching project_id.
+            if let ActiveView::ModBrowser {
+                slug: cur_slug,
+                results,
+                ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug {
+                    for r in results.iter_mut() {
+                        if r.project_id == project_id {
+                            r.already_installed = true;
+                        }
+                    }
+                }
+            }
+            vec![]
+        }
+
+        Action::ModInstallFailed { slug, mod_title, version_label, error, log_tail } => {
+            state.running_mod_jobs.remove(&slug);
+            // Compute return_to from current active_view (per UI-SPEC line 626).
+            let return_to = match &state.active_view {
+                ActiveView::ModBrowser { .. } => ModInstallFailedReturnTo::ModBrowser,
+                _ => ModInstallFailedReturnTo::InstalledModsList,
+            };
+            state.active_view = ActiveView::ModInstallFailedModal {
+                slug,
+                mod_title,
+                version_label,
+                error,
+                log_tail,
+                return_to,
+            };
+            vec![]
+        }
+
+        Action::DismissModInstallFailed => {
+            let captured = match &state.active_view {
+                ActiveView::ModInstallFailedModal { slug, return_to, .. } => {
+                    Some((slug.clone(), *return_to))
+                }
+                _ => None,
+            };
+            match captured {
+                Some((slug, ModInstallFailedReturnTo::ModBrowser)) => {
+                    let (mc, loader) = state
+                        .instances
+                        .iter()
+                        .find(|m| m.slug == slug)
+                        .map(|m| (Some(m.mc_version_id.clone()), m.loader.clone()))
+                        .unwrap_or((None, None));
+                    state.active_view = ActiveView::ModBrowser {
+                        slug: slug.clone(),
+                        search: String::new(),
+                        mc_filter_override: None,
+                        loader_filter_override: None,
+                        results: Vec::new(),
+                        selected: 0,
+                        fetch_state: ModBrowserFetchState::Loading,
+                        selected_detail: None,
+                    };
+                    vec![Effect::SearchModrinth {
+                        slug,
+                        query: String::new(),
+                        mc,
+                        loader,
+                    }]
+                }
+                Some((slug, ModInstallFailedReturnTo::InstalledModsList)) => {
+                    state.active_view = ActiveView::InstalledModsList {
+                        slug: slug.clone(),
+                        mods: Vec::new(),
+                        selected: 0,
+                    };
+                    vec![Effect::FetchInstalledMods { slug }]
+                }
+                None => {
+                    state.active_view = ActiveView::default();
+                    vec![]
+                }
+            }
+        }
+
+        Action::OpenInstalledMods { slug } => {
+            state.active_view = ActiveView::InstalledModsList {
+                slug: slug.clone(),
+                mods: Vec::new(),
+                selected: 0,
+            };
+            vec![Effect::FetchInstalledMods { slug }]
+        }
+
+        Action::InstalledModsLoaded { slug, mods } => {
+            if let ActiveView::InstalledModsList {
+                slug: cur_slug,
+                mods: ref mut m,
+                selected,
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug {
+                    let new_len = mods.len();
+                    *m = mods;
+                    *selected = (*selected).min(new_len.saturating_sub(1));
+                }
+            }
+            vec![]
+        }
+
+        Action::InstalledModsMove(delta) => {
+            if let ActiveView::InstalledModsList { mods, selected, .. } = &mut state.active_view {
+                let len = mods.len();
+                if len > 0 {
+                    let new_idx = (*selected as isize + delta)
+                        .clamp(0, len as isize - 1) as usize;
+                    *selected = new_idx;
+                }
+            }
+            vec![]
+        }
+
+        Action::ToggleModEnabled => {
+            let captured = match &state.active_view {
+                ActiveView::InstalledModsList { slug, mods, selected } => {
+                    mods.get(*selected).map(|row| {
+                        (slug.clone(), row.mod_id.clone(), !row.enabled)
+                    })
+                }
+                _ => None,
+            };
+            let Some((slug, mod_id, want_enabled)) = captured else {
+                return vec![];
+            };
+            vec![Effect::ToggleModEnabledEff { slug, mod_id, want_enabled }]
+        }
+
+        Action::ModToggled { slug, mod_id, enabled } => {
+            if let ActiveView::InstalledModsList {
+                slug: cur_slug, mods, ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug {
+                    if let Some(row) = mods.iter_mut().find(|r| r.mod_id == mod_id) {
+                        row.enabled = enabled;
+                    }
+                }
+            }
+            vec![]
+        }
+
+        Action::OpenUninstallModConfirm => {
+            let captured = match &state.active_view {
+                ActiveView::InstalledModsList { slug, mods, selected } => {
+                    mods.get(*selected).map(|row| {
+                        (slug.clone(), row.mod_id.clone(), row.display_name.clone())
+                    })
+                }
+                _ => None,
+            };
+            let Some((slug, mod_id, display_name)) = captured else {
+                return vec![];
+            };
+            state.active_view = ActiveView::UninstallModConfirm {
+                slug,
+                mod_id,
+                display_name,
+            };
+            vec![]
+        }
+
+        Action::ConfirmUninstallMod => {
+            let captured = match &state.active_view {
+                ActiveView::UninstallModConfirm { slug, mod_id, .. } => {
+                    Some((slug.clone(), mod_id.clone()))
+                }
+                _ => None,
+            };
+            let Some((slug, mod_id)) = captured else {
+                return vec![];
+            };
+            // Responsive UX: return to InstalledModsList immediately; the row will
+            // be removed by Action::ModUninstalled when the effect completes.
+            state.active_view = ActiveView::InstalledModsList {
+                slug: slug.clone(),
+                mods: Vec::new(),
+                selected: 0,
+            };
+            vec![
+                Effect::UninstallMod {
+                    slug: slug.clone(),
+                    mod_id,
+                },
+                Effect::FetchInstalledMods { slug },
+            ]
+        }
+
+        Action::CancelUninstallMod => {
+            let captured = match &state.active_view {
+                ActiveView::UninstallModConfirm { slug, .. } => Some(slug.clone()),
+                _ => None,
+            };
+            let Some(slug) = captured else {
+                state.active_view = ActiveView::default();
+                return vec![];
+            };
+            state.active_view = ActiveView::InstalledModsList {
+                slug: slug.clone(),
+                mods: Vec::new(),
+                selected: 0,
+            };
+            vec![Effect::FetchInstalledMods { slug }]
+        }
+
+        Action::ModUninstalled { slug, mod_id } => {
+            if let ActiveView::InstalledModsList {
+                slug: cur_slug, mods, selected,
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug {
+                    mods.retain(|r| r.mod_id != mod_id);
+                    let new_len = mods.len();
+                    *selected = (*selected).min(new_len.saturating_sub(1));
+                }
+            }
+            vec![]
+        }
+
+        Action::CloseInstalledMods => {
             state.active_view = ActiveView::default();
             vec![]
         }
