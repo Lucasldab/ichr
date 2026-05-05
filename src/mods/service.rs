@@ -47,7 +47,13 @@ impl ModrinthService {
         })
     }
 
-    #[cfg(test)]
+    /// Construct a service from an already-built client.
+    ///
+    /// Used by unit tests with httpmock-injected base URLs and by integration
+    /// tests under `tests/` that exercise the full service stack against a
+    /// mock server. Promoted from `#[cfg(test)]` so external integration
+    /// tests can reach it without env-var-based race-prone redirection
+    /// (08-09 Task 2 needs `ModrinthService` over a per-test `MockServer`).
     pub fn with_client(client: ModrinthClient) -> Self {
         Self { client }
     }
