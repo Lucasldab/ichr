@@ -1572,3 +1572,137 @@ fn test_toggle_mc_filter_cycles_state_and_re_emits_search() {
         other => panic!("expected SearchModrinth; got {other:?}"),
     }
 }
+
+// ========================================================================
+// Phase 8 (08-08): keymap → action wiring tests for the M/m keybinds and
+// the mod_browser j/k disambiguation.
+// ========================================================================
+
+/// Helper: build a state focused on the InstanceList view with a single instance.
+fn instance_list_state_with(slug: &str, mc: &str) -> AppState {
+    AppState {
+        active_view: ActiveView::InstanceList { selected: 0 },
+        instances: vec![InstanceManifest::new(slug.into(), slug.into(), mc.into())],
+        ..AppState::default()
+    }
+}
+
+#[test]
+#[allow(non_snake_case)]
+fn test_uppercase_M_on_instance_list_emits_open_mod_browser() {
+    let state = instance_list_state_with("alpha", "1.20.4");
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('M'), KeyModifiers::NONE));
+    let action = map_event_pub(ev, &state).expect("M should emit Action");
+    match action {
+        Action::OpenModBrowser { slug } => assert_eq!(slug, "alpha"),
+        other => panic!("expected OpenModBrowser; got {other:?}"),
+    }
+}
+
+#[test]
+#[allow(non_snake_case)]
+fn test_uppercase_M_on_instance_list_blocked_when_install_in_flight() {
+    // Pitfall 8 (defense in depth at the keymap layer).
+    let mut state = instance_list_state_with("alpha", "1.20.4");
+    state.running_mod_jobs.insert("alpha".into(), CancellationToken::new());
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('M'), KeyModifiers::NONE));
+    assert!(
+        map_event_pub(ev, &state).is_none(),
+        "M must be a no-op while a mod install is in flight for the same slug",
+    );
+}
+
+#[test]
+fn test_lowercase_m_on_instance_list_emits_open_installed_mods() {
+    let state = instance_list_state_with("alpha", "1.20.4");
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE));
+    let action = map_event_pub(ev, &state).expect("m should emit Action");
+    match action {
+        Action::OpenInstalledMods { slug } => assert_eq!(slug, "alpha"),
+        other => panic!("expected OpenInstalledMods; got {other:?}"),
+    }
+}
+
+#[test]
+fn test_mod_browser_jk_navigates_when_search_empty() {
+    use mineltui::mods::types::ModBrowserFetchState;
+    let state = AppState {
+        active_view: ActiveView::ModBrowser {
+            slug: "alpha".into(),
+            search: String::new(),
+            mc_filter_override: None,
+            loader_filter_override: None,
+            results: vec![],
+            selected: 0,
+            fetch_state: ModBrowserFetchState::Ready,
+            selected_detail: None,
+        },
+        ..AppState::default()
+    };
+    let ev_j = CtEvent::Key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+    let ev_k = CtEvent::Key(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::NONE));
+    assert!(matches!(
+        map_event_pub(ev_j, &state),
+        Some(Action::ModBrowserMove(1))
+    ));
+    assert!(matches!(
+        map_event_pub(ev_k, &state),
+        Some(Action::ModBrowserMove(-1))
+    ));
+}
+
+#[test]
+fn test_mod_browser_jk_types_when_search_nonempty() {
+    use mineltui::mods::types::ModBrowserFetchState;
+    let state = AppState {
+        active_view: ActiveView::ModBrowser {
+            slug: "alpha".into(),
+            search: "fa".into(),
+            mc_filter_override: None,
+            loader_filter_override: None,
+            results: vec![],
+            selected: 0,
+            fetch_state: ModBrowserFetchState::Ready,
+            selected_detail: None,
+        },
+        ..AppState::default()
+    };
+    let ev_j = CtEvent::Key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+    let ev_k = CtEvent::Key(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::NONE));
+    assert!(matches!(
+        map_event_pub(ev_j, &state),
+        Some(Action::ModBrowserTypeSearch('j'))
+    ));
+    assert!(matches!(
+        map_event_pub(ev_k, &state),
+        Some(Action::ModBrowserTypeSearch('k'))
+    ));
+}
+
+#[test]
+fn test_mod_browser_arrows_always_navigate_even_with_search() {
+    use mineltui::mods::types::ModBrowserFetchState;
+    let state = AppState {
+        active_view: ActiveView::ModBrowser {
+            slug: "alpha".into(),
+            search: "fabric".into(),
+            mc_filter_override: None,
+            loader_filter_override: None,
+            results: vec![],
+            selected: 0,
+            fetch_state: ModBrowserFetchState::Ready,
+            selected_detail: None,
+        },
+        ..AppState::default()
+    };
+    let ev_up = CtEvent::Key(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE));
+    let ev_dn = CtEvent::Key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    assert!(matches!(
+        map_event_pub(ev_up, &state),
+        Some(Action::ModBrowserMove(-1))
+    ));
+    assert!(matches!(
+        map_event_pub(ev_dn, &state),
+        Some(Action::ModBrowserMove(1))
+    ));
+}

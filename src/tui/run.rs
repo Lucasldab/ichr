@@ -25,6 +25,7 @@ use crate::java::service::JavaService;
 use crate::loader::service::LoaderService;
 use crate::loader::types::LoaderType;
 use crate::launcher;
+use crate::mods::service::ModrinthService;
 use crate::mojang::client::MojangClient;
 use crate::mojang::types::VersionEntry;
 use crate::persistence::paths::AppPaths;
@@ -83,6 +84,8 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
     // Build the JavaService (owns Mojang JRE + Adoptium clients; constructed once).
     let java_service = Arc::new(JavaService::new().map_err(|e| anyhow::anyhow!("JavaService::new: {e}"))?);
     let loader_service = Arc::new(LoaderService::new().map_err(|e| anyhow::anyhow!("LoaderService::new: {e}"))?);
+    // Phase 8 (08-08): Modrinth service backs the mod browser/install flow.
+    let modrinth_service = Arc::new(ModrinthService::new().map_err(|e| anyhow::anyhow!("ModrinthService::new: {e}"))?);
 
     // Build the task plumbing. TaskEvents arrive on task_rx; we convert each
     // into an Action::Task and forward to the event loop via action_tx.
@@ -154,7 +157,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
                     Some(Ok(ev)) => {
                         if let Some(action) = map_event(ev, &state) {
                             let effects = update(&mut state, action);
-                            execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), &task_manager, &action_tx).await;
+                            execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), Arc::clone(&modrinth_service), &task_manager, &action_tx).await;
                         }
                     }
                     Some(Err(e)) => {
@@ -168,7 +171,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
                 match maybe_action {
                     Some(action) => {
                         let effects = update(&mut state, action);
-                        execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), &task_manager, &action_tx).await;
+                        execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), Arc::clone(&modrinth_service), &task_manager, &action_tx).await;
                     }
                     None => break,
                 }
@@ -234,14 +237,25 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         ActiveView::LoaderSwitchConfirm { .. } => {
             super::views::loader_switch_confirm::map_loader_switch_confirm_event(ev)
         }
-        // Phase 8 (08-07): event mappers for the new mod views land in 08-08.
-        // Until then, swallow events for these states so the build is green.
-        ActiveView::ModBrowser { .. }
-        | ActiveView::ModVersionPickerModal { .. }
-        | ActiveView::DepConfirmModal { .. }
-        | ActiveView::InstalledModsList { .. }
-        | ActiveView::UninstallModConfirm { .. }
-        | ActiveView::ModInstallFailedModal { .. } => None,
+        // Phase 8 (08-08): Modrinth view event mappers.
+        ActiveView::ModBrowser { .. } => {
+            super::views::mod_browser::map_mod_browser_event(ev, state)
+        }
+        ActiveView::ModVersionPickerModal { .. } => {
+            super::views::mod_version_picker_modal::map_mod_version_picker_event(ev)
+        }
+        ActiveView::DepConfirmModal { .. } => {
+            super::views::dep_confirm_modal::map_dep_confirm_event(ev, state)
+        }
+        ActiveView::InstalledModsList { .. } => {
+            super::views::installed_mods_list::map_installed_mods_list_event(ev)
+        }
+        ActiveView::UninstallModConfirm { .. } => {
+            super::views::uninstall_mod_confirm::map_uninstall_mod_confirm_event(ev)
+        }
+        ActiveView::ModInstallFailedModal { .. } => {
+            super::views::mod_install_failed_modal::map_mod_install_failed_event(ev)
+        }
     }
 }
 
@@ -339,6 +353,33 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
                     {
                         return Some(Action::OpenLoaderPicker { slug: m.slug.clone() });
                     }
+                }
+            }
+            None
+        }
+        CtEvent::Key(KeyEvent { code: KeyCode::Char('M'), modifiers, .. })
+            if !modifiers.contains(KeyModifiers::CONTROL) =>
+        {
+            // `M` (uppercase) opens the Modrinth mod browser. Pitfall 8 guard:
+            // silent no-op while a previous mod install is in flight for the same
+            // instance. The update() arm in app.rs enforces this too (defense in
+            // depth) — see test_open_mod_browser_blocked_when_install_in_flight.
+            if let ActiveView::InstanceList { selected } = &state.active_view {
+                if let Some(m) = state.instances.get(*selected) {
+                    if !state.running_mod_jobs.contains_key(&m.slug) {
+                        return Some(Action::OpenModBrowser { slug: m.slug.clone() });
+                    }
+                }
+            }
+            None
+        }
+        CtEvent::Key(KeyEvent { code: KeyCode::Char('m'), modifiers, .. })
+            if !modifiers.contains(KeyModifiers::CONTROL) =>
+        {
+            // `m` (lowercase) opens the per-instance Installed Mods List.
+            if let ActiveView::InstanceList { selected } = &state.active_view {
+                if let Some(m) = state.instances.get(*selected) {
+                    return Some(Action::OpenInstalledMods { slug: m.slug.clone() });
                 }
             }
             None
@@ -517,6 +558,7 @@ async fn execute_effects(
     account_service: Arc<AccountService>,
     java_service: Arc<JavaService>,
     loader_service: Arc<LoaderService>,
+    modrinth_service: Arc<ModrinthService>,
     task_manager: &TaskManager,
     action_tx: &mpsc::Sender<Action>,
 ) {
@@ -1011,19 +1053,303 @@ async fn execute_effects(
                 });
             }
 
-            // Phase 8 (08-07): Modrinth integration effects are declared up-front
-            // so the state machine + tui_smoke tests can land independently of the
-            // run-loop wiring. The spawn arms below are scaffold no-ops; 08-08
-            // replaces them with real ModrinthService calls (HTTP + ledger I/O).
-            Effect::SearchModrinth { .. }
-            | Effect::FetchModDetail { .. }
-            | Effect::ListModVersions { .. }
-            | Effect::ResolveModDependencies { .. }
-            | Effect::InstallModWithDeps { .. }
-            | Effect::ToggleModEnabledEff { .. }
-            | Effect::UninstallMod { .. }
-            | Effect::FetchInstalledMods { .. } => {
-                // Scaffold no-op — wired in 08-08.
+            // Phase 8 (08-08): Modrinth integration effect arms — wired below.
+            // Install progress (`Effect::InstallModWithDeps`) flows through the
+            // existing `download_pane` via `Action::Task(TaskEvent::Progress)`,
+            // NOT a blocking install modal — UI-SPEC §11 invariant.
+            Effect::SearchModrinth { slug, query, mc, loader } => {
+                let svc = Arc::clone(&modrinth_service);
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match svc
+                        .search(&query, mc.as_deref(), loader.as_ref(), Some(&paths2), Some(&slug))
+                        .await
+                    {
+                        Ok(hits) => {
+                            let _ = tx
+                                .send(Action::ModBrowserSearchLoaded { slug, hits })
+                                .await;
+                        }
+                        Err(e) => {
+                            // v1 surfaces empty results on error and logs a warning;
+                            // a dedicated `Action::ModBrowserSearchFailed` is a polish
+                            // item left for a follow-up plan (08-RESEARCH §Q1).
+                            tracing::warn!(error = %e, slug = %slug, "Modrinth search failed");
+                            let _ = tx
+                                .send(Action::ModBrowserSearchLoaded { slug, hits: Vec::new() })
+                                .await;
+                        }
+                    }
+                });
+            }
+
+            Effect::FetchModDetail { slug, project_id } => {
+                let svc = Arc::clone(&modrinth_service);
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match svc.get_project(&project_id).await {
+                        Ok(detail) => {
+                            let _ = tx.send(Action::ModDetailLoaded { slug, detail }).await;
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                error = %e,
+                                slug = %slug,
+                                project_id = %project_id,
+                                "Modrinth get_project failed",
+                            );
+                        }
+                    }
+                });
+            }
+
+            Effect::ListModVersions { slug, project_id, project_title: _, mc, loader } => {
+                let svc = Arc::clone(&modrinth_service);
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match svc
+                        .list_versions(&project_id, mc.as_deref(), loader.as_ref())
+                        .await
+                    {
+                        Ok(versions) => {
+                            let _ = tx
+                                .send(Action::ModVersionsLoaded { slug, versions })
+                                .await;
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                error = %e,
+                                slug = %slug,
+                                project_id = %project_id,
+                                "Modrinth list_versions failed",
+                            );
+                            // Surface as empty list — the version-picker empty-state
+                            // copy ("No versions match...") will render.
+                            let _ = tx
+                                .send(Action::ModVersionsLoaded { slug, versions: Vec::new() })
+                                .await;
+                        }
+                    }
+                });
+            }
+
+            Effect::ResolveModDependencies {
+                slug,
+                project_id,
+                project_title,
+                version_id,
+                version_label,
+                mc,
+                loader,
+            } => {
+                let svc = Arc::clone(&modrinth_service);
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match svc
+                        .resolve_dependencies(&paths2, &slug, &version_id, &mc, loader.as_ref())
+                        .await
+                    {
+                        Ok(graph) => {
+                            let _ = tx
+                                .send(Action::ModDepsResolved {
+                                    slug,
+                                    project_id,
+                                    project_title,
+                                    version_id,
+                                    version_label,
+                                    graph: Box::new(graph),
+                                })
+                                .await;
+                        }
+                        Err(e) => {
+                            // Surface dep-resolution failures via the install-failed
+                            // modal — same UX surface as a download error.
+                            let _ = tx
+                                .send(Action::ModInstallFailed {
+                                    slug,
+                                    mod_title: project_title,
+                                    version_label,
+                                    error: e.to_string(),
+                                    log_tail: String::new(),
+                                })
+                                .await;
+                        }
+                    }
+                });
+            }
+
+            Effect::InstallModWithDeps {
+                slug,
+                project_slug,
+                project_title,
+                root_version,
+                graph,
+            } => {
+                let svc = Arc::clone(&modrinth_service);
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                let job_id = task_manager.next_job_id();
+
+                // Forwarder: ModrinthService emits TaskEvent::Progress through `lt_tx`.
+                // Translate each event into Action::Task so it flows through the
+                // existing `state.active_jobs` → `download_pane` LineGauge — NOT
+                // a blocking install modal (UI-SPEC §11).
+                let (lt_tx, mut lt_rx) = mpsc::channel::<TaskEvent>(64);
+                {
+                    let tx_fwd = tx.clone();
+                    tokio::spawn(async move {
+                        while let Some(evt) = lt_rx.recv().await {
+                            // Only Progress events drive the download_pane LineGauge.
+                            // Completed/Failed are signalled separately via the per-arm
+                            // ModInstalled / ModInstallFailed actions below.
+                            if let TaskEvent::Progress { id, pct, msg } = evt {
+                                let _ = tx_fwd
+                                    .send(Action::Task(TaskEvent::Progress { id, pct, msg }))
+                                    .await;
+                            }
+                        }
+                    });
+                }
+
+                let slug_for_task = slug.clone();
+                let project_slug_for_task = project_slug.clone();
+                let project_title_for_task = project_title.clone();
+                let root_version_for_task = root_version.clone();
+                let graph_for_task = graph.clone();
+                task_manager.spawn_task(job_id, move |_task_tx, token| async move {
+                    let slug = slug_for_task;
+                    let _ = tx
+                        .send(Action::ModInstallStarted {
+                            slug: slug.clone(),
+                            project_id: root_version_for_task.project_id.clone(),
+                            token: token.clone(),
+                        })
+                        .await;
+
+                    let res = svc
+                        .install_mod_into_instance(
+                            &paths2,
+                            &slug,
+                            &project_slug_for_task,
+                            &project_title_for_task,
+                            &root_version_for_task,
+                            &graph_for_task,
+                            lt_tx,
+                            token,
+                            job_id,
+                        )
+                        .await;
+
+                    match res {
+                        Ok(()) => {
+                            let _ = tx
+                                .send(Action::ModInstalled {
+                                    slug,
+                                    project_id: root_version_for_task.project_id.clone(),
+                                })
+                                .await;
+                        }
+                        Err(crate::mods::error::ModrinthError::Cancelled) => {
+                            // Treat cancellation as a clean completion (Phase 6 precedent —
+                            // run.rs lines 962-967 for LoaderInstall). The user already
+                            // returned to ModBrowser via the cancel path.
+                            let _ = tx
+                                .send(Action::ModInstalled {
+                                    slug,
+                                    project_id: root_version_for_task.project_id.clone(),
+                                })
+                                .await;
+                        }
+                        Err(e) => {
+                            let _ = tx
+                                .send(Action::ModInstallFailed {
+                                    slug,
+                                    mod_title: project_title_for_task,
+                                    version_label: root_version_for_task.version_number.clone(),
+                                    error: e.to_string(),
+                                    log_tail: String::new(),
+                                })
+                                .await;
+                        }
+                    }
+                    Ok(())
+                });
+            }
+
+            Effect::ToggleModEnabledEff { slug, mod_id, want_enabled } => {
+                let svc = Arc::clone(&modrinth_service);
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    let res = if want_enabled {
+                        svc.enable_mod(&paths2, &slug, &mod_id).await
+                    } else {
+                        svc.disable_mod(&paths2, &slug, &mod_id).await
+                    };
+                    match res {
+                        Ok(()) => {
+                            let _ = tx
+                                .send(Action::ModToggled { slug, mod_id, enabled: want_enabled })
+                                .await;
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                error = %e,
+                                slug = %slug,
+                                mod_id = %mod_id,
+                                "Modrinth toggle_mod_enabled failed",
+                            );
+                        }
+                    }
+                });
+            }
+
+            Effect::UninstallMod { slug, mod_id } => {
+                let svc = Arc::clone(&modrinth_service);
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match svc.uninstall_mod(&paths2, &slug, &mod_id).await {
+                        Ok(()) => {
+                            let _ = tx.send(Action::ModUninstalled { slug, mod_id }).await;
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                error = %e,
+                                slug = %slug,
+                                mod_id = %mod_id,
+                                "Modrinth uninstall_mod failed",
+                            );
+                        }
+                    }
+                });
+            }
+
+            Effect::FetchInstalledMods { slug } => {
+                let svc = Arc::clone(&modrinth_service);
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match svc.list_installed_mods(&paths2, &slug).await {
+                        Ok(mods) => {
+                            let _ = tx
+                                .send(Action::InstalledModsLoaded { slug, mods })
+                                .await;
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                error = %e,
+                                slug = %slug,
+                                "Modrinth list_installed_mods failed",
+                            );
+                            let _ = tx
+                                .send(Action::InstalledModsLoaded { slug, mods: Vec::new() })
+                                .await;
+                        }
+                    }
+                });
             }
         }
     }
