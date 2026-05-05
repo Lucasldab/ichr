@@ -1,13 +1,37 @@
 //! BFS dependency resolution over Modrinth project versions.
 //!
-//! TDD RED: stub signature; full implementation lands in the GREEN commit.
+//! The algorithm is **pure-async** -- caller injects fetch closures so the
+//! algorithm is testable without httpmock (just hand-built ModrinthVersion
+//! fixtures). 08-06 ModrinthService passes closures that delegate to
+//! ModrinthClient::list_versions / get_version.
+//!
+//! Edge cases enumerated in 08-RESEARCH.md Section Pattern 5:
+//!   1. Circular deps -- `seen` HashSet ensures each project_id is processed once.
+//!   2. Missing version for MC+loader -- `fetch_latest` returns None -> NoCompatibleVersion.
+//!   3. Required dep already installed -- pre-seeded `seen` from ledger.
+//!   4. Embedded dep -- never queued, never downloaded.
+//!   5. Optional dep -- collected for UI; never queued.
+//!   6. Incompatible dep already installed -- abort with DependencyConflict.
+//!   7. Version downgrade -- out of scope for v1 (atomic_write replaces existing JAR).
+//!
+//! Q2 (08-RESEARCH.md Open Question Q2): if a dep has only `version_id` set
+//! (no `project_id`), the algorithm calls `fetch_version_by_id` to resolve the
+//! version, then derives `project_id` from the response and dedupes against `seen`.
+//!
+//! Algorithm shape mirrors `src/mojang/inherits.rs::resolve_inherits` -- iterative
+//! `VecDeque` + `HashSet` walk with no recursion (no `Box<dyn Future>` pin needed).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::mods::error::ModrinthError;
-use crate::mods::types::{ModrinthVersion, ResolvedDep};
+use crate::mods::filter::pick_primary_file;
+use crate::mods::types::{DepKind, ModrinthDep, ModrinthVersion, ResolvedDep};
 
 /// Result of dependency resolution.
+///
+/// `deps` is in BFS layer order; the root version is NOT included.
+/// `total_new_bytes` / `total_new_files` count only required-and-not-already-satisfied
+/// entries (matches the dep-confirm modal "Total: N file(s) to download (~size)" line).
 #[derive(Debug, Clone)]
 pub struct ResolvedDepGraph {
     pub root: ModrinthVersion,
@@ -18,15 +42,19 @@ pub struct ResolvedDepGraph {
 
 /// BFS resolve of the root version's required dependencies.
 ///
-/// RED-phase stub: returns an empty graph. GREEN replaces with the BFS body.
-#[allow(clippy::too_many_arguments)]
+/// Caller responsibilities:
+/// - `installed`: `project_id -> version_id` from the per-instance ledger.
+/// - `fetch_latest_for_project`: returns the latest matching ModrinthVersion (or None).
+///   For 08-06, this is `client.list_versions(...).map(pick_latest_by_date)`.
+/// - `fetch_version_by_id`: resolves a version_id to a ModrinthVersion (Q2 path).
+///   For 08-06, this is `client.get_version(version_id)`.
 pub async fn resolve_required_deps<F1, Fut1, F2, Fut2>(
     root: ModrinthVersion,
-    _mc: &str,
-    _loaders: &[String],
-    _installed: &HashMap<String, String>,
-    _fetch_latest_for_project: F1,
-    _fetch_version_by_id: F2,
+    mc: &str,
+    loaders: &[String],
+    installed: &HashMap<String, String>,
+    fetch_latest_for_project: F1,
+    fetch_version_by_id: F2,
 ) -> Result<ResolvedDepGraph, ModrinthError>
 where
     F1: Fn(String, String, Vec<String>) -> Fut1 + Sync,
@@ -34,21 +62,161 @@ where
     F2: Fn(String) -> Fut2 + Sync,
     Fut2: std::future::Future<Output = Result<ModrinthVersion, ModrinthError>> + Send,
 {
-    Ok(ResolvedDepGraph {
-        root,
-        deps: Vec::new(),
-        total_new_bytes: 0,
-        total_new_files: 0,
-    })
+    let mut deps: Vec<ResolvedDep> = Vec::new();
+    let mut seen: HashSet<String> = installed.keys().cloned().collect();
+    let mut q: VecDeque<ModrinthVersion> = VecDeque::new();
+    q.push_back(root.clone());
+
+    while let Some(v) = q.pop_front() {
+        // Iterate by index to avoid borrowing `v` across `.await` (the inner
+        // closure may need `v.project_id` but we only read scalar fields).
+        for d in v.dependencies.clone() {
+            // Resolve project_id -- direct on `dep`, or via Q2 fallback to fetch_version_by_id.
+            let project_id_owned: String = match (&d.project_id, &d.version_id) {
+                (Some(pid), _) => pid.clone(),
+                (None, Some(vid)) => {
+                    // Q2 path: dep pins a version_id without project_id. Resolve it.
+                    let resolved = fetch_version_by_id(vid.clone()).await?;
+                    resolved.project_id.clone()
+                }
+                (None, None) => continue, // spec-rare; skip silently per 08-RESEARCH.md Pattern 5.
+            };
+
+            process_dep(
+                &d,
+                project_id_owned,
+                &v,
+                mc,
+                loaders,
+                installed,
+                &mut seen,
+                &mut q,
+                &mut deps,
+                &fetch_latest_for_project,
+            )
+            .await?;
+        }
+    }
+
+    let mut total_new_bytes: u64 = 0;
+    let mut total_new_files: usize = 0;
+    for rd in &deps {
+        if matches!(rd.kind, DepKind::Required) && rd.is_new_download {
+            if let Some(ver) = &rd.version {
+                if let Some(f) = pick_primary_file(&ver.files) {
+                    total_new_bytes += f.size;
+                }
+                total_new_files += 1;
+            }
+        }
+    }
+
+    Ok(ResolvedDepGraph { root, deps, total_new_bytes, total_new_files })
+}
+
+/// Inner per-dep processing -- extracted to keep the BFS loop readable.
+#[allow(clippy::too_many_arguments)]
+async fn process_dep<F1, Fut1>(
+    d: &ModrinthDep,
+    project_id: String,
+    parent_version: &ModrinthVersion,
+    mc: &str,
+    loaders: &[String],
+    installed: &HashMap<String, String>,
+    seen: &mut HashSet<String>,
+    q: &mut VecDeque<ModrinthVersion>,
+    deps: &mut Vec<ResolvedDep>,
+    fetch_latest_for_project: &F1,
+) -> Result<(), ModrinthError>
+where
+    F1: Fn(String, String, Vec<String>) -> Fut1 + Sync,
+    Fut1: std::future::Future<Output = Result<Option<ModrinthVersion>, ModrinthError>> + Send,
+{
+    match d.dependency_type {
+        DepKind::Embedded => {
+            deps.push(ResolvedDep {
+                kind: DepKind::Embedded,
+                project_id,
+                project_title: String::new(),
+                version: None,
+                already_satisfied: true,
+                is_new_download: false,
+            });
+        }
+        DepKind::Incompatible => {
+            if installed.contains_key(&project_id) {
+                return Err(ModrinthError::DependencyConflict {
+                    conflicting_project_id: project_id,
+                    requested_by: parent_version.project_id.clone(),
+                });
+            }
+            deps.push(ResolvedDep {
+                kind: DepKind::Incompatible,
+                project_id,
+                project_title: String::new(),
+                version: None,
+                already_satisfied: false,
+                is_new_download: false,
+            });
+        }
+        DepKind::Optional => {
+            let satisfied = installed.contains_key(&project_id);
+            deps.push(ResolvedDep {
+                kind: DepKind::Optional,
+                project_id,
+                project_title: String::new(),
+                version: None,
+                already_satisfied: satisfied,
+                is_new_download: false,
+            });
+        }
+        DepKind::Required => {
+            if seen.contains(&project_id) {
+                deps.push(ResolvedDep {
+                    kind: DepKind::Required,
+                    project_id,
+                    project_title: String::new(),
+                    version: None,
+                    already_satisfied: true,
+                    is_new_download: false,
+                });
+                return Ok(());
+            }
+            seen.insert(project_id.clone());
+            let chosen = fetch_latest_for_project(
+                project_id.clone(),
+                mc.to_string(),
+                loaders.to_vec(),
+            )
+            .await?;
+            let Some(version) = chosen else {
+                return Err(ModrinthError::NoCompatibleVersion {
+                    project_id,
+                    mc: mc.to_string(),
+                    loaders: loaders.to_vec(),
+                });
+            };
+            q.push_back(version.clone());
+            deps.push(ResolvedDep {
+                kind: DepKind::Required,
+                project_id,
+                project_title: String::new(),
+                version: Some(version),
+                already_satisfied: false,
+                is_new_download: true,
+            });
+        }
+    }
+    Ok(())
 }
 
 // ============================================================================
-// === Tests — synthetic dep graphs, no HTTP                               ===
+// === Tests -- synthetic dep graphs, no HTTP                              ===
 // ============================================================================
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mods::types::{DepKind, ModrinthDep, ModrinthFile, ModrinthHashes};
+    use crate::mods::types::{ModrinthFile, ModrinthHashes};
 
     fn mk_file(name: &str, size: u64) -> ModrinthFile {
         ModrinthFile {
@@ -115,6 +283,7 @@ mod tests {
     }
 
     // 2. Diamond: root(A) -> required(B), required(C); B->D required, C->D required.
+    // Result: B, C, D unique downloads — D appears twice in deps but is_new_download=true once.
     #[tokio::test]
     async fn test_diamond_dedupe() {
         let d = mk_version("d1", "D", 50, vec![]);
@@ -139,6 +308,7 @@ mod tests {
             never_fetch_by_id,
         ).await.unwrap();
 
+        // BFS layer order: root visits B and C; then B visits D (new) then C visits D (already seen).
         let new_pids: Vec<&str> = g.deps.iter()
             .filter(|d| d.is_new_download)
             .map(|d| d.project_id.as_str())
@@ -170,6 +340,7 @@ mod tests {
             never_fetch_by_id,
         ).await.unwrap();
 
+        // Critical invariant: the function returns. Bounded by `seen` so cycles cannot diverge.
         assert!(g.deps.len() <= 4, "should terminate without exploding: got {} deps", g.deps.len());
     }
 
@@ -195,7 +366,7 @@ mod tests {
         }
     }
 
-    // 5. Optional collected, never queued. Root A -> optional(C). Algorithm should NOT call fetch_latest for C.
+    // 5. Optional collected, never queued. Root A -> optional(C). Algorithm should NOT call fetch_latest.
     #[tokio::test]
     async fn test_optional_collected_not_installed() {
         let root = mk_version("a1", "A", 100, vec![dep("C", DepKind::Optional)]);
