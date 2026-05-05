@@ -141,6 +141,17 @@ impl AppPaths {
         self.instance_dir(slug).join("instance.json")
     }
 
+    /// Sidecar mod ledger: `instances/{slug}/installed-mods.toml`.
+    /// Lives OUTSIDE `.minecraft/` so the game never sees it.
+    pub fn instance_mod_ledger(&self, slug: &str) -> PathBuf {
+        self.instance_dir(slug).join("installed-mods.toml")
+    }
+
+    /// Mod jar destination: `instances/{slug}/.minecraft/mods/{filename}`.
+    pub fn instance_mod_file(&self, slug: &str, filename: &str) -> PathBuf {
+        self.instance_minecraft_dir(slug).join("mods").join(filename)
+    }
+
     /// Per-instance log file for Minecraft stdout/stderr drain.
     /// Path: `{data_dir}/instances/{slug}/logs/mineltui.log`.
     /// The file is APPENDED at each launch; sessions are separated by a
@@ -279,5 +290,55 @@ mod accounts_path_tests {
         );
         assert_eq!(p.accounts_file(), PathBuf::from("/c/accounts.enc"));
         assert_eq!(p.accounts_json_file(), PathBuf::from("/c/accounts.json"));
+    }
+}
+
+#[cfg(test)]
+mod instance_mod_paths_tests {
+    use super::*;
+
+    fn test_paths() -> AppPaths {
+        AppPaths::with_roots(
+            PathBuf::from("/data"),
+            PathBuf::from("/config"),
+            PathBuf::from("/cache"),
+        )
+    }
+
+    #[test]
+    fn instance_mod_ledger_lives_outside_dot_minecraft() {
+        let p = test_paths();
+        let path = p.instance_mod_ledger("foo");
+        assert!(
+            path.ends_with("foo/installed-mods.toml"),
+            "got: {}",
+            path.display()
+        );
+        // Crucially NOT under .minecraft.
+        assert!(
+            !path.to_string_lossy().contains(".minecraft"),
+            "ledger must live outside .minecraft: {}",
+            path.display()
+        );
+        // Full expected path under instances/.
+        assert_eq!(
+            path,
+            PathBuf::from("/data/instances/foo/installed-mods.toml")
+        );
+    }
+
+    #[test]
+    fn instance_mod_file_lives_inside_dot_minecraft_mods() {
+        let p = test_paths();
+        let path = p.instance_mod_file("foo", "sodium.jar");
+        assert!(
+            path.ends_with("foo/.minecraft/mods/sodium.jar"),
+            "got: {}",
+            path.display()
+        );
+        assert_eq!(
+            path,
+            PathBuf::from("/data/instances/foo/.minecraft/mods/sodium.jar")
+        );
     }
 }
