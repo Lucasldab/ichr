@@ -22,7 +22,12 @@ use crate::domain::platform::{Arch, OsName};
 use crate::domain::InstanceManifest;
 use crate::java::detect::SystemJava;
 use crate::java::types::JavaRuntimeId;
-use crate::loader::types::{LoaderType, LoaderVersionEntry};
+use crate::loader::types::{LoaderInfo, LoaderType, LoaderVersionEntry};
+use crate::mods::dep_resolve::ResolvedDepGraph;
+use crate::mods::types::{
+    InstalledModRow, ModBrowserFetchState, ModrinthProjectDetail, ModrinthSearchHit,
+    ModrinthVersion, ModrinthVersionEntry, ResolvedDep,
+};
 use crate::mojang::types::VersionEntry;
 use crate::tasks::{JobId, TaskEvent};
 
@@ -111,6 +116,88 @@ pub enum ActiveView {
         to_loader: String,
         type_switch: bool,
     },
+    /// Phase 8 (MOD-01): full-screen split-pane Modrinth mod browser.
+    /// Rendered by `src/tui/views/mod_browser.rs` (added in 08-08).
+    ModBrowser {
+        slug: String,
+        search: String,
+        /// None = use instance's MC version; Some("any") = no MC filter; Some(version) = explicit override.
+        mc_filter_override: Option<String>,
+        /// Same shape as mc_filter_override. Default: None (use instance loader).
+        loader_filter_override: Option<String>,
+        /// Cached search results from the most recent Modrinth query.
+        results: Vec<ModrinthSearchHit>,
+        /// Index into `results` of the currently highlighted row.
+        selected: usize,
+        /// "loading" / "ready" / "error" state.
+        fetch_state: ModBrowserFetchState,
+        /// Cached project detail for the right-pane preview. None while in flight.
+        selected_detail: Option<ModrinthProjectDetail>,
+    },
+    /// Phase 8 (MOD-01): centered modal of available versions for a mod.
+    /// Rendered by `src/tui/views/mod_version_picker_modal.rs` (added in 08-08).
+    ModVersionPickerModal {
+        slug: String,
+        project_id: String,
+        project_title: String,
+        versions: Vec<ModrinthVersionEntry>,
+        selected: usize,
+    },
+    /// Phase 8 (MOD-02): centered modal listing required/optional/incompatible deps.
+    /// Rendered by `src/tui/views/dep_confirm_modal.rs` (added in 08-08).
+    DepConfirmModal {
+        slug: String,
+        project_id: String,
+        project_title: String,
+        version_id: String,
+        version_label: String,
+        /// Resolved dependencies (required + optional, with already-installed marked).
+        deps: Vec<ResolvedDep>,
+        /// Total bytes across all NEW downloads (already-satisfied deps excluded).
+        total_bytes: u64,
+        /// Total file count across all NEW downloads.
+        total_files: usize,
+        /// True if any dep is `incompatible`. Disables the `y` confirm path.
+        has_conflict: bool,
+        /// Carry the root_version so `ConfirmModInstall` can pass it to
+        /// `Effect::InstallModWithDeps` without re-fetching.
+        root_version: Box<ModrinthVersion>,
+    },
+    /// Phase 8 (MOD-05): full-screen single-column installed-mods table.
+    /// Rendered by `src/tui/views/installed_mods_list.rs` (added in 08-08).
+    InstalledModsList {
+        slug: String,
+        mods: Vec<InstalledModRow>,
+        selected: usize,
+    },
+    /// Phase 8 (MOD-07): inline overlay confirm for uninstalling a mod.
+    /// Rendered by `src/tui/views/uninstall_mod_confirm.rs` (added in 08-08).
+    UninstallModConfirm {
+        slug: String,
+        /// Modrinth project_id or filesystem hash for manual mods.
+        mod_id: String,
+        display_name: String,
+    },
+    /// Phase 8 (MOD-02): error modal when a mod install fails.
+    /// Rendered by `src/tui/views/mod_install_failed_modal.rs` (added in 08-08).
+    ModInstallFailedModal {
+        slug: String,
+        mod_title: String,
+        version_label: String,
+        error: String,
+        log_tail: String,
+        /// Where to return after dismissal — depends on which view triggered the install.
+        return_to: ModInstallFailedReturnTo,
+    },
+}
+
+/// Where the `Action::DismissModInstallFailed` arm should return to.
+/// Set when the failure modal is opened, based on the previous active view
+/// (per UI-SPEC line 626: "returns to whichever view triggered the install").
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModInstallFailedReturnTo {
+    ModBrowser,
+    InstalledModsList,
 }
 
 /// A row in the Java picker modal.
@@ -159,6 +246,12 @@ pub struct AppState {
     /// Populated by Action::LoaderInstallStarted; cleared by
     /// LoaderInstalled / LoaderInstallFailed (mirrors `running_instances`).
     pub running_loader_installs: HashMap<String, CancellationToken>,
+    /// Tracks slug → CancellationToken for in-progress mod installs.
+    /// Pitfall 8 (08-RESEARCH.md §Pitfall 8): a second `M` keybind on the same
+    /// instance is silently rejected while a previous mod install is in flight.
+    /// Populated by Action::ModInstallStarted; cleared by ModInstalled /
+    /// ModInstallFailed (mirrors `running_loader_installs`).
+    pub running_mod_jobs: HashMap<String, CancellationToken>,
     /// Persisted list of Microsoft accounts.
     pub accounts: Vec<Account>,
     /// id of the currently-active account, if any. Drives whether
@@ -358,6 +451,55 @@ pub enum Effect {
     CancelLoaderInstall { slug: String },
     /// Phase 6: remove the active loader from an instance.
     RemoveLoader { slug: String },
+
+    // ── Phase 8 (Modrinth Integration) — wired by 08-08 run.rs effect arms ──
+    /// MOD-01: search Modrinth for mods matching the query, filtered by the
+    /// instance's MC version + loader (with optional UI override).
+    SearchModrinth {
+        slug: String,
+        query: String,
+        mc: Option<String>,
+        loader: Option<LoaderInfo>,
+    },
+    /// MOD-01: fetch the project detail (right pane) for the highlighted mod.
+    FetchModDetail { slug: String, project_id: String },
+    /// MOD-01: list all versions of a project compatible with the instance's MC + loader.
+    ListModVersions {
+        slug: String,
+        project_id: String,
+        project_title: String,
+        mc: Option<String>,
+        loader: Option<LoaderInfo>,
+    },
+    /// MOD-02: BFS-resolve dependencies for a chosen version (with installed-set diff).
+    ResolveModDependencies {
+        slug: String,
+        project_id: String,
+        project_title: String,
+        version_id: String,
+        version_label: String,
+        mc: String,
+        loader: Option<LoaderInfo>,
+    },
+    /// MOD-02: download + verify + install the root + dep graph; updates ledger.
+    InstallModWithDeps {
+        slug: String,
+        project_slug: String,
+        project_title: String,
+        root_version: Box<ModrinthVersion>,
+        graph: Box<ResolvedDepGraph>,
+    },
+    /// MOD-06: rename `.jar` ↔ `.jar.disabled` and update the ledger row.
+    /// Suffix `Eff` disambiguates from `Action::ToggleModEnabled`.
+    ToggleModEnabledEff {
+        slug: String,
+        mod_id: String,
+        want_enabled: bool,
+    },
+    /// MOD-07: delete the mod file and remove its row from the ledger.
+    UninstallMod { slug: String, mod_id: String },
+    /// MOD-05: read the per-instance ledger and dispatch `InstalledModsLoaded`.
+    FetchInstalledMods { slug: String },
 }
 
 /// Format a loader for the status cell or switch dialog: "fabric:0.16.9".

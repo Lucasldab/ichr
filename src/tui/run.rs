@@ -234,6 +234,14 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         ActiveView::LoaderSwitchConfirm { .. } => {
             super::views::loader_switch_confirm::map_loader_switch_confirm_event(ev)
         }
+        // Phase 8 (08-07): event mappers for the new mod views land in 08-08.
+        // Until then, swallow events for these states so the build is green.
+        ActiveView::ModBrowser { .. }
+        | ActiveView::ModVersionPickerModal { .. }
+        | ActiveView::DepConfirmModal { .. }
+        | ActiveView::InstalledModsList { .. }
+        | ActiveView::UninstallModConfirm { .. }
+        | ActiveView::ModInstallFailedModal { .. } => None,
     }
 }
 
@@ -1001,6 +1009,21 @@ async fn execute_effects(
                         }
                     }
                 });
+            }
+
+            // Phase 8 (08-07): Modrinth integration effects are declared up-front
+            // so the state machine + tui_smoke tests can land independently of the
+            // run-loop wiring. The spawn arms below are scaffold no-ops; 08-08
+            // replaces them with real ModrinthService calls (HTTP + ledger I/O).
+            Effect::SearchModrinth { .. }
+            | Effect::FetchModDetail { .. }
+            | Effect::ListModVersions { .. }
+            | Effect::ResolveModDependencies { .. }
+            | Effect::InstallModWithDeps { .. }
+            | Effect::ToggleModEnabledEff { .. }
+            | Effect::UninstallMod { .. }
+            | Effect::FetchInstalledMods { .. } => {
+                // Scaffold no-op — wired in 08-08.
             }
         }
     }

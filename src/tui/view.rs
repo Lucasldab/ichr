@@ -63,6 +63,16 @@ pub fn view(state: &AppState, f: &mut Frame) {
             render_loader_install_failed_modal(f, main, state)
         }
         ActiveView::LoaderSwitchConfirm { .. } => render_loader_switch_confirm(f, main, state),
+        // Phase 8 (08-07): the new ActiveView variants are declared up-front so
+        // `app.rs` can compile and `tests/tui_smoke.rs` can drive update() arms.
+        // The render_* dispatch arms land in 08-08 alongside the new view files.
+        // Until then, fall through to the InstanceList background render.
+        ActiveView::ModBrowser { .. }
+        | ActiveView::ModVersionPickerModal { .. }
+        | ActiveView::DepConfirmModal { .. }
+        | ActiveView::InstalledModsList { .. }
+        | ActiveView::UninstallModConfirm { .. }
+        | ActiveView::ModInstallFailedModal { .. } => {}
     }
 
     render_download_pane(f, dl, state);
