@@ -65,6 +65,9 @@ pub enum AppError {
     #[error("Authentication error: {0}")]
     Auth(#[from] crate::auth::AuthError),
 
+    #[error("Modrinth error: {0}")]
+    Modrinth(#[from] crate::mods::error::ModrinthError),
+
     #[error("No active account — add a Microsoft account or launch in offline mode")]
     NoActiveAccount,
 }
