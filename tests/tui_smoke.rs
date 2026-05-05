@@ -1133,3 +1133,442 @@ fn test_cancel_loader_install_cancels_token_and_returns_to_list() {
     assert!(matches!(s.active_view, ActiveView::InstanceList { .. }));
     assert!(matches!(effects.as_slice(), [Effect::CancelLoaderInstall { .. }]));
 }
+
+// ========================================================================
+// Phase 8 (08-07): Modrinth state machine — 15 transition tests
+// ========================================================================
+
+use mineltui::mods::types::{
+    DepKind, InstalledModRow, ModBrowserFetchState, ModSource, ModrinthFile, ModrinthHashes,
+    ModrinthSearchHit, ModrinthVersion, ModrinthVersionEntry, ResolvedDep,
+};
+use mineltui::tui::app::ModInstallFailedReturnTo;
+
+/// Like `state_with_one_instance`, but returns an instance with no loader
+/// (None). Same shape as Phase 6's helper; named distinctly so future
+/// loader-bearing helpers can coexist.
+fn make_state_with_one_instance(slug: &str, mc: &str) -> AppState {
+    let mut s = AppState::default();
+    s.instances.push(InstanceManifest::new(slug.into(), slug.into(), mc.into()));
+    s
+}
+
+/// Build a minimal `ModrinthSearchHit` for tests.
+fn hit(project_id: &str, slug: &str) -> ModrinthSearchHit {
+    ModrinthSearchHit {
+        project_id: project_id.into(),
+        slug: slug.into(),
+        title: slug.into(),
+        description: "x".into(),
+        downloads: 0,
+        already_installed: false,
+    }
+}
+
+/// Build a minimal `ModrinthVersion` for tests (no deps).
+fn fake_version(id: &str, project_id: &str) -> ModrinthVersion {
+    ModrinthVersion {
+        id: id.into(),
+        project_id: project_id.into(),
+        name: id.into(),
+        version_number: "1.0.0".into(),
+        version_type: "release".into(),
+        game_versions: vec!["1.20.4".into()],
+        loaders: vec!["fabric".into()],
+        downloads: 0,
+        date_published: "2026-01-01T00:00:00Z".into(),
+        dependencies: vec![],
+        files: vec![ModrinthFile {
+            url: "https://cdn.modrinth.com/x.jar".into(),
+            filename: "x.jar".into(),
+            primary: true,
+            size: 1024,
+            hashes: ModrinthHashes {
+                sha1: "aa".into(),
+                sha512: "bb".into(),
+            },
+        }],
+    }
+}
+
+/// Build a minimal `InstalledModRow` for tests.
+fn installed_row(mod_id: &str, name: &str, enabled: bool) -> InstalledModRow {
+    InstalledModRow {
+        mod_id: mod_id.into(),
+        project_slug: name.into(),
+        display_name: name.into(),
+        version_id: "v1".into(),
+        version_label: "1.0.0".into(),
+        file_name: format!("{name}.jar"),
+        sha512: "deadbeef".into(),
+        size: 1024,
+        source: ModSource::Modrinth,
+        enabled,
+        installed_at: "2026-01-01T00:00:00Z".into(),
+    }
+}
+
+#[test]
+fn test_open_mod_browser_emits_search_effect_and_sets_active_view() {
+    let mut state = make_state_with_one_instance("foo", "1.20.4");
+    let effects = update(&mut state, Action::OpenModBrowser { slug: "foo".into() });
+    assert!(matches!(state.active_view, ActiveView::ModBrowser { .. }));
+    match effects.as_slice() {
+        [Effect::SearchModrinth { slug, query, mc, loader: _ }] => {
+            assert_eq!(slug, "foo");
+            assert_eq!(query, "");
+            assert_eq!(mc.as_deref(), Some("1.20.4"));
+        }
+        other => panic!("expected SearchModrinth; got {other:?}"),
+    }
+}
+
+#[test]
+fn test_open_mod_browser_blocked_when_install_in_flight() {
+    // Pitfall 8 — T-08-07-01.
+    let mut state = make_state_with_one_instance("foo", "1.20.4");
+    state.running_mod_jobs.insert("foo".into(), CancellationToken::new());
+    let prev_active_view_marker = matches!(state.active_view, ActiveView::InstanceList { .. });
+    assert!(prev_active_view_marker, "precondition: starts on InstanceList");
+    let effects = update(&mut state, Action::OpenModBrowser { slug: "foo".into() });
+    assert!(effects.is_empty(), "guard should produce no effect");
+    // active_view must NOT have transitioned to ModBrowser.
+    assert!(
+        matches!(state.active_view, ActiveView::InstanceList { .. }),
+        "active_view should remain on InstanceList while install in flight"
+    );
+}
+
+#[test]
+fn test_mod_browser_search_loaded_replaces_results() {
+    let mut state = make_state_with_one_instance("foo", "1.20.4");
+    state.active_view = ActiveView::ModBrowser {
+        slug: "foo".into(),
+        search: String::new(),
+        mc_filter_override: None,
+        loader_filter_override: None,
+        results: Vec::new(),
+        selected: 0,
+        fetch_state: ModBrowserFetchState::Loading,
+        selected_detail: None,
+    };
+    let _ = update(
+        &mut state,
+        Action::ModBrowserSearchLoaded {
+            slug: "foo".into(),
+            hits: vec![hit("P1", "sodium"), hit("P2", "iris")],
+        },
+    );
+    if let ActiveView::ModBrowser { results, fetch_state, .. } = &state.active_view {
+        assert_eq!(results.len(), 2);
+        assert_eq!(*fetch_state, ModBrowserFetchState::Ready);
+    } else {
+        panic!("active_view changed unexpectedly");
+    }
+}
+
+#[test]
+fn test_mod_browser_move_clamps_to_results_len() {
+    let mut state = make_state_with_one_instance("foo", "1.20.4");
+    state.active_view = ActiveView::ModBrowser {
+        slug: "foo".into(),
+        search: String::new(),
+        mc_filter_override: None,
+        loader_filter_override: None,
+        results: vec![hit("P1", "sodium"), hit("P2", "iris")],
+        selected: 0,
+        fetch_state: ModBrowserFetchState::Ready,
+        selected_detail: None,
+    };
+    // Move down 5 — should saturate at 1 (len-1).
+    for _ in 0..5 {
+        let _ = update(&mut state, Action::ModBrowserMove(1));
+    }
+    if let ActiveView::ModBrowser { selected, .. } = &state.active_view {
+        assert_eq!(*selected, 1, "saturating add should clamp at len-1");
+    } else {
+        panic!()
+    }
+    // Move up 5 — should saturate at 0.
+    for _ in 0..5 {
+        let _ = update(&mut state, Action::ModBrowserMove(-1));
+    }
+    if let ActiveView::ModBrowser { selected, .. } = &state.active_view {
+        assert_eq!(*selected, 0, "saturating sub should clamp at 0");
+    } else {
+        panic!()
+    }
+}
+
+#[test]
+fn test_mod_version_picker_select_emits_resolve_deps_effect() {
+    let mut state = make_state_with_one_instance("foo", "1.20.4");
+    state.active_view = ActiveView::ModVersionPickerModal {
+        slug: "foo".into(),
+        project_id: "P1".into(),
+        project_title: "Sodium".into(),
+        versions: vec![ModrinthVersionEntry {
+            version_id: "V1".into(),
+            version_label: "0.5.8".into(),
+            channel: "release".into(),
+            is_latest_stable: true,
+        }],
+        selected: 0,
+    };
+    let effects = update(&mut state, Action::ModVersionPickerSelect);
+    match effects.as_slice() {
+        [Effect::ResolveModDependencies {
+            slug,
+            project_id,
+            version_id,
+            mc,
+            ..
+        }] => {
+            assert_eq!(slug, "foo");
+            assert_eq!(project_id, "P1");
+            assert_eq!(version_id, "V1");
+            assert_eq!(mc, "1.20.4");
+        }
+        other => panic!("expected ResolveModDependencies; got {other:?}"),
+    }
+    // Stays on the version picker until ModDepsResolved arrives.
+    assert!(matches!(state.active_view, ActiveView::ModVersionPickerModal { .. }));
+}
+
+#[test]
+fn test_mod_version_picker_cancel_returns_to_mod_browser() {
+    let mut state = make_state_with_one_instance("foo", "1.20.4");
+    state.active_view = ActiveView::ModVersionPickerModal {
+        slug: "foo".into(),
+        project_id: "P1".into(),
+        project_title: "Sodium".into(),
+        versions: vec![],
+        selected: 0,
+    };
+    let _ = update(&mut state, Action::ModVersionPickerCancel);
+    assert!(matches!(state.active_view, ActiveView::ModBrowser { .. }));
+}
+
+#[test]
+fn test_dep_confirm_y_emits_install_effect_when_no_conflict() {
+    let mut state = make_state_with_one_instance("foo", "1.20.4");
+    state.active_view = ActiveView::DepConfirmModal {
+        slug: "foo".into(),
+        project_id: "P1".into(),
+        project_title: "Sodium".into(),
+        version_id: "V1".into(),
+        version_label: "0.5.8".into(),
+        deps: vec![],
+        total_bytes: 1024,
+        total_files: 1,
+        has_conflict: false,
+        root_version: Box::new(fake_version("V1", "P1")),
+    };
+    let effects = update(&mut state, Action::ConfirmModInstall);
+    match effects.as_slice() {
+        [Effect::InstallModWithDeps { slug, project_title, .. }] => {
+            assert_eq!(slug, "foo");
+            assert_eq!(project_title, "Sodium");
+        }
+        other => panic!("expected InstallModWithDeps; got {other:?}"),
+    }
+}
+
+#[test]
+fn test_dep_confirm_y_blocked_when_has_conflict() {
+    // T-08-07-04 mitigation.
+    let mut state = make_state_with_one_instance("foo", "1.20.4");
+    state.active_view = ActiveView::DepConfirmModal {
+        slug: "foo".into(),
+        project_id: "P1".into(),
+        project_title: "Sodium".into(),
+        version_id: "V1".into(),
+        version_label: "0.5.8".into(),
+        deps: vec![ResolvedDep {
+            kind: DepKind::Incompatible,
+            project_id: "P2".into(),
+            project_title: "OptiFine".into(),
+            version: None,
+            already_satisfied: false,
+            is_new_download: false,
+        }],
+        total_bytes: 0,
+        total_files: 0,
+        has_conflict: true,
+        root_version: Box::new(fake_version("V1", "P1")),
+    };
+    let effects = update(&mut state, Action::ConfirmModInstall);
+    assert!(effects.is_empty(), "y must be a no-op when has_conflict");
+    // Stays on the same modal.
+    assert!(matches!(state.active_view, ActiveView::DepConfirmModal { .. }));
+}
+
+#[test]
+fn test_mod_installed_stamps_already_installed_in_browser_results() {
+    // Pitfall 10 — T-08-07-02.
+    let mut state = make_state_with_one_instance("foo", "1.20.4");
+    state.active_view = ActiveView::ModBrowser {
+        slug: "foo".into(),
+        search: String::new(),
+        mc_filter_override: None,
+        loader_filter_override: None,
+        results: vec![hit("P1", "sodium"), hit("P2", "iris")],
+        selected: 0,
+        fetch_state: ModBrowserFetchState::Ready,
+        selected_detail: None,
+    };
+    let _ = update(
+        &mut state,
+        Action::ModInstalled { slug: "foo".into(), project_id: "P1".into() },
+    );
+    if let ActiveView::ModBrowser { results, .. } = &state.active_view {
+        assert!(results[0].already_installed, "Pitfall 10 — already_installed must be stamped");
+        assert!(!results[1].already_installed, "non-matching project_id must NOT be stamped");
+    } else {
+        panic!("active_view changed unexpectedly")
+    }
+}
+
+#[test]
+fn test_install_failed_routes_to_failed_modal_with_return_to() {
+    let mut state = make_state_with_one_instance("foo", "1.20.4");
+    state.active_view = ActiveView::ModBrowser {
+        slug: "foo".into(),
+        search: String::new(),
+        mc_filter_override: None,
+        loader_filter_override: None,
+        results: vec![],
+        selected: 0,
+        fetch_state: ModBrowserFetchState::Ready,
+        selected_detail: None,
+    };
+    state.running_mod_jobs.insert("foo".into(), CancellationToken::new());
+    let _ = update(
+        &mut state,
+        Action::ModInstallFailed {
+            slug: "foo".into(),
+            mod_title: "Sodium".into(),
+            version_label: "0.5.8".into(),
+            error: "network".into(),
+            log_tail: "GET /...".into(),
+        },
+    );
+    assert!(state.running_mod_jobs.is_empty());
+    match &state.active_view {
+        ActiveView::ModInstallFailedModal { return_to, .. } => {
+            assert_eq!(*return_to, ModInstallFailedReturnTo::ModBrowser);
+        }
+        other => panic!("expected ModInstallFailedModal; got {other:?}"),
+    }
+}
+
+#[test]
+fn test_open_installed_mods_emits_fetch_effect() {
+    let mut state = make_state_with_one_instance("foo", "1.20.4");
+    let effects = update(&mut state, Action::OpenInstalledMods { slug: "foo".into() });
+    assert!(matches!(state.active_view, ActiveView::InstalledModsList { .. }));
+    match effects.as_slice() {
+        [Effect::FetchInstalledMods { slug }] => assert_eq!(slug, "foo"),
+        other => panic!("expected FetchInstalledMods; got {other:?}"),
+    }
+}
+
+#[test]
+fn test_uninstall_confirm_y_emits_uninstall_effect() {
+    let mut state = make_state_with_one_instance("foo", "1.20.4");
+    state.active_view = ActiveView::UninstallModConfirm {
+        slug: "foo".into(),
+        mod_id: "P1".into(),
+        display_name: "Sodium".into(),
+    };
+    let effects = update(&mut state, Action::ConfirmUninstallMod);
+    // Returns to InstalledModsList immediately for responsive UX.
+    assert!(matches!(state.active_view, ActiveView::InstalledModsList { .. }));
+    // Effects: UninstallMod followed by FetchInstalledMods refresh.
+    match effects.as_slice() {
+        [Effect::UninstallMod { slug, mod_id }, Effect::FetchInstalledMods { slug: slug2 }] => {
+            assert_eq!(slug, "foo");
+            assert_eq!(mod_id, "P1");
+            assert_eq!(slug2, "foo");
+        }
+        other => panic!("expected UninstallMod then FetchInstalledMods; got {other:?}"),
+    }
+}
+
+#[test]
+fn test_close_installed_mods_returns_to_instance_list() {
+    let mut state = make_state_with_one_instance("foo", "1.20.4");
+    state.active_view = ActiveView::InstalledModsList {
+        slug: "foo".into(),
+        mods: vec![],
+        selected: 0,
+    };
+    let _ = update(&mut state, Action::CloseInstalledMods);
+    assert!(matches!(state.active_view, ActiveView::InstanceList { .. }));
+}
+
+#[test]
+fn test_toggle_mod_enabled_emits_correct_effect() {
+    // Per /gsd-check-plans Issue 5 — MOD-06 integration coverage.
+    let mut state = make_state_with_one_instance("foo", "1.20.4");
+    state.active_view = ActiveView::InstalledModsList {
+        slug: "foo".into(),
+        mods: vec![installed_row("P1", "sodium", true)], // currently enabled
+        selected: 0,
+    };
+    let effects = update(&mut state, Action::ToggleModEnabled);
+    match effects.as_slice() {
+        [Effect::ToggleModEnabledEff { slug, mod_id, want_enabled }] => {
+            assert_eq!(slug, "foo");
+            assert_eq!(mod_id, "P1");
+            assert!(!*want_enabled, "currently enabled → want_enabled should flip to false");
+        }
+        other => panic!("expected ToggleModEnabledEff; got {other:?}"),
+    }
+}
+
+#[test]
+fn test_toggle_mc_filter_cycles_state_and_re_emits_search() {
+    // Per /gsd-check-plans Issue 9 — MOD-01 filter coverage.
+    let mut state = make_state_with_one_instance("foo", "1.20.4");
+    state.active_view = ActiveView::ModBrowser {
+        slug: "foo".into(),
+        search: String::new(),
+        mc_filter_override: None,
+        loader_filter_override: None,
+        results: vec![],
+        selected: 0,
+        fetch_state: ModBrowserFetchState::Ready,
+        selected_detail: None,
+    };
+    // First toggle: None -> Some("any"). Effect must use mc=None (any filter).
+    let effects = update(&mut state, Action::ToggleModMcFilter);
+    if let ActiveView::ModBrowser { mc_filter_override, .. } = &state.active_view {
+        assert_eq!(mc_filter_override.as_deref(), Some("any"));
+    } else {
+        panic!()
+    }
+    match effects.as_slice() {
+        [Effect::SearchModrinth { mc, .. }] => assert!(
+            mc.is_none(),
+            "mc_filter_override='any' must produce mc=None in the effect"
+        ),
+        other => panic!("expected SearchModrinth; got {other:?}"),
+    }
+    // Second toggle: Some("any") -> None. Effect must use mc=Some("1.20.4")
+    // (instance default restored).
+    let effects = update(&mut state, Action::ToggleModMcFilter);
+    if let ActiveView::ModBrowser { mc_filter_override, .. } = &state.active_view {
+        assert!(mc_filter_override.is_none(), "second toggle restores None");
+    } else {
+        panic!()
+    }
+    match effects.as_slice() {
+        [Effect::SearchModrinth { mc, .. }] => assert_eq!(
+            mc.as_deref(),
+            Some("1.20.4"),
+            "instance default MC must be restored"
+        ),
+        other => panic!("expected SearchModrinth; got {other:?}"),
+    }
+}
