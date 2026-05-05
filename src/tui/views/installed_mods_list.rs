@@ -1,0 +1,157 @@
+//! Installed mods list — full-screen 4-column table of mods in an instance.
+//!
+//! Source: 08-UI-SPEC.md §"Installed Mods List" lines 326-365.
+//! Mirrors `instance_list.rs` (Table widget + REVERSED selection +
+//! block title with keybind hints).
+
+use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
+use ratatui::layout::{Constraint, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table};
+use ratatui::Frame;
+
+use crate::mods::types::ModSource;
+use crate::tui::app::{Action, ActiveView, AppState};
+
+pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
+    let ActiveView::InstalledModsList { slug, mods, selected } = &state.active_view else {
+        return;
+    };
+
+    if mods.is_empty() {
+        // UI-SPEC line 365 — empty-state copy, DIM, single line.
+        let p = Paragraph::new("No mods installed — press Esc and M to browse")
+            .style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(format!("Installed Mods — {slug}  (e/x/Esc)")),
+            );
+        f.render_widget(p, area);
+        return;
+    }
+
+    let rows: Vec<Row> = mods
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            // Source cell — body for modrinth/curseforge, DIM for manual/modpack.
+            let (source_label, source_style) = match m.source {
+                ModSource::Modrinth => ("modrinth", Style::default()),
+                ModSource::CurseForge => ("curseforge", Style::default()),
+                ModSource::Manual => (
+                    "manual",
+                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                ),
+                ModSource::Modpack => (
+                    "modpack",
+                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                ),
+            };
+            // State cell — body for enabled, DIM for disabled.
+            let (state_label, state_style) = if m.enabled {
+                ("enabled", Style::default())
+            } else {
+                (
+                    "disabled",
+                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                )
+            };
+
+            let row = Row::new(vec![
+                Cell::from(m.display_name.clone()),
+                Cell::from(m.version_label.clone()),
+                Cell::from(source_label).style(source_style),
+                Cell::from(state_label).style(state_style),
+            ]);
+            // REVERSED across the entire row when selected (UI-SPEC line 362).
+            if i == *selected {
+                row.style(Style::default().add_modifier(Modifier::REVERSED))
+            } else {
+                row
+            }
+        })
+        .collect();
+
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Percentage(40),
+            Constraint::Percentage(25),
+            Constraint::Percentage(15),
+            Constraint::Percentage(20),
+        ],
+    )
+    .header(Row::new(vec!["Name", "Version", "Source", "State"]))
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(format!("Installed Mods — {slug}  (e/x/Esc)")),
+    );
+    f.render_widget(table, area);
+}
+
+pub fn map_installed_mods_list_event(ev: CtEvent) -> Option<Action> {
+    match ev {
+        CtEvent::Key(KeyEvent { code: KeyCode::Up, .. })
+        | CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
+            Some(Action::InstalledModsMove(-1))
+        }
+        CtEvent::Key(KeyEvent { code: KeyCode::Down, .. })
+        | CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
+            Some(Action::InstalledModsMove(1))
+        }
+        CtEvent::Key(KeyEvent { code: KeyCode::Char('e'), .. }) => Some(Action::ToggleModEnabled),
+        CtEvent::Key(KeyEvent { code: KeyCode::Char('x'), .. }) => {
+            Some(Action::OpenUninstallModConfirm)
+        }
+        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CloseInstalledMods),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    fn key(code: KeyCode) -> CtEvent {
+        CtEvent::Key(KeyEvent::new(code, KeyModifiers::NONE))
+    }
+
+    #[test]
+    fn jk_arrows_move() {
+        assert!(matches!(
+            map_installed_mods_list_event(key(KeyCode::Char('j'))),
+            Some(Action::InstalledModsMove(1))
+        ));
+        assert!(matches!(
+            map_installed_mods_list_event(key(KeyCode::Char('k'))),
+            Some(Action::InstalledModsMove(-1))
+        ));
+        assert!(matches!(
+            map_installed_mods_list_event(key(KeyCode::Up)),
+            Some(Action::InstalledModsMove(-1))
+        ));
+        assert!(matches!(
+            map_installed_mods_list_event(key(KeyCode::Down)),
+            Some(Action::InstalledModsMove(1))
+        ));
+    }
+
+    #[test]
+    fn e_toggles_x_uninstalls_esc_closes() {
+        assert!(matches!(
+            map_installed_mods_list_event(key(KeyCode::Char('e'))),
+            Some(Action::ToggleModEnabled)
+        ));
+        assert!(matches!(
+            map_installed_mods_list_event(key(KeyCode::Char('x'))),
+            Some(Action::OpenUninstallModConfirm)
+        ));
+        assert!(matches!(
+            map_installed_mods_list_event(key(KeyCode::Esc)),
+            Some(Action::CloseInstalledMods)
+        ));
+    }
+}

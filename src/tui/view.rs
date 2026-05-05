@@ -10,7 +10,9 @@ use super::views::{
     add_account_device_code::render_add_account_device_code,
     create_modal::render_create_modal,
     delete_confirm::render_delete_confirm,
+    dep_confirm_modal::render_dep_confirm_modal,
     download_pane::render_download_pane,
+    installed_mods_list::render_installed_mods_list,
     instance_list::{render_group_inline_overlay, render_instance_list},
     java_picker_modal::render_java_picker_modal,
     launch_failed_modal::render_launch_failed_modal,
@@ -19,6 +21,10 @@ use super::views::{
     loader_picker_modal::render_loader_picker_modal,
     loader_switch_confirm::render_loader_switch_confirm,
     loader_version_picker_modal::render_loader_version_picker_modal,
+    mod_browser::render_mod_browser,
+    mod_install_failed_modal::render_mod_install_failed_modal,
+    mod_version_picker_modal::render_mod_version_picker_modal,
+    uninstall_mod_confirm::render_uninstall_mod_confirm,
     version_picker::render_version_picker,
 };
 
@@ -36,7 +42,16 @@ pub fn view(state: &AppState, f: &mut Frame) {
     let main = layout[0];
     let dl = layout[1];
 
-    render_instance_list(f, main, state);
+    // Phase 8 (08-08): full-screen views (ModBrowser, InstalledModsList) own
+    // the entire `main` rect — suppress the instance-list background render so
+    // the modless view can claim the full body width without bleed-through.
+    let full_screen = matches!(
+        state.active_view,
+        ActiveView::ModBrowser { .. } | ActiveView::InstalledModsList { .. }
+    );
+    if !full_screen {
+        render_instance_list(f, main, state);
+    }
 
     match &state.active_view {
         ActiveView::InstanceList { .. } => {}
@@ -63,16 +78,17 @@ pub fn view(state: &AppState, f: &mut Frame) {
             render_loader_install_failed_modal(f, main, state)
         }
         ActiveView::LoaderSwitchConfirm { .. } => render_loader_switch_confirm(f, main, state),
-        // Phase 8 (08-07): the new ActiveView variants are declared up-front so
-        // `app.rs` can compile and `tests/tui_smoke.rs` can drive update() arms.
-        // The render_* dispatch arms land in 08-08 alongside the new view files.
-        // Until then, fall through to the InstanceList background render.
-        ActiveView::ModBrowser { .. }
-        | ActiveView::ModVersionPickerModal { .. }
-        | ActiveView::DepConfirmModal { .. }
-        | ActiveView::InstalledModsList { .. }
-        | ActiveView::UninstallModConfirm { .. }
-        | ActiveView::ModInstallFailedModal { .. } => {}
+        // Phase 8 (08-08): Modrinth views.
+        ActiveView::ModBrowser { .. } => render_mod_browser(f, main, state),
+        ActiveView::ModVersionPickerModal { .. } => {
+            render_mod_version_picker_modal(f, main, state)
+        }
+        ActiveView::DepConfirmModal { .. } => render_dep_confirm_modal(f, main, state),
+        ActiveView::InstalledModsList { .. } => render_installed_mods_list(f, main, state),
+        ActiveView::UninstallModConfirm { .. } => render_uninstall_mod_confirm(f, main, state),
+        ActiveView::ModInstallFailedModal { .. } => {
+            render_mod_install_failed_modal(f, main, state)
+        }
     }
 
     render_download_pane(f, dl, state);

@@ -64,7 +64,7 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
         ],
     )
     .header(Row::new(vec!["Name", "MC Version", "Group", "Last played"]))
-    .block(Block::default().borders(Borders::ALL).title("Instances (c/r/x/d/g/Enter/s/A/L)"));
+    .block(Block::default().borders(Borders::ALL).title("Instances (c/r/x/d/g/Enter/s/A/L/M/m)"));
     f.render_widget(table, table_area);
 
     // Active-account footer row.
