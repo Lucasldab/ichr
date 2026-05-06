@@ -34,6 +34,36 @@ pub enum LoaderError {
     /// Underlying I/O error (filesystem, atomic_write, etc.).
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
+
+    /// Subprocess (Forge/NeoForge installer) exited non-zero. `tail` is the
+    /// last LOG_TAIL_LINES (200) lines of interleaved stdout/stderr captured
+    /// by the ring buffer in `installer_subprocess::run_installer`.
+    #[error("Installer exited with code {code}; last lines:\n{tail}")]
+    SubprocessExit { code: i32, tail: String },
+
+    /// Failed to populate the staging directory (mkdir, file copy, or skeleton
+    /// `launcher_profiles.json` write). PITFALL 2 fix.
+    #[error("Failed to populate staging directory: {reason}")]
+    StagingPopulate { reason: String },
+
+    /// Post-install harvest failed — staging didn't produce the expected
+    /// `versions/<id>/` tree, version JSON malformed, or library walk failed.
+    #[error("Failed to harvest install output: {reason}")]
+    HarvestFailed { reason: String },
+
+    /// Installer JAR download failed (network, non-2xx status, body read,
+    /// or `.sha1` sidecar mismatch).
+    #[error("Failed to fetch installer JAR: {reason}")]
+    InstallerJarFetch { reason: String },
+
+    /// Maven metadata XML parse error (extracted version list empty or
+    /// upstream returned non-XML payload).
+    #[error("Failed to parse Maven metadata: {reason}")]
+    MavenMetadataParse { reason: String },
+
+    /// Maven metadata HTTP fetch error (connect timeout, non-2xx, or body read).
+    #[error("Failed to fetch Maven metadata: {reason}")]
+    MavenMetadataFetch { reason: String },
 }
 
 #[cfg(test)]
@@ -102,5 +132,56 @@ mod tests {
         let s = le.to_string();
         assert!(s.contains("I/O error"), "I/O headline missing: {s}");
         assert!(s.contains("denied"), "io message missing: {s}");
+    }
+
+    #[test]
+    fn test_subprocess_exit_display_includes_code_and_tail() {
+        let e = LoaderError::SubprocessExit {
+            code: 1,
+            tail: "java.lang.NullPointerException at Foo.bar".into(),
+        };
+        let s = e.to_string();
+        assert!(s.contains("1"), "code missing: {s}");
+        assert!(s.contains("NullPointerException"), "tail missing: {s}");
+    }
+
+    #[test]
+    fn test_staging_populate_display() {
+        let e = LoaderError::StagingPopulate { reason: "no space left".into() };
+        let s = e.to_string();
+        assert!(s.contains("staging"), "headline missing: {s}");
+        assert!(s.contains("no space"), "reason missing: {s}");
+    }
+
+    #[test]
+    fn test_harvest_failed_display() {
+        let e = LoaderError::HarvestFailed { reason: "no version dir produced".into() };
+        let s = e.to_string();
+        assert!(s.contains("harvest"), "headline missing: {s}");
+        assert!(s.contains("no version dir"), "reason missing: {s}");
+    }
+
+    #[test]
+    fn test_installer_jar_fetch_display() {
+        let e = LoaderError::InstallerJarFetch { reason: "404 Not Found".into() };
+        let s = e.to_string();
+        assert!(s.contains("installer"), "headline missing: {s}");
+        assert!(s.contains("404"), "reason missing: {s}");
+    }
+
+    #[test]
+    fn test_maven_metadata_parse_display() {
+        let e = LoaderError::MavenMetadataParse { reason: "empty version list".into() };
+        let s = e.to_string();
+        assert!(s.contains("Maven"), "headline missing: {s}");
+        assert!(s.contains("empty version list"), "reason missing: {s}");
+    }
+
+    #[test]
+    fn test_maven_metadata_fetch_display() {
+        let e = LoaderError::MavenMetadataFetch { reason: "tls handshake failed".into() };
+        let s = e.to_string();
+        assert!(s.contains("Maven"), "headline missing: {s}");
+        assert!(s.contains("tls handshake failed"), "reason missing: {s}");
     }
 }
