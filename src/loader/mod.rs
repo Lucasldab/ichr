@@ -1,9 +1,12 @@
-//! Fabric and Quilt modloader install — meta fetch, library download, version JSON write.
-//! See `.planning/phases/06-fabric-and-quilt-modloaders/06-RESEARCH.md`.
+//! Fabric, Quilt, Forge, NeoForge modloader install — meta fetch + (for
+//! Forge/NeoForge) installer subprocess + library harvest + version JSON
+//! write. See `.planning/phases/06-fabric-and-quilt-modloaders/06-RESEARCH.md`
+//! and `.planning/phases/07-forge-and-neoforge-modloaders/07-RESEARCH.md`.
 
 pub mod error;
 pub mod fabric;
 pub mod maven;
+pub mod maven_metadata;
 pub mod quilt;
 pub mod service;
 pub mod types;
