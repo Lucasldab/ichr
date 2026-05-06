@@ -23,8 +23,9 @@ use super::view::view;
 use crate::auth::service::{AccountAuthEvent, AccountService};
 use crate::java::service::JavaService;
 use crate::loader::service::LoaderService;
-use crate::loader::types::LoaderType;
+use crate::loader::types::{LoaderInfo, LoaderType};
 use crate::launcher;
+use crate::mods::curseforge::service::CurseForgeService;
 use crate::mods::service::ModrinthService;
 use crate::mojang::client::MojangClient;
 use crate::mojang::types::VersionEntry;
@@ -86,6 +87,16 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
     let loader_service = Arc::new(LoaderService::new().map_err(|e| anyhow::anyhow!("LoaderService::new: {e}"))?);
     // Phase 8 (08-08): Modrinth service backs the mod browser/install flow.
     let modrinth_service = Arc::new(ModrinthService::new().map_err(|e| anyhow::anyhow!("ModrinthService::new: {e}"))?);
+    // Phase 9 (09-07): CurseForge service backs the F-keybind browser/install flow.
+    // Pitfall 1: `CurseForgeService::new` returns `Ok` even when no API key is
+    // configured (the launcher continues to function for everything else; F
+    // keybind silently no-ops via api_key_present()=false). The `?` here is
+    // defensive against unexpected ctor failures (e.g., malformed key string
+    // tripping reqwest header parsing).
+    let cf_service = Arc::new(
+        CurseForgeService::new()
+            .map_err(|e| anyhow::anyhow!("CurseForgeService::new: {e}"))?,
+    );
 
     // Build the task plumbing. TaskEvents arrive on task_rx; we convert each
     // into an Action::Task and forward to the event loop via action_tx.
@@ -105,7 +116,14 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
         });
     }
 
-    let mut state = AppState::default();
+    // Phase 9 (09-07): seed AppState with the CurseForge api-key flag so the
+    // F keybind can no-op silently and instance_list can render the title hint.
+    // Use struct-update syntax to satisfy clippy::field_reassign_with_default
+    // (Phase 1 precedent — same pattern as arch/os).
+    let mut state = AppState {
+        cf_api_key_present: cf_service.api_key_present(),
+        ..AppState::default()
+    };
 
     // Load instances on startup.
     {
@@ -157,7 +175,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
                     Some(Ok(ev)) => {
                         if let Some(action) = map_event(ev, &state) {
                             let effects = update(&mut state, action);
-                            execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), Arc::clone(&modrinth_service), &task_manager, &action_tx).await;
+                            execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), Arc::clone(&modrinth_service), Arc::clone(&cf_service), &task_manager, &action_tx).await;
                         }
                     }
                     Some(Err(e)) => {
@@ -171,7 +189,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
                 match maybe_action {
                     Some(action) => {
                         let effects = update(&mut state, action);
-                        execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), Arc::clone(&modrinth_service), &task_manager, &action_tx).await;
+                        execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), Arc::clone(&modrinth_service), Arc::clone(&cf_service), &task_manager, &action_tx).await;
                     }
                     None => break,
                 }
@@ -256,10 +274,16 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         ActiveView::ModInstallFailedModal { .. } => {
             super::views::mod_install_failed_modal::map_mod_install_failed_event(ev)
         }
-        // Phase 9 (CurseForge) — event mappers wired in 09-07. Until then, no-op.
-        ActiveView::CfBrowser { .. }
-        | ActiveView::CfFilePickerModal { .. }
-        | ActiveView::CfInstallFailedModal { .. } => None,
+        // Phase 9 (09-07): CurseForge view event mappers.
+        ActiveView::CfBrowser { .. } => {
+            super::views::cf_browser::map_cf_browser_event(ev, state)
+        }
+        ActiveView::CfFilePickerModal { .. } => {
+            super::views::cf_file_picker_modal::map_cf_file_picker_event(ev)
+        }
+        ActiveView::CfInstallFailedModal { .. } => {
+            super::views::cf_install_failed_modal::map_cf_install_failed_event(ev)
+        }
     }
 }
 
@@ -384,6 +408,26 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
                     return Some(Action::OpenInstalledMods { slug: m.slug.clone() });
+                }
+            }
+            None
+        }
+        CtEvent::Key(KeyEvent { code: KeyCode::Char('F'), modifiers, .. })
+            if !modifiers.contains(KeyModifiers::CONTROL) =>
+        {
+            // `F` (uppercase) opens the CurseForge mod browser. Pitfall 1
+            // guard: silent no-op when no CurseForge API key was resolved at
+            // startup. Pitfall 8 guard (inherited from Phase 8): silent no-op
+            // while a previous mod install is in flight for the same instance.
+            // The update() arm in app.rs enforces both guards too (defense in
+            // depth) — see test_cf_open_no_op_when_api_key_absent.
+            if let ActiveView::InstanceList { selected } = &state.active_view {
+                if let Some(m) = state.instances.get(*selected) {
+                    if state.cf_api_key_present
+                        && !state.running_mod_jobs.contains_key(&m.slug)
+                    {
+                        return Some(Action::OpenCfBrowser { slug: m.slug.clone() });
+                    }
                 }
             }
             None
@@ -563,6 +607,7 @@ async fn execute_effects(
     java_service: Arc<JavaService>,
     loader_service: Arc<LoaderService>,
     modrinth_service: Arc<ModrinthService>,
+    cf_service: Arc<CurseForgeService>,
     task_manager: &TaskManager,
     action_tx: &mpsc::Sender<Action>,
 ) {
@@ -1356,16 +1401,241 @@ async fn execute_effects(
                 });
             }
 
-            // Phase 9 (CurseForge) — effect handlers wired in 09-07. Until then,
-            // these are no-ops so the exhaustive match still compiles.
-            Effect::SearchCurseForge { .. }
-            | Effect::FetchCfMod { .. }
-            | Effect::ListCfFiles { .. }
-            | Effect::InstallCfMod { .. } => {
-                // Stub — real handlers in 09-07 will dispatch
-                // Action::CfBrowserSearchLoaded / CfBrowserDetailLoaded /
-                // CfFilePickerLoaded / CfModInstallStarted etc.
+            // Phase 9 (09-07): CurseForge effect arms — LOCKED design with 4
+            // SEPARATE arms (SearchCurseForge / FetchCfMod / ListCfFiles /
+            // InstallCfMod). Mirrors Phase 8's separate-fetch-then-list pattern
+            // (FetchModDetail + ListModVersions). Do NOT collapse into a
+            // combined `OpenCfFilePicker` effect — the design relies on the
+            // Action ping-pong: CfBrowserOpenDetail → FetchCfMod →
+            // CfBrowserDetailLoaded → ListCfFiles → CfFilePickerLoaded.
+            //
+            // Install progress (`Effect::InstallCfMod`) flows through the
+            // existing `download_pane` via `Action::Task(TaskEvent::Progress)`,
+            // NOT a blocking install modal — UI-SPEC §11 invariant inherited
+            // from Phase 8.
+            Effect::SearchCurseForge { slug, query, mc, loader } => {
+                let svc = Arc::clone(&cf_service);
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                let loader_info = synthetic_loader_info_from_cf_type(loader);
+                tokio::spawn(async move {
+                    match svc
+                        .search(
+                            &query,
+                            mc.as_deref(),
+                            loader_info.as_ref(),
+                            Some(&paths2),
+                            Some(&slug),
+                        )
+                        .await
+                    {
+                        Ok(hits) => {
+                            let _ = tx
+                                .send(Action::CfBrowserSearchLoaded { slug, hits })
+                                .await;
+                        }
+                        Err(e) => {
+                            tracing::warn!(error = %e, slug = %slug, "CurseForge search failed");
+                            let _ = tx
+                                .send(Action::CfBrowserSearchFailed {
+                                    slug,
+                                    error: e.to_string(),
+                                })
+                                .await;
+                        }
+                    }
+                });
+            }
+
+            Effect::FetchCfMod { slug, mod_id } => {
+                let svc = Arc::clone(&cf_service);
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match svc.get_mod(mod_id).await {
+                        Ok(detail) => {
+                            let _ = tx
+                                .send(Action::CfBrowserDetailLoaded { slug, detail })
+                                .await;
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                error = %e, slug = %slug, mod_id, "CurseForge get_mod failed"
+                            );
+                            let _ = tx
+                                .send(Action::CfBrowserSearchFailed {
+                                    slug,
+                                    error: e.to_string(),
+                                })
+                                .await;
+                        }
+                    }
+                });
+            }
+
+            Effect::ListCfFiles { slug, mod_id, mc, loader } => {
+                // Mirrors Phase 8 ListModVersions: the spawned task fetches BOTH
+                // the project detail (needed for CfFilePickerLoaded.mod_detail)
+                // AND the file list. One extra get_mod round-trip per file-picker
+                // open (~50ms) — acceptable for v1; deferred caching to v2.
+                let svc = Arc::clone(&cf_service);
+                let tx = action_tx.clone();
+                let loader_info = synthetic_loader_info_from_cf_type(loader);
+                tokio::spawn(async move {
+                    let res: Result<_, crate::mods::curseforge::error::CurseForgeError> = async {
+                        let detail = svc.get_mod(mod_id).await?;
+                        let files = svc
+                            .list_files(mod_id, mc.as_deref(), loader_info.as_ref())
+                            .await?;
+                        Ok::<_, crate::mods::curseforge::error::CurseForgeError>((detail, files))
+                    }
+                    .await;
+                    match res {
+                        Ok((detail, files)) => {
+                            let _ = tx
+                                .send(Action::CfFilePickerLoaded {
+                                    slug,
+                                    mod_detail: detail,
+                                    files,
+                                })
+                                .await;
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                error = %e, slug = %slug, mod_id, "CurseForge list_files failed"
+                            );
+                            let _ = tx
+                                .send(Action::CfBrowserSearchFailed {
+                                    slug,
+                                    error: e.to_string(),
+                                })
+                                .await;
+                        }
+                    }
+                });
+            }
+
+            Effect::InstallCfMod { slug, mod_detail, file } => {
+                // Verbatim per 09-RESEARCH.md §"Effect arm template" lines
+                // 1163-1216. Mirrors Phase 8 InstallModWithDeps mpsc-forwarder
+                // pattern, plus the FileNotDownloadable → CfModInstallFailed
+                // mapping that carries `web_url: Some(...)` so the modal can
+                // render the actionable browser link (MOD-04 load-bearing path).
+                let svc = Arc::clone(&cf_service);
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                let job_id = task_manager.next_job_id();
+
+                // Forwarder: cf_service emits TaskEvent::Progress through
+                // `lt_tx`. Translate each event into Action::Task so it flows
+                // through the existing `state.active_jobs` → `download_pane`
+                // LineGauge — NOT a blocking install modal (UI-SPEC §11).
+                let (lt_tx, mut lt_rx) = mpsc::channel::<TaskEvent>(64);
+                {
+                    let tx_fwd = tx.clone();
+                    tokio::spawn(async move {
+                        while let Some(evt) = lt_rx.recv().await {
+                            if let TaskEvent::Progress { id, pct, msg } = evt {
+                                let _ = tx_fwd
+                                    .send(Action::Task(TaskEvent::Progress { id, pct, msg }))
+                                    .await;
+                            }
+                        }
+                    });
+                }
+
+                let slug_for_task = slug.clone();
+                let mod_id = mod_detail.id;
+                let file_id = file.id;
+                task_manager.spawn_task(job_id, move |_task_tx, token| async move {
+                    let slug = slug_for_task;
+                    let _ = tx
+                        .send(Action::CfModInstallStarted {
+                            slug: slug.clone(),
+                            mod_id,
+                            file_id,
+                            token: token.clone(),
+                        })
+                        .await;
+
+                    let res = svc
+                        .install_mod_into_instance(
+                            &paths2,
+                            &slug,
+                            mod_detail.as_ref(),
+                            file.as_ref(),
+                            lt_tx,
+                            token,
+                            job_id,
+                        )
+                        .await;
+
+                    match res {
+                        Ok(()) => {
+                            let _ = tx
+                                .send(Action::CfModInstalled { slug, mod_id })
+                                .await;
+                        }
+                        Err(crate::mods::curseforge::error::CurseForgeError::Cancelled) => {
+                            // Silent — the cancel path already pruned
+                            // running_mod_jobs (if applicable). Phase 6/8 precedent.
+                            let _ = tx
+                                .send(Action::CfModInstalled { slug, mod_id })
+                                .await;
+                        }
+                        Err(crate::mods::curseforge::error::CurseForgeError::FileNotDownloadable {
+                            web_url,
+                            ..
+                        }) => {
+                            let _ = tx
+                                .send(Action::CfModInstallFailed {
+                                    slug,
+                                    mod_title: mod_detail.name.clone(),
+                                    file_label: file.display_name.clone(),
+                                    error: "Author has disabled third-party downloads".into(),
+                                    web_url: Some(web_url),
+                                })
+                                .await;
+                        }
+                        Err(e) => {
+                            let _ = tx
+                                .send(Action::CfModInstallFailed {
+                                    slug,
+                                    mod_title: mod_detail.name.clone(),
+                                    file_label: file.display_name.clone(),
+                                    error: e.to_string(),
+                                    web_url: None,
+                                })
+                                .await;
+                        }
+                    }
+                    Ok(())
+                });
             }
         }
     }
+}
+
+/// Map a CurseForge `modLoaderType` integer back to a synthetic `LoaderInfo`
+/// suitable for `cf_service.search` / `cf_service.list_files`. Only the `kind`
+/// field is read by the underlying filter (`curseforge_loader_type`), so the
+/// `version` / `version_id` strings can be empty.
+///
+/// Phase 9 (09-07): the `Effect::SearchCurseForge` / `Effect::ListCfFiles`
+/// variants carry `Option<i32>` (already filtered through update arm), but the
+/// service signatures take `Option<&LoaderInfo>`. The 1:1 inverse is exact
+/// because `curseforge_loader_type` is total over the four valid loader kinds.
+fn synthetic_loader_info_from_cf_type(cf_type: Option<i32>) -> Option<LoaderInfo> {
+    use crate::domain::instance::ModloaderKind;
+    let kind = match cf_type? {
+        1 => ModloaderKind::Forge,
+        4 => ModloaderKind::Fabric,
+        5 => ModloaderKind::Quilt,
+        6 => ModloaderKind::NeoForge,
+        _ => return None,
+    };
+    Some(LoaderInfo {
+        kind,
+        version: String::new(),
+        version_id: String::new(),
+    })
 }
