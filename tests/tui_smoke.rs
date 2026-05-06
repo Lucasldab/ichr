@@ -1707,3 +1707,318 @@ fn test_mod_browser_arrows_always_navigate_even_with_search() {
         Some(Action::ModBrowserMove(1))
     ));
 }
+
+// ========================================================================
+// Phase 9 (09-06): CurseForge state machine — 12 tui_smoke tests
+// ========================================================================
+
+use mineltui::mods::curseforge::types::{
+    CurseForgeFileEntry, CurseForgeProjectDetail, CurseForgeSearchHit,
+};
+
+/// Build an `AppState` with `cf_api_key_present` set as requested.
+/// Uses struct-update syntax to satisfy `clippy::field_reassign_with_default`.
+fn cf_state(api_key_present: bool) -> AppState {
+    AppState {
+        cf_api_key_present: api_key_present,
+        ..AppState::default()
+    }
+}
+
+/// Build a minimal `CurseForgeSearchHit` for tests.
+fn cf_hit(id: u64, slug: &str) -> CurseForgeSearchHit {
+    CurseForgeSearchHit {
+        id,
+        slug: slug.into(),
+        name: slug.into(),
+        summary: "x".into(),
+        download_count: 100,
+        categories: vec![],
+        already_installed: false,
+    }
+}
+
+/// Build a minimal `CurseForgeProjectDetail` for tests.
+fn cf_project_detail(id: u64, slug: &str) -> CurseForgeProjectDetail {
+    CurseForgeProjectDetail {
+        id,
+        slug: slug.into(),
+        name: slug.into(),
+        summary: "x".into(),
+        description: "x".into(),
+        download_count: 100,
+        authors: vec![],
+        links: Default::default(),
+    }
+}
+
+/// Build a minimal `CurseForgeFileEntry` for tests. `dl` is the (nullable)
+/// downloadUrl — None mirrors the FileNotDownloadable wire shape (MOD-04).
+fn cf_file_entry(id: u64, fname: &str, dl: Option<String>) -> CurseForgeFileEntry {
+    CurseForgeFileEntry {
+        id,
+        display_name: fname.into(),
+        file_name: format!("{fname}.jar"),
+        release_type: 1,
+        file_status: 4,
+        hashes: vec![],
+        file_date: "2026-01-01T00:00:00Z".into(),
+        file_length: 1024,
+        download_count: 0,
+        download_url: dl,
+        game_versions: vec!["1.20.4".into()],
+        dependencies: vec![],
+        is_available: true,
+    }
+}
+
+#[test]
+fn test_cf_open_no_op_when_api_key_absent() {
+    // Pitfall 1 — F is silently disabled when no API key is configured.
+    let mut s = cf_state(false);
+    let effects = update(&mut s, Action::OpenCfBrowser { slug: "x".into() });
+    assert!(
+        !matches!(s.active_view, ActiveView::CfBrowser { .. }),
+        "active_view must NOT transition to CfBrowser when api key absent"
+    );
+    assert!(
+        !effects
+            .iter()
+            .any(|e| matches!(e, Effect::SearchCurseForge { .. })),
+        "no SearchCurseForge effect must be emitted"
+    );
+}
+
+#[test]
+fn test_cf_open_transitions_to_cf_browser_when_api_key_present() {
+    // Happy path — F opens CfBrowser + emits SearchCurseForge.
+    let mut s = cf_state(true);
+    let effects = update(&mut s, Action::OpenCfBrowser { slug: "x".into() });
+    assert!(matches!(s.active_view, ActiveView::CfBrowser { .. }));
+    assert!(effects
+        .iter()
+        .any(|e| matches!(e, Effect::SearchCurseForge { .. })));
+}
+
+#[test]
+fn test_cf_open_blocked_while_install_in_flight_on_same_instance() {
+    // Pitfall 8 inheritance from Phase 8 — running_mod_jobs is the
+    // source-agnostic per-instance install lock.
+    let mut s = cf_state(true);
+    s.running_mod_jobs
+        .insert("x".into(), CancellationToken::new());
+    let effects = update(&mut s, Action::OpenCfBrowser { slug: "x".into() });
+    assert!(
+        !matches!(s.active_view, ActiveView::CfBrowser { .. }),
+        "Pitfall 8 — install in flight must block the F keybind"
+    );
+    assert!(effects.is_empty(), "Pitfall 8 guard must produce no effect");
+}
+
+#[test]
+fn test_cf_browser_search_loaded_resets_state() {
+    let mut s = cf_state(true);
+    let _ = update(&mut s, Action::OpenCfBrowser { slug: "x".into() });
+    let hits = vec![cf_hit(1, "sodium"), cf_hit(2, "iris")];
+    let _ = update(
+        &mut s,
+        Action::CfBrowserSearchLoaded {
+            slug: "x".into(),
+            hits: hits.clone(),
+        },
+    );
+    if let ActiveView::CfBrowser {
+        results,
+        fetch_state,
+        selected,
+        ..
+    } = &s.active_view
+    {
+        assert_eq!(*selected, 0);
+        assert!(matches!(
+            fetch_state,
+            mineltui::mods::types::ModBrowserFetchState::Ready
+        ));
+        assert_eq!(results.len(), hits.len());
+    } else {
+        panic!("expected CfBrowser, got {:?}", s.active_view);
+    }
+}
+
+#[test]
+fn test_cf_browser_type_search_appends_char() {
+    let mut s = cf_state(true);
+    let _ = update(&mut s, Action::OpenCfBrowser { slug: "x".into() });
+    let _ = update(&mut s, Action::CfBrowserTypeSearch('s'));
+    let _ = update(&mut s, Action::CfBrowserTypeSearch('o'));
+    if let ActiveView::CfBrowser { search_input, .. } = &s.active_view {
+        assert_eq!(search_input, "so");
+    } else {
+        panic!("expected CfBrowser, got {:?}", s.active_view);
+    }
+}
+
+#[test]
+fn test_cf_browser_open_detail_emits_fetch_cf_mod_effect() {
+    // Phase 8-mirror Action ping-pong: half 1.
+    // CfBrowserOpenDetail emits Effect::FetchCfMod — NOT a combined
+    // OpenCfFilePicker effect. The design locks separate FetchCfMod + ListCfFiles.
+    let mut s = cf_state(true);
+    let _ = update(&mut s, Action::OpenCfBrowser { slug: "x".into() });
+    let effects = update(
+        &mut s,
+        Action::CfBrowserOpenDetail {
+            slug: "x".into(),
+            mod_id: 12345,
+        },
+    );
+    let found_fetch = effects.iter().any(|e| match e {
+        Effect::FetchCfMod { mod_id, .. } => *mod_id == 12345,
+        _ => false,
+    });
+    assert!(
+        found_fetch,
+        "expected FetchCfMod with mod_id=12345 (Action ping-pong half 1), got {effects:?}"
+    );
+}
+
+#[test]
+fn test_cf_browser_detail_loaded_chains_to_list_cf_files_effect() {
+    // Phase 8-mirror Action ping-pong: half 2.
+    // CfBrowserDetailLoaded MUST automatically chain to ListCfFiles —
+    // mirrors Phase 8 ModDetailLoaded -> ModVersionsLoaded pattern.
+    let mut s = cf_state(true);
+    let _ = update(&mut s, Action::OpenCfBrowser { slug: "x".into() });
+    let detail = cf_project_detail(12345, "sodium");
+    let effects = update(
+        &mut s,
+        Action::CfBrowserDetailLoaded {
+            slug: "x".into(),
+            detail,
+        },
+    );
+    let found_list = effects.iter().any(|e| match e {
+        Effect::ListCfFiles { mod_id, .. } => *mod_id == 12345,
+        _ => false,
+    });
+    assert!(
+        found_list,
+        "expected ListCfFiles after detail loaded (Phase 8 ping-pong mirror), got {effects:?}"
+    );
+}
+
+#[test]
+fn test_cf_file_picker_confirm_emits_install_cf_mod_effect_when_no_install_in_flight() {
+    let mut s = cf_state(true);
+    s.active_view = ActiveView::CfFilePickerModal {
+        slug: "x".into(),
+        mod_detail: cf_project_detail(1, "sodium"),
+        files: vec![cf_file_entry(2, "sodium", Some("https://x".into()))],
+        selected: 0,
+    };
+    let effects = update(&mut s, Action::CfFilePickerConfirm);
+    assert!(
+        effects
+            .iter()
+            .any(|e| matches!(e, Effect::InstallCfMod { .. })),
+        "expected InstallCfMod, got {effects:?}"
+    );
+}
+
+#[test]
+fn test_cf_file_picker_confirm_blocked_while_install_in_flight() {
+    // Pitfall 8 guard — even with an open file picker, install-in-flight on
+    // the same instance must silently no-op.
+    let mut s = cf_state(true);
+    s.running_mod_jobs
+        .insert("x".into(), CancellationToken::new());
+    s.active_view = ActiveView::CfFilePickerModal {
+        slug: "x".into(),
+        mod_detail: cf_project_detail(1, "sodium"),
+        files: vec![cf_file_entry(2, "sodium", Some("https://x".into()))],
+        selected: 0,
+    };
+    let effects = update(&mut s, Action::CfFilePickerConfirm);
+    assert!(
+        !effects
+            .iter()
+            .any(|e| matches!(e, Effect::InstallCfMod { .. })),
+        "Pitfall 8 — InstallCfMod must NOT be emitted while install in flight"
+    );
+}
+
+#[test]
+fn test_cf_mod_install_failed_transitions_to_modal_with_web_url() {
+    // MOD-04 success criterion 3 — FileNotDownloadable carries web_url,
+    // and the modal renders the link.
+    let mut s = cf_state(true);
+    let url = "https://www.curseforge.com/minecraft/mc-mods/wonderful-world-mod/files/4567890"
+        .to_string();
+    let _ = update(
+        &mut s,
+        Action::CfModInstallFailed {
+            slug: "x".into(),
+            mod_title: "Wonderful World".into(),
+            file_label: "1.5.0".into(),
+            error: "Author has disabled third-party downloads".into(),
+            web_url: Some(url.clone()),
+        },
+    );
+    if let ActiveView::CfInstallFailedModal { web_url: Some(u), .. } = &s.active_view {
+        assert_eq!(*u, url);
+    } else {
+        panic!(
+            "expected CfInstallFailedModal with Some(web_url), got {:?}",
+            s.active_view
+        );
+    }
+}
+
+#[test]
+fn test_cf_dismiss_install_failed_returns_to_instance_list() {
+    let mut s = cf_state(true);
+    s.active_view = ActiveView::CfInstallFailedModal {
+        slug: "x".into(),
+        mod_title: "X".into(),
+        file_label: "v".into(),
+        error_message: "e".into(),
+        web_url: None,
+    };
+    let _ = update(&mut s, Action::CfDismissInstallFailed);
+    assert!(
+        matches!(s.active_view, ActiveView::InstanceList { .. }),
+        "Esc on CfInstallFailedModal must return to InstanceList, got {:?}",
+        s.active_view
+    );
+}
+
+#[test]
+fn test_cf_mod_install_started_inserts_running_mod_job_and_cf_mod_installed_removes_it() {
+    // Single-mutation-point invariant for running_mod_jobs.
+    let mut s = cf_state(true);
+    let token = CancellationToken::new();
+    let _ = update(
+        &mut s,
+        Action::CfModInstallStarted {
+            slug: "x".into(),
+            mod_id: 1,
+            file_id: 2,
+            token,
+        },
+    );
+    assert!(
+        s.running_mod_jobs.contains_key("x"),
+        "CfModInstallStarted must insert into running_mod_jobs"
+    );
+    let _ = update(
+        &mut s,
+        Action::CfModInstalled {
+            slug: "x".into(),
+            mod_id: 1,
+        },
+    );
+    assert!(
+        !s.running_mod_jobs.contains_key("x"),
+        "CfModInstalled must remove the running_mod_jobs entry"
+    );
+}
