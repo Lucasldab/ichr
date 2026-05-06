@@ -223,6 +223,59 @@ impl JavaService {
             .await
             .map(|_| ())
     }
+
+    // -----------------------------------------------------------------------
+    // Install-time JRE resolver (D-06)
+    // -----------------------------------------------------------------------
+
+    /// Resolve a JRE path for installer subprocess use, given only the MC
+    /// version string. Loads the vanilla version JSON from
+    /// `paths.version_json(mc_version)` and delegates to `resolve_jre_for_launch`
+    /// with a synthesized stub `InstanceManifest`.
+    ///
+    /// Per 07-CONTEXT.md decision D-06: the same JRE that runs Minecraft for
+    /// MC version X.Y.Z is sufficient for running the Forge/NeoForge installer
+    /// targeting that MC version (researcher cross-checked Forge installer
+    /// JDK requirements against per-MC runtime JDKs for every era 1.13+).
+    ///
+    /// Errors:
+    /// - `AppError::VersionNotInstalled { slug }` when the vanilla version JSON
+    ///   is not yet on disk (caller must install vanilla MC first).
+    /// - `AppError::Io(_)` when the file exists but fails to read.
+    /// - `AppError::MojangParse(_)` when the file is malformed JSON.
+    /// - Whatever `resolve_jre_for_launch` returns for unresolvable JRE.
+    #[tracing::instrument(skip_all, fields(mc_version = %mc_version))]
+    pub async fn resolve_jre_for_mc_version_install(
+        &self,
+        paths: &AppPaths,
+        mc_version: &str,
+    ) -> Result<PathBuf, AppError> {
+        use crate::domain::instance::InstanceManifest;
+        use crate::error::AppError;
+
+        let json_path = paths.version_json(mc_version);
+        // 1) Vanilla version JSON must be on disk; otherwise surface a
+        //    typed "install vanilla first" error using the existing variant.
+        if !tokio::fs::try_exists(&json_path).await.unwrap_or(false) {
+            return Err(AppError::VersionNotInstalled {
+                slug: mc_version.to_string(),
+            });
+        }
+        // 2) Read + parse — `?` auto-wraps via #[from] on AppError::Io and
+        //    AppError::MojangParse. No string-based fallback variants.
+        let bytes = tokio::fs::read(&json_path).await?;
+        let version_json: crate::mojang::types::VersionJson =
+            serde_json::from_slice(&bytes)?;
+
+        // 3) Synthesize a stub instance manifest — no overrides, drives the
+        //    standard precedence chain inside resolve_jre_for_launch.
+        let stub = InstanceManifest::new(
+            "loader-install".into(),
+            "loader-install".into(),
+            mc_version.to_string(),
+        );
+        self.resolve_jre_for_launch(paths, &stub, &version_json).await
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -798,5 +851,24 @@ mod tests {
             loaded2.java_override.is_none(),
             "override must be cleared"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // resolve_jre_for_mc_version_install
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resolve_jre_for_mc_version_install_missing_vanilla_returns_error() {
+        use crate::error::AppError;
+        let td = TempDir::new().unwrap();
+        let paths = make_paths(&td);
+        let svc = JavaService::new().unwrap();
+        let r = svc.resolve_jre_for_mc_version_install(&paths, "1.21.4").await;
+        match r {
+            Err(AppError::VersionNotInstalled { slug }) => {
+                assert_eq!(slug, "1.21.4", "slug should carry the missing MC version id");
+            }
+            other => panic!("expected VersionNotInstalled, got {other:?}"),
+        }
     }
 }
