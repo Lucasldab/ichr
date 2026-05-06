@@ -68,6 +68,9 @@ pub enum AppError {
     #[error("Modrinth error: {0}")]
     Modrinth(#[from] crate::mods::error::ModrinthError),
 
+    #[error("CurseForge error: {0}")]
+    CurseForge(#[from] crate::mods::curseforge::error::CurseForgeError),
+
     #[error("No active account — add a Microsoft account or launch in offline mode")]
     NoActiveAccount,
 }
