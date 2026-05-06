@@ -35,10 +35,12 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
         .iter()
         .enumerate()
         .map(|(i, m)| {
-            // Source cell — body for modrinth/curseforge, DIM for manual/modpack.
+            // Source cell — short tags for body sources (Phase 9 09-07
+            // Pitfall 10 visual disambiguator: `[M]` Modrinth, `[CF]` CurseForge);
+            // DIM long-form for the rare manual/modpack paths.
             let (source_label, source_style) = match m.source {
-                ModSource::Modrinth => ("modrinth", Style::default()),
-                ModSource::CurseForge => ("curseforge", Style::default()),
+                ModSource::Modrinth => ("[M]", Style::default()),
+                ModSource::CurseForge => ("[CF]", Style::default()),
                 ModSource::Manual => (
                     "manual",
                     Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),

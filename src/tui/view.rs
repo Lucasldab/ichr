@@ -8,6 +8,9 @@ use super::views::{
     account_auth_failed::render_account_auth_failed,
     accounts_list::render_accounts_list,
     add_account_device_code::render_add_account_device_code,
+    cf_browser::render_cf_browser,
+    cf_file_picker_modal::render_cf_file_picker_modal,
+    cf_install_failed_modal::render_cf_install_failed_modal,
     create_modal::render_create_modal,
     delete_confirm::render_delete_confirm,
     dep_confirm_modal::render_dep_confirm_modal,
@@ -42,12 +45,16 @@ pub fn view(state: &AppState, f: &mut Frame) {
     let main = layout[0];
     let dl = layout[1];
 
-    // Phase 8 (08-08): full-screen views (ModBrowser, InstalledModsList) own
-    // the entire `main` rect — suppress the instance-list background render so
-    // the modless view can claim the full body width without bleed-through.
+    // Phase 8 (08-08) + Phase 9 (09-07): full-screen views (ModBrowser,
+    // InstalledModsList, CfBrowser) own the entire `main` rect — suppress the
+    // instance-list background render so the modless view can claim the full
+    // body width without bleed-through. The CurseForge file-picker and
+    // install-failed modals overlay normally.
     let full_screen = matches!(
         state.active_view,
-        ActiveView::ModBrowser { .. } | ActiveView::InstalledModsList { .. }
+        ActiveView::ModBrowser { .. }
+            | ActiveView::InstalledModsList { .. }
+            | ActiveView::CfBrowser { .. }
     );
     if !full_screen {
         render_instance_list(f, main, state);
@@ -89,12 +96,11 @@ pub fn view(state: &AppState, f: &mut Frame) {
         ActiveView::ModInstallFailedModal { .. } => {
             render_mod_install_failed_modal(f, main, state)
         }
-        // Phase 9 (CurseForge) — renderers wired in 09-07. Until then, no-op.
-        ActiveView::CfBrowser { .. }
-        | ActiveView::CfFilePickerModal { .. }
-        | ActiveView::CfInstallFailedModal { .. } => {
-            // Stub — render_cf_browser / render_cf_file_picker_modal /
-            // render_cf_install_failed_modal land in 09-07.
+        // Phase 9 (09-07): CurseForge views.
+        ActiveView::CfBrowser { .. } => render_cf_browser(f, main, state),
+        ActiveView::CfFilePickerModal { .. } => render_cf_file_picker_modal(f, main, state),
+        ActiveView::CfInstallFailedModal { .. } => {
+            render_cf_install_failed_modal(f, main, state)
         }
     }
 

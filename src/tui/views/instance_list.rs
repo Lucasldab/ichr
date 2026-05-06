@@ -54,6 +54,14 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
             .style(style)
         })
         .collect();
+    // Phase 9 (09-07): F keybind opens the CurseForge browser. Title shows the
+    // disabled hint `(no API key)` when no CurseForge API key was resolved at
+    // startup — matches the Phase 6 `L (running)` DIM disabled-feature pattern.
+    let title = if state.cf_api_key_present {
+        "Instances (c/r/x/d/g/Enter/s/A/L/M/m/F)"
+    } else {
+        "Instances (c/r/x/d/g/Enter/s/A/L/M/m/F (no API key))"
+    };
     let table = Table::new(
         rows,
         [
@@ -64,7 +72,7 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
         ],
     )
     .header(Row::new(vec!["Name", "MC Version", "Group", "Last played"]))
-    .block(Block::default().borders(Borders::ALL).title("Instances (c/r/x/d/g/Enter/s/A/L/M/m)"));
+    .block(Block::default().borders(Borders::ALL).title(title));
     f.render_widget(table, table_area);
 
     // Active-account footer row.
