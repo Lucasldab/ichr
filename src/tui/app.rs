@@ -2361,27 +2361,348 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![Effect::KillProcess { slug }]
         }
 
-        // ── Phase 9 (CurseForge Integration) — Task 1 placeholders ──
-        // Real update arms land in 09-06 Task 2. Until then, every new Action
-        // variant is a no-op so the exhaustive match still compiles. Removed in Task 2.
-        Action::OpenCfBrowser { .. }
-        | Action::CfBrowserSearchStart { .. }
-        | Action::CfBrowserSearchLoaded { .. }
-        | Action::CfBrowserSearchFailed { .. }
-        | Action::CfBrowserMoveSelection(_)
-        | Action::CfBrowserToggleMcFilter
-        | Action::CfBrowserToggleLoaderFilter
-        | Action::CfBrowserOpenDetail { .. }
-        | Action::CfBrowserDetailLoaded { .. }
-        | Action::CfBrowserTypeSearch(_)
-        | Action::CfBrowserBackspaceSearch
-        | Action::CfFilePickerLoaded { .. }
-        | Action::CfFilePickerMove(_)
-        | Action::CfFilePickerConfirm
-        | Action::CfModInstallStarted { .. }
-        | Action::CfModInstalled { .. }
-        | Action::CfModInstallFailed { .. }
-        | Action::CfDismissInstallFailed => vec![],
+        // ── Phase 9 (CurseForge Integration) — pure update() arms ──
+        // All arms below mutate AppState and (optionally) emit Effects. NO arm
+        // performs HTTP, file I/O, or task spawning — those live in 09-07 run.rs.
+        // Mirrors Phase 8's modrinth arms 1:1 (CfBrowser ≡ ModBrowser, etc.).
+
+        Action::OpenCfBrowser { slug } => {
+            // Pitfall 1 (09-RESEARCH.md §"Keybind guard"): F is silently disabled
+            // when no CurseForge API key was resolved at startup. Tested by
+            // `test_cf_open_no_op_when_api_key_absent`.
+            if !state.cf_api_key_present {
+                return vec![];
+            }
+            // Pitfall 8 inheritance from Phase 8 (running_mod_jobs is the
+            // source-agnostic per-instance install lock).
+            if state.running_mod_jobs.contains_key(&slug) {
+                return vec![];
+            }
+            let (mc, loader) = state
+                .instances
+                .iter()
+                .find(|m| m.slug == slug)
+                .map(|m| (
+                    Some(m.mc_version_id.clone()),
+                    crate::mods::curseforge::filter::curseforge_loader_type(m.loader.as_ref()),
+                ))
+                .unwrap_or((None, None));
+            state.active_view = ActiveView::CfBrowser {
+                slug: slug.clone(),
+                search_input: String::new(),
+                results: Vec::new(),
+                selected: 0,
+                fetch_state: ModBrowserFetchState::Loading,
+                mc_filter: None,
+                loader_filter: None,
+                selected_detail: None,
+            };
+            vec![Effect::SearchCurseForge {
+                slug,
+                query: String::new(),
+                mc,
+                loader,
+            }]
+        }
+
+        Action::CfBrowserSearchStart { slug, query, mc, loader } => {
+            if let ActiveView::CfBrowser {
+                slug: cur_slug, fetch_state, ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug {
+                    *fetch_state = ModBrowserFetchState::Loading;
+                }
+            }
+            vec![Effect::SearchCurseForge { slug, query, mc, loader }]
+        }
+
+        Action::CfBrowserSearchLoaded { slug, hits } => {
+            if let ActiveView::CfBrowser {
+                slug: cur_slug, results, selected, fetch_state, ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug {
+                    let new_len = hits.len();
+                    *results = hits;
+                    *fetch_state = ModBrowserFetchState::Ready;
+                    *selected = (*selected).min(new_len.saturating_sub(1));
+                }
+            }
+            vec![]
+        }
+
+        Action::CfBrowserSearchFailed { slug, error } => {
+            if let ActiveView::CfBrowser {
+                slug: cur_slug, fetch_state, ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug {
+                    *fetch_state = ModBrowserFetchState::Error(error);
+                }
+            }
+            vec![]
+        }
+
+        Action::CfBrowserMoveSelection(delta) => {
+            if let ActiveView::CfBrowser { results, selected, .. } = &mut state.active_view {
+                let len = results.len();
+                if len > 0 {
+                    let new_idx = (*selected as i32 + delta)
+                        .clamp(0, len as i32 - 1) as usize;
+                    *selected = new_idx;
+                }
+            }
+            vec![]
+        }
+
+        Action::CfBrowserToggleMcFilter => {
+            // Cycle: None ↔ Some("any"). Re-emit search with the new filter.
+            let captured = match &mut state.active_view {
+                ActiveView::CfBrowser {
+                    slug, search_input, mc_filter, loader_filter, ..
+                } => {
+                    *mc_filter = match mc_filter.as_deref() {
+                        None => Some("any".to_string()),
+                        Some(_) => None,
+                    };
+                    Some((slug.clone(), search_input.clone(), mc_filter.clone(), *loader_filter))
+                }
+                _ => None,
+            };
+            let Some((slug, query, mc_override, loader_override)) = captured else {
+                return vec![];
+            };
+            let inst = state.instances.iter().find(|m| m.slug == slug);
+            let mc = match mc_override.as_deref() {
+                Some("any") => None,
+                _ => inst.map(|m| m.mc_version_id.clone()),
+            };
+            let loader = match loader_override {
+                None => inst.and_then(|m| {
+                    crate::mods::curseforge::filter::curseforge_loader_type(m.loader.as_ref())
+                }),
+                Some(v) => Some(v),
+            };
+            vec![Effect::SearchCurseForge { slug, query, mc, loader }]
+        }
+
+        Action::CfBrowserToggleLoaderFilter => {
+            // Cycle: None ↔ Some(<instance loader>). Re-emit search.
+            let captured = match &mut state.active_view {
+                ActiveView::CfBrowser {
+                    slug, search_input, mc_filter, loader_filter, ..
+                } => {
+                    // Look up the instance loader integer to use as the toggle target.
+                    let inst_loader = state
+                        .instances
+                        .iter()
+                        .find(|m| m.slug == *slug)
+                        .and_then(|m| {
+                            crate::mods::curseforge::filter::curseforge_loader_type(
+                                m.loader.as_ref(),
+                            )
+                        });
+                    *loader_filter = match *loader_filter {
+                        None => inst_loader,
+                        Some(_) => None,
+                    };
+                    Some((slug.clone(), search_input.clone(), mc_filter.clone(), *loader_filter))
+                }
+                _ => None,
+            };
+            let Some((slug, query, mc_override, loader_override)) = captured else {
+                return vec![];
+            };
+            let inst = state.instances.iter().find(|m| m.slug == slug);
+            let mc = match mc_override.as_deref() {
+                Some("any") => None,
+                _ => inst.map(|m| m.mc_version_id.clone()),
+            };
+            let loader = loader_override;
+            vec![Effect::SearchCurseForge { slug, query, mc, loader }]
+        }
+
+        Action::CfBrowserOpenDetail { slug, mod_id } => {
+            // Action ping-pong half 1 (mirrors Phase 8 ModBrowserOpenVersions →
+            // FetchModDetail). Detail arrival triggers the chained ListCfFiles.
+            vec![Effect::FetchCfMod { slug, mod_id }]
+        }
+
+        Action::CfBrowserDetailLoaded { slug, detail } => {
+            // Action ping-pong half 2 (mirrors Phase 8 ModDetailLoaded → ModVersionsLoaded
+            // chain): cache the detail on CfBrowser.selected_detail AND emit
+            // Effect::ListCfFiles to populate the file picker.
+            let mod_id = detail.id;
+            // Capture mc/loader from the CfBrowser view BEFORE mutating it.
+            let (mc, loader) = match &state.active_view {
+                ActiveView::CfBrowser { mc_filter, loader_filter, .. } => {
+                    let inst = state.instances.iter().find(|m| m.slug == slug);
+                    let mc = match mc_filter.as_deref() {
+                        Some("any") => None,
+                        _ => inst.map(|m| m.mc_version_id.clone()),
+                    };
+                    let loader = match *loader_filter {
+                        None => inst.and_then(|m| {
+                            crate::mods::curseforge::filter::curseforge_loader_type(
+                                m.loader.as_ref(),
+                            )
+                        }),
+                        Some(v) => Some(v),
+                    };
+                    (mc, loader)
+                }
+                _ => (None, None),
+            };
+            if let ActiveView::CfBrowser {
+                slug: cur_slug, selected_detail, ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug {
+                    *selected_detail = Some(detail);
+                }
+            }
+            vec![Effect::ListCfFiles { slug, mod_id, mc, loader }]
+        }
+
+        Action::CfBrowserTypeSearch(c) => {
+            let captured = match &mut state.active_view {
+                ActiveView::CfBrowser {
+                    slug, search_input, mc_filter, loader_filter, ..
+                } => {
+                    search_input.push(c);
+                    Some((slug.clone(), search_input.clone(), mc_filter.clone(), *loader_filter))
+                }
+                _ => None,
+            };
+            let Some((slug, query, mc_override, loader_override)) = captured else {
+                return vec![];
+            };
+            let inst = state.instances.iter().find(|m| m.slug == slug);
+            let mc = match mc_override.as_deref() {
+                Some("any") => None,
+                _ => inst.map(|m| m.mc_version_id.clone()),
+            };
+            let loader = match loader_override {
+                None => inst.and_then(|m| {
+                    crate::mods::curseforge::filter::curseforge_loader_type(m.loader.as_ref())
+                }),
+                Some(v) => Some(v),
+            };
+            vec![Effect::SearchCurseForge { slug, query, mc, loader }]
+        }
+
+        Action::CfBrowserBackspaceSearch => {
+            let captured = match &mut state.active_view {
+                ActiveView::CfBrowser {
+                    slug, search_input, mc_filter, loader_filter, ..
+                } => {
+                    search_input.pop();
+                    Some((slug.clone(), search_input.clone(), mc_filter.clone(), *loader_filter))
+                }
+                _ => None,
+            };
+            let Some((slug, query, mc_override, loader_override)) = captured else {
+                return vec![];
+            };
+            let inst = state.instances.iter().find(|m| m.slug == slug);
+            let mc = match mc_override.as_deref() {
+                Some("any") => None,
+                _ => inst.map(|m| m.mc_version_id.clone()),
+            };
+            let loader = match loader_override {
+                None => inst.and_then(|m| {
+                    crate::mods::curseforge::filter::curseforge_loader_type(m.loader.as_ref())
+                }),
+                Some(v) => Some(v),
+            };
+            vec![Effect::SearchCurseForge { slug, query, mc, loader }]
+        }
+
+        Action::CfFilePickerLoaded { slug, mod_detail, files } => {
+            state.active_view = ActiveView::CfFilePickerModal {
+                slug,
+                mod_detail,
+                files,
+                selected: 0,
+            };
+            vec![]
+        }
+
+        Action::CfFilePickerMove(delta) => {
+            if let ActiveView::CfFilePickerModal { files, selected, .. } =
+                &mut state.active_view
+            {
+                let len = files.len();
+                if len > 0 {
+                    let new_idx = (*selected as i32 + delta)
+                        .clamp(0, len as i32 - 1) as usize;
+                    *selected = new_idx;
+                }
+            }
+            vec![]
+        }
+
+        Action::CfFilePickerConfirm => {
+            // Pitfall 8 guard: silent no-op when an install is already in flight
+            // on this instance (running_mod_jobs is shared with Phase 8).
+            let captured = match &state.active_view {
+                ActiveView::CfFilePickerModal { slug, mod_detail, files, selected } => {
+                    if state.running_mod_jobs.contains_key(slug) {
+                        return vec![];
+                    }
+                    files.get(*selected).map(|f| {
+                        (slug.clone(), mod_detail.clone(), f.clone())
+                    })
+                }
+                _ => None,
+            };
+            let Some((slug, mod_detail, file)) = captured else {
+                return vec![];
+            };
+            vec![Effect::InstallCfMod {
+                slug,
+                mod_detail: Box::new(mod_detail),
+                file: Box::new(file),
+            }]
+        }
+
+        Action::CfModInstallStarted { slug, mod_id: _, file_id: _, token } => {
+            // Single-mutation-point invariant for running_mod_jobs (insert site).
+            state.running_mod_jobs.insert(slug, token);
+            vec![]
+        }
+
+        Action::CfModInstalled { slug, mod_id: _ } => {
+            // Single-mutation-point invariant for running_mod_jobs (remove site #1).
+            state.running_mod_jobs.remove(&slug);
+            // If user is still on the file picker for this slug, return to the
+            // instance list (matches Phase 8 install-completed UX).
+            if let ActiveView::CfFilePickerModal { slug: cur_slug, .. } = &state.active_view {
+                if *cur_slug == slug {
+                    state.active_view = ActiveView::default();
+                }
+            }
+            vec![]
+        }
+
+        Action::CfModInstallFailed { slug, mod_title, file_label, error, web_url } => {
+            // Single-mutation-point invariant for running_mod_jobs (remove site #2).
+            state.running_mod_jobs.remove(&slug);
+            state.active_view = ActiveView::CfInstallFailedModal {
+                slug,
+                mod_title,
+                file_label,
+                error_message: error,
+                web_url,
+            };
+            vec![]
+        }
+
+        Action::CfDismissInstallFailed => {
+            state.active_view = ActiveView::default();
+            vec![]
+        }
     }
 }
 
