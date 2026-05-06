@@ -16,6 +16,7 @@
 use std::sync::Arc;
 
 use futures::StreamExt;
+use sha1::Sha1;
 use sha2::{Digest, Sha512};
 use tokio::sync::{mpsc, Semaphore};
 use tokio_util::sync::CancellationToken;
@@ -211,6 +212,186 @@ fn sha512_hex(bytes: &[u8]) -> String {
         write!(s, "{b:02x}").unwrap();
         s
     })
+}
+
+/// SHA-1 lowercase hex (40 chars) of a digest output. Mirrors `sha512_hex`
+/// shape (sha2 0.11 Array does not implement LowerHex; iter().fold()).
+/// Per Phase 9 09-RESEARCH.md §Pattern 5 line 622 (CurseForge default hash).
+pub fn sha1_hex(bytes: &[u8]) -> String {
+    bytes.iter().fold(String::with_capacity(40), |mut s, b| {
+        use std::fmt::Write;
+        write!(s, "{b:02x}").unwrap();
+        s
+    })
+}
+
+/// SHA-256 lowercase hex (64 chars). Same pattern; rare in CurseForge but
+/// supported as a fallback for files carrying algo=3 instead of algo=1.
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    bytes.iter().fold(String::with_capacity(64), |mut s, b| {
+        use std::fmt::Write;
+        write!(s, "{b:02x}").unwrap();
+        s
+    })
+}
+
+/// Stream a file with hash verification driven by `HashAlgo`. Sibling to
+/// `download_and_verify` (which is hardcoded SHA-512 for the Modrinth path).
+/// Per Phase 9 09-PATTERNS.md §"Generalization delta" line 657 + 09-RESEARCH.md
+/// §"Per-Instance Ledger Reuse" line 312.
+///
+/// Preserves the Phase 8 invariants from `download_and_verify`:
+///   - 256MB cap (pre- and mid-stream)
+///   - safe-filename allowlist via `is_safe_mod_filename`
+///   - HTTPS-only URL acceptability (loopback exemption for httpmock tests)
+///   - per-chunk progress emit
+///   - cancellation check before send and per-chunk
+///   - case-insensitive hash compare (Pitfall 3)
+///
+/// On hash mismatch returns `ModrinthError::Sha512Mismatch` (kept under that
+/// variant for ModrinthError stability; the Phase 9 service-layer maps to
+/// `CurseForgeError::ShaMismatch { algo, ... }` at the boundary).
+#[allow(clippy::too_many_arguments)]
+#[tracing::instrument(
+    name = "mods::download_one_with_hash_algo",
+    skip_all,
+    fields(url = %url, file_label = %file_label, hash_algo = ?hash_algo)
+)]
+pub async fn download_one_with_hash_algo(
+    http: &reqwest::Client,
+    url: &str,
+    expected_hash: &str,
+    hash_algo: HashAlgo,
+    dest_tmp: &std::path::Path,
+    file_label: &str,
+    file_size_hint: u64,
+    progress_tx: &mpsc::Sender<TaskEvent>,
+    job_id: JobId,
+    token: &CancellationToken,
+    completed_files: usize,
+    total_files: usize,
+) -> Result<u64, ModrinthError> {
+    if !is_safe_mod_filename(file_label) {
+        return Err(ModrinthError::Io(std::io::Error::other(format!(
+            "unsafe filename: {file_label}"
+        ))));
+    }
+    if !is_acceptable_mod_url(url) {
+        return Err(ModrinthError::FileNotDownloadable {
+            project_slug: format!("{file_label} (non-https URL: {url})"),
+        });
+    }
+    if file_size_hint > MAX_MOD_FILE_BYTES {
+        return Err(ModrinthError::FileNotDownloadable {
+            project_slug: format!(
+                "{file_label} ({file_size_hint}B exceeds cap {MAX_MOD_FILE_BYTES}B)"
+            ),
+        });
+    }
+    if token.is_cancelled() {
+        return Err(ModrinthError::Cancelled);
+    }
+
+    let resp = http
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| ModrinthError::Http(format!("GET {url}: {e}")))?
+        .error_for_status()
+        .map_err(|e| ModrinthError::Http(format!("status {url}: {e}")))?;
+
+    let mut buf: Vec<u8> = Vec::with_capacity(file_size_hint as usize);
+    let mut bytes_done: u64 = 0;
+    let mut stream = resp.bytes_stream();
+
+    while let Some(chunk) = stream.next().await {
+        if token.is_cancelled() {
+            return Err(ModrinthError::Cancelled);
+        }
+        let chunk = chunk
+            .map_err(|e| ModrinthError::Http(format!("body {url}: {e}")))?;
+        bytes_done += chunk.len() as u64;
+        if bytes_done > MAX_MOD_FILE_BYTES {
+            return Err(ModrinthError::FileNotDownloadable {
+                project_slug: format!(
+                    "{file_label} (mid-stream bytes {bytes_done}B exceeded cap {MAX_MOD_FILE_BYTES}B)"
+                ),
+            });
+        }
+        buf.extend_from_slice(&chunk);
+
+        let intra_pct: u64 = if file_size_hint == 0 {
+            100
+        } else {
+            (bytes_done.saturating_mul(100)) / file_size_hint.max(1)
+        };
+        let total = total_files.max(1) as u64;
+        let already_done_pct: u64 = (completed_files as u64 * 100) / total;
+        let this_share_pct: u64 = intra_pct / total;
+        let pct = (already_done_pct + this_share_pct).min(99) as u8;
+        let _ = progress_tx
+            .send(TaskEvent::Progress {
+                id: job_id,
+                pct,
+                msg: format!(
+                    "Downloading mod {}/{}: {file_label}",
+                    completed_files + 1,
+                    total_files
+                ),
+            })
+            .await;
+    }
+
+    // Verify: branch on HashAlgo. Case-insensitive compare per Pitfall 3.
+    //
+    // Important: `sha1` 0.10 uses `digest` 0.10 while `sha2` 0.11 uses `digest`
+    // 0.11 (CLAUDE.md compatibility note: "they coexist but you cannot unify
+    // the digest trait across them. Call them independently"). The module-level
+    // `use sha2::{Digest, Sha512}` puts `sha2::Digest` (digest 0.11) in scope —
+    // sha2 hashers (Sha512, Sha256) work directly. For Sha1 we scope-import
+    // `sha1::Digest` inside the arm so its method resolution wins locally.
+    let got = match hash_algo {
+        HashAlgo::Sha512 => {
+            let mut h = Sha512::new();
+            h.update(&buf);
+            sha512_hex(h.finalize().as_slice())
+        }
+        HashAlgo::Sha1 => {
+            use sha1::Digest as _;
+            let mut h = Sha1::new();
+            h.update(&buf);
+            sha1_hex(h.finalize().as_slice())
+        }
+        HashAlgo::Sha256 => {
+            use sha2::Sha256;
+            let mut h = Sha256::new();
+            h.update(&buf);
+            sha256_hex(h.finalize().as_slice())
+        }
+    };
+    if !got.eq_ignore_ascii_case(expected_hash) {
+        return Err(ModrinthError::Sha512Mismatch {
+            url: url.to_string(),
+            expected: expected_hash.to_string(),
+            got,
+        });
+    }
+
+    if let Some(parent) = dest_tmp.parent() {
+        tokio::fs::create_dir_all(parent).await.map_err(|e| {
+            ModrinthError::Io(std::io::Error::other(format!(
+                "create_dir_all {}: {e}",
+                parent.display()
+            )))
+        })?;
+    }
+    tokio::fs::write(dest_tmp, &buf).await.map_err(|e| {
+        ModrinthError::Io(std::io::Error::other(format!(
+            "write {}: {e}",
+            dest_tmp.display()
+        )))
+    })?;
+    Ok(buf.len() as u64)
 }
 
 /// One element of the install plan -- a row to write into the ledger and the
@@ -920,6 +1101,165 @@ mod tests {
         assert!(!final_path.exists(), "no final jar on hash mismatch");
         let l = crate::mods::ledger::read_ledger(&paths, "inst").await.unwrap();
         assert!(l.mods.is_empty(), "no ledger row on hash mismatch");
+    }
+
+    // --- download_one_with_hash_algo (Phase 9 generic helper) ---------------
+
+    #[tokio::test]
+    async fn test_sha1_verify_passes_with_correct_hash() {
+        use httpmock::prelude::*;
+        use sha1::{Digest, Sha1};
+        let server = MockServer::start();
+        let body = b"hello sha1 world".to_vec();
+        let mut h = Sha1::new();
+        h.update(&body);
+        let expected = sha1_hex(h.finalize().as_slice());
+        server.mock(|when, then| {
+            when.method(GET).path("/x.jar");
+            then.status(200).body(body.clone());
+        });
+
+        let td = TempDir::new().unwrap();
+        let dest = td.path().join("x.jar.tmp");
+        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let (tx, rx) = mpsc::channel(64);
+        drain(rx);
+        let token = CancellationToken::new();
+
+        let n = download_one_with_hash_algo(
+            &http,
+            &format!("{}/x.jar", server.base_url()),
+            &expected,
+            HashAlgo::Sha1,
+            &dest,
+            "x.jar",
+            body.len() as u64,
+            &tx,
+            JobId(0),
+            &token,
+            0,
+            1,
+        )
+        .await
+        .unwrap();
+        assert_eq!(n, body.len() as u64);
+        assert!(dest.exists());
+    }
+
+    #[tokio::test]
+    async fn test_sha1_verify_fails_with_wrong_hash() {
+        use httpmock::prelude::*;
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(GET).path("/x.jar");
+            then.status(200).body(b"actual body");
+        });
+        let td = TempDir::new().unwrap();
+        let dest = td.path().join("x.jar.tmp");
+        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let (tx, rx) = mpsc::channel(64);
+        drain(rx);
+        let token = CancellationToken::new();
+
+        let r = download_one_with_hash_algo(
+            &http,
+            &format!("{}/x.jar", server.base_url()),
+            "deadbeef",
+            HashAlgo::Sha1,
+            &dest,
+            "x.jar",
+            11,
+            &tx,
+            JobId(0),
+            &token,
+            0,
+            1,
+        )
+        .await;
+        assert!(
+            matches!(r, Err(ModrinthError::Sha512Mismatch { .. })),
+            "expected Sha512Mismatch (used as generic mismatch variant), got {r:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sha1_verify_case_insensitive_uppercase_expected() {
+        // Pitfall 3: CurseForge sometimes returns hashes in UPPERCASE.
+        use httpmock::prelude::*;
+        use sha1::{Digest, Sha1};
+        let server = MockServer::start();
+        let body = b"case-insensitive test".to_vec();
+        let mut h = Sha1::new();
+        h.update(&body);
+        let expected_lower = sha1_hex(h.finalize().as_slice());
+        let expected_upper = expected_lower.to_uppercase();
+        server.mock(|when, then| {
+            when.method(GET).path("/x.jar");
+            then.status(200).body(body.clone());
+        });
+        let td = TempDir::new().unwrap();
+        let dest = td.path().join("x.jar.tmp");
+        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let (tx, rx) = mpsc::channel(64);
+        drain(rx);
+        let token = CancellationToken::new();
+
+        let n = download_one_with_hash_algo(
+            &http,
+            &format!("{}/x.jar", server.base_url()),
+            &expected_upper,
+            HashAlgo::Sha1,
+            &dest,
+            "x.jar",
+            body.len() as u64,
+            &tx,
+            JobId(0),
+            &token,
+            0,
+            1,
+        )
+        .await
+        .unwrap();
+        assert_eq!(n, body.len() as u64);
+    }
+
+    #[tokio::test]
+    async fn test_sha256_verify_passes() {
+        use httpmock::prelude::*;
+        use sha2::{Digest, Sha256};
+        let server = MockServer::start();
+        let body = b"sha256 round trip".to_vec();
+        let mut h = Sha256::new();
+        h.update(&body);
+        let expected = sha256_hex(h.finalize().as_slice());
+        server.mock(|when, then| {
+            when.method(GET).path("/x.jar");
+            then.status(200).body(body.clone());
+        });
+        let td = TempDir::new().unwrap();
+        let dest = td.path().join("x.jar.tmp");
+        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let (tx, rx) = mpsc::channel(64);
+        drain(rx);
+        let token = CancellationToken::new();
+
+        let n = download_one_with_hash_algo(
+            &http,
+            &format!("{}/x.jar", server.base_url()),
+            &expected,
+            HashAlgo::Sha256,
+            &dest,
+            "x.jar",
+            body.len() as u64,
+            &tx,
+            JobId(0),
+            &token,
+            0,
+            1,
+        )
+        .await
+        .unwrap();
+        assert_eq!(n, body.len() as u64);
     }
 
     #[tokio::test]
