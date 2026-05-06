@@ -25,7 +25,7 @@ use crate::mods::filter::{is_safe_mod_filename, pick_primary_file};
 use crate::mods::ledger::{per_instance_lock, upsert_mod};
 use crate::mods::modrinth::client::MAX_MOD_FILE_BYTES;
 use crate::mods::types::{
-    DepKind, InstalledModRow, ModSource, ModrinthFile, ModrinthVersion, ResolvedDep,
+    DepKind, HashAlgo, InstalledModRow, ModSource, ModrinthFile, ModrinthVersion, ResolvedDep,
 };
 use crate::persistence::paths::AppPaths;
 use crate::tasks::{JobId, TaskEvent};
@@ -249,6 +249,7 @@ pub fn build_install_plan(
             file_name: root_file.filename.clone(),
             sha512: root_file.hashes.sha512.clone(),
             size: root_file.size,
+            hash_algo: HashAlgo::Sha512,
             source: ModSource::Modrinth,
             enabled: true,
             installed_at: now_iso8601(),
@@ -285,6 +286,7 @@ pub fn build_install_plan(
                 file_name: f.filename.clone(),
                 sha512: f.hashes.sha512.clone(),
                 size: f.size,
+                hash_algo: HashAlgo::Sha512,
                 source: ModSource::Modrinth,
                 enabled: true,
                 installed_at: now_iso8601(),
@@ -810,6 +812,7 @@ mod tests {
             file_name: "sodium.jar".into(),
             sha512: sha,
             size: body.len() as u64,
+            hash_algo: HashAlgo::Sha512,
             source: ModSource::Modrinth,
             enabled: true,
             installed_at: "2026-01-01T00:00:00Z".into(),
@@ -890,6 +893,7 @@ mod tests {
             file_name: "x.jar".into(),
             sha512: "deadbeef".into(),
             size: body.len() as u64,
+            hash_algo: HashAlgo::Sha512,
             source: ModSource::Modrinth,
             enabled: true,
             installed_at: "2026-01-01T00:00:00Z".into(),
@@ -936,6 +940,7 @@ mod tests {
                 file_name: "p.jar".into(),
                 sha512: "0".into(),
                 size: 1,
+                hash_algo: HashAlgo::Sha512,
                 source: ModSource::Modrinth,
                 enabled: true,
                 installed_at: "now".into(),

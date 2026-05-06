@@ -334,7 +334,7 @@ impl ModrinthService {
 mod tests {
     use super::*;
     use crate::domain::instance::ModloaderKind;
-    use crate::mods::types::{InstalledModRow, ModSource};
+    use crate::mods::types::{HashAlgo, InstalledModRow, ModSource};
     use httpmock::prelude::*;
     use serde_json::json;
     use tempfile::TempDir;
@@ -423,6 +423,7 @@ mod tests {
                 file_name: "sodium.jar".into(),
                 sha512: "x".into(),
                 size: 1,
+                hash_algo: HashAlgo::Sha512,
                 source: ModSource::Modrinth,
                 enabled: true,
                 installed_at: "now".into(),
@@ -535,6 +536,7 @@ mod tests {
                 file_name: "p.jar".into(),
                 sha512: "x".into(),
                 size: 1,
+                hash_algo: HashAlgo::Sha512,
                 source: ModSource::Modrinth,
                 enabled: true,
                 installed_at: "now".into(),
@@ -567,6 +569,7 @@ mod tests {
                 file_name: "p.jar".into(),
                 sha512: "x".into(),
                 size: 1,
+                hash_algo: HashAlgo::Sha512,
                 source: ModSource::Modrinth,
                 enabled: true,
                 installed_at: "now".into(),
@@ -598,6 +601,7 @@ mod tests {
                 file_name: "p.jar".into(),
                 sha512: "x".into(),
                 size: 1,
+                hash_algo: HashAlgo::Sha512,
                 source: ModSource::Modrinth,
                 enabled: false,
                 installed_at: "now".into(),
@@ -638,6 +642,7 @@ mod tests {
                 file_name: "p.jar".into(),
                 sha512: "x".into(),
                 size: 1,
+                hash_algo: HashAlgo::Sha512,
                 source: ModSource::Modrinth,
                 enabled: true,
                 installed_at: "now".into(),

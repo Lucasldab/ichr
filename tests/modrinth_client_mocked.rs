@@ -37,7 +37,7 @@ use mineltui::mods::installer::{install_mods_into_instance, InstallStep, MOD_DOW
 use mineltui::mods::modrinth::ModrinthClient;
 use mineltui::mods::service::ModrinthService;
 use mineltui::mods::types::{
-    DepKind, InstalledModRow, Ledger, ModSource, ModrinthFile, ModrinthHashes,
+    DepKind, HashAlgo, InstalledModRow, Ledger, ModSource, ModrinthFile, ModrinthHashes,
 };
 use mineltui::persistence::paths::AppPaths;
 use mineltui::tasks::JobId;
@@ -162,6 +162,7 @@ async fn test_install_respects_concurrency_cap() {
                 file_name: format!("mod-{i}.jar"),
                 sha512: sha.clone(),
                 size: body.len() as u64,
+                hash_algo: HashAlgo::Sha512,
                 source: ModSource::Modrinth,
                 enabled: true,
                 installed_at: "2026-01-01T00:00:00Z".into(),
@@ -282,6 +283,7 @@ async fn test_cancel_aborts_install_no_ledger_write() {
                 file_name: format!("slow-{i}.jar"),
                 sha512: sha.clone(),
                 size: body.len() as u64,
+                hash_algo: HashAlgo::Sha512,
                 source: ModSource::Modrinth,
                 enabled: true,
                 installed_at: "2026-01-01T00:00:00Z".into(),

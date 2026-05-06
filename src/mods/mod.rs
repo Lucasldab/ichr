@@ -15,5 +15,4 @@ pub mod types;
 pub use curseforge::{CurseForgeClient, CurseForgeError, CurseForgeService};
 pub use error::ModrinthError;
 pub use service::ModrinthService;
-pub use types::ModSource;
-// `pub use types::HashAlgo;` added in Task 3 of plan 09-01 once the enum is declared.
+pub use types::{HashAlgo, ModSource};

@@ -155,6 +155,29 @@ pub enum ModSource {
     Modpack,
 }
 
+/// Hash algorithm discriminator for `InstalledModRow.hash_algo`.
+///
+/// Phase 8 (Modrinth) uses Sha512 canonically; Phase 9 (CurseForge) uses
+/// Sha1 by default (with Sha256 as a rare fallback). Default == Sha512 so
+/// pre-Phase-9 ledger files (no `hash_algo` field) deserialize transparently
+/// — see `tests::test_pre_phase9_ledger_loads_with_default_hash_algo`.
+///
+/// Per 09-RESEARCH.md §"Per-Instance Ledger Reuse" lines 297-318.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum HashAlgo {
+    /// Modrinth canonical (Phase 8). Default — pre-Phase-9 ledger rows
+    /// without a `hash_algo` field deserialize as `Sha512`.
+    #[default]
+    Sha512,
+    /// CurseForge default. The hex value is stored in the existing
+    /// `InstalledModRow.sha512` field — the field name is a Phase 8
+    /// historical-naming carve-out, the discriminator is `hash_algo`.
+    Sha1,
+    /// Rare — for future use (CurseForge files occasionally carry SHA-256).
+    Sha256,
+}
+
 /// One row in `instance_dir/installed-mods.toml`. Carries full provenance
 /// (project_id, version_id, sha512) so we can detect "already installed"
 /// without re-hashing every file in `.minecraft/mods/`.
@@ -169,6 +192,16 @@ pub struct InstalledModRow {
     pub file_name: String,     // e.g. "sodium-fabric-0.5.8+mc1.20.4.jar"
     pub sha512: String,        // 128 hex chars, lowercase
     pub size: u64,
+    /// Hash algorithm discriminator. NEW in Phase 9: `Sha512` (Modrinth)
+    /// or `Sha1` (CurseForge). The `sha512` field name is kept stable for
+    /// back-compat — for CurseForge rows, the SHA-1 hex value is stored
+    /// in `sha512` with `hash_algo == HashAlgo::Sha1` as the discriminator.
+    /// Documented historical-naming carve-out.
+    /// `#[serde(default)]` lets pre-Phase-9 ledger files deserialize with
+    /// `hash_algo == HashAlgo::Sha512` (the Modrinth canonical).
+    /// Per 09-RESEARCH.md §"Per-Instance Ledger Reuse" lines 297-318.
+    #[serde(default)]
+    pub hash_algo: HashAlgo,
     pub source: ModSource,
     pub enabled: bool,         // false → file is "{file_name}.disabled"
     pub installed_at: String,  // RFC3339
@@ -265,6 +298,7 @@ mod tests {
             file_name: "sodium-fabric-0.5.8+mc1.20.4.jar".into(),
             sha512: "a3f0c91a".into(),
             size: 1567890,
+            hash_algo: HashAlgo::Sha512,
             source: ModSource::Modrinth,
             enabled: true,
             installed_at: "2026-05-05T12:34:56Z".into(),
@@ -290,6 +324,7 @@ mod tests {
                     file_name: "sodium.jar".into(),
                     sha512: "deadbeef".into(),
                     size: 1024,
+                    hash_algo: HashAlgo::Sha512,
                     source: ModSource::Modrinth,
                     enabled: true,
                     installed_at: "2026-01-01T00:00:00Z".into(),
@@ -303,6 +338,7 @@ mod tests {
                     file_name: "fabric-api.jar".into(),
                     sha512: "cafebabe".into(),
                     size: 2048,
+                    hash_algo: HashAlgo::Sha512,
                     source: ModSource::Modrinth,
                     enabled: false,
                     installed_at: "2026-01-02T00:00:00Z".into(),
@@ -314,6 +350,45 @@ mod tests {
         assert_eq!(parsed, l);
         assert_eq!(parsed.mods.len(), 2);
         assert!(!parsed.mods[1].enabled);
+    }
+
+    #[test]
+    fn test_pre_phase9_ledger_loads_with_default_hash_algo() {
+        // A Phase 8 ledger file (no `hash_algo` field) must deserialize with
+        // `hash_algo == HashAlgo::Sha512` thanks to `#[serde(default)]`.
+        // Per 09-RESEARCH.md §"Per-Instance Ledger Reuse" lines 297-318.
+        let toml_text = r#"
+mod_id = "AANobbMI"
+project_slug = "sodium"
+display_name = "Sodium"
+version_id = "Yp8wLY1P"
+version_label = "0.5.8"
+file_name = "sodium.jar"
+sha512 = "deadbeef"
+size = 1024
+source = "modrinth"
+enabled = true
+installed_at = "2026-01-01T00:00:00Z"
+"#;
+        let row: InstalledModRow = toml::from_str(toml_text).unwrap();
+        assert_eq!(
+            row.hash_algo,
+            HashAlgo::Sha512,
+            "pre-Phase-9 row must default to Sha512"
+        );
+        assert_eq!(row.source, ModSource::Modrinth);
+        assert_eq!(row.mod_id, "AANobbMI");
+        assert_eq!(row.sha512, "deadbeef");
+    }
+
+    #[test]
+    fn test_hash_algo_serde_snake_case() {
+        assert_eq!(serde_json::to_string(&HashAlgo::Sha512).unwrap(), "\"sha512\"");
+        assert_eq!(serde_json::to_string(&HashAlgo::Sha1).unwrap(), "\"sha1\"");
+        assert_eq!(serde_json::to_string(&HashAlgo::Sha256).unwrap(), "\"sha256\"");
+        let parsed: HashAlgo = serde_json::from_str("\"sha1\"").unwrap();
+        assert_eq!(parsed, HashAlgo::Sha1);
+        assert_eq!(HashAlgo::default(), HashAlgo::Sha512);
     }
 
     #[test]
