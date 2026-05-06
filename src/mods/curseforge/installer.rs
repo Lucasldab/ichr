@@ -15,15 +15,66 @@
 //!   3. Inline null + dedicated endpoint returns None (403/404 — the author
 //!      has disabled third-party distribution; user must open in browser)
 
+use crate::mods::curseforge::client::CurseForgeClient;
+use crate::mods::curseforge::error::CurseForgeError;
+use crate::mods::curseforge::types::{CurseForgeFileEntry, CurseForgeProjectDetail};
+use crate::mods::curseforge::url::web_url_for_file;
+
+/// Result of the download-URL resolution. v1 carries only the success case;
+/// the failure case surfaces as `Err(CurseForgeError::FileNotDownloadable)`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DownloadResolution {
+    Resolved(String),
+}
+
+/// Resolve the actual CDN URL for a CurseForge file, with the `downloadUrl: null`
+/// fallback chain. Returns `Err(FileNotDownloadable)` carrying the user-facing
+/// web URL when the file is restricted at the API level.
+///
+/// Per 09-RESEARCH.md §"downloadUrl null UX" lines 247-289 — the three cases:
+///
+///   1. `file.download_url == Some(non-empty)` → `Ok(Resolved(url))`,
+///      ZERO additional HTTP calls.
+///   2. `file.download_url == None` (or empty) AND `client.get_file_download_url`
+///      returns `Ok(Some(url))` → `Ok(Resolved(url))` (transient null recovered).
+///   3. Same as case 2 but inner returns `Ok(None)` (403/404 at the client layer)
+///      → `Err(CurseForgeError::FileNotDownloadable { web_url, mod_slug, file_id })`
+///      with `web_url` built via `web_url_for_file`.
+///
+/// Any HTTP error from `get_file_download_url` (e.g. RateLimited, 5xx) bubbles
+/// up via `?` — the FileNotDownloadable variant is reserved for the explicit
+/// 403/404 restricted-distribution signal.
+pub async fn resolve_download_url(
+    client: &CurseForgeClient,
+    mod_detail: &CurseForgeProjectDetail,
+    file: &CurseForgeFileEntry,
+) -> Result<DownloadResolution, CurseForgeError> {
+    // Case 1: inline URL present and non-empty.
+    // Pitfall 5: when inline URL present, do NOT call the fallback endpoint.
+    if let Some(u) = &file.download_url {
+        if !u.is_empty() {
+            return Ok(DownloadResolution::Resolved(u.clone()));
+        }
+    }
+
+    // Case 2 / 3: inline absent or empty, try dedicated endpoint.
+    match client
+        .get_file_download_url(mod_detail.id, file.id)
+        .await?
+    {
+        Some(url) => Ok(DownloadResolution::Resolved(url)),
+        None => Err(CurseForgeError::FileNotDownloadable {
+            web_url: web_url_for_file(&mod_detail.slug, file.id),
+            mod_slug: mod_detail.slug.clone(),
+            file_id: file.id,
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::mods::curseforge::client::CurseForgeClient;
-    use crate::mods::curseforge::error::CurseForgeError;
-    use crate::mods::curseforge::installer::{resolve_download_url, DownloadResolution};
-    use crate::mods::curseforge::types::{
-        CurseForgeAuthor, CurseForgeFileEntry, CurseForgeHash, CurseForgeLinks,
-        CurseForgeProjectDetail,
-    };
+    use super::*;
+    use crate::mods::curseforge::types::{CurseForgeAuthor, CurseForgeHash, CurseForgeLinks};
     use httpmock::prelude::*;
 
     fn make_client(server: &MockServer) -> CurseForgeClient {
@@ -87,7 +138,7 @@ mod tests {
             r,
             DownloadResolution::Resolved("https://edge.forgecdn.net/files/inline.jar".into())
         );
-        unwanted.assert_hits(0); // Pitfall 5: when inline URL present, we MUST NOT call the fallback endpoint
+        unwanted.assert_calls(0); // Pitfall 5: when inline URL present, we MUST NOT call the fallback endpoint
     }
 
     // Case 2: inline null + dedicated endpoint returns Some(url).
