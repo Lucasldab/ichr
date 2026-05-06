@@ -786,6 +786,8 @@ pub fn loader_versions_visible_indices(
         .filter(|(_, v)| match loader {
             LoaderType::Fabric => !filter_stable_only || v.stable,
             LoaderType::Quilt => true, // see UI-SPEC §Loader Version Picker (Quilt)
+            // Forge/NeoForge: apply stable filter same as Fabric (07-02 populates stable field)
+            LoaderType::Forge | LoaderType::NeoForge => !filter_stable_only || v.stable,
         })
         .filter(|(_, v)| s_lc.is_empty() || v.version.to_ascii_lowercase().contains(&s_lc))
         .map(|(i, _)| i)
@@ -1432,6 +1434,8 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 let loader_kind = match loader_type {
                     LoaderType::Fabric => crate::domain::instance::ModloaderKind::Fabric,
                     LoaderType::Quilt => crate::domain::instance::ModloaderKind::Quilt,
+                    LoaderType::Forge => crate::domain::instance::ModloaderKind::Forge,
+                    LoaderType::NeoForge => crate::domain::instance::ModloaderKind::NeoForge,
                 };
                 let from_label = current_version
                     .as_deref()
@@ -1480,6 +1484,8 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             let row = match loader {
                 LoaderType::Fabric => 1,
                 LoaderType::Quilt => 2,
+                LoaderType::Forge => 3,
+                LoaderType::NeoForge => 4,
             };
             state.active_view = ActiveView::LoaderPickerModal { slug, selected: row };
             vec![]

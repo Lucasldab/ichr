@@ -6,12 +6,17 @@ use crate::domain::instance::ModloaderKind;
 
 /// Modloader family for which the loader install pipeline runs.
 /// Distinct from `ModloaderKind` (which also has Vanilla/Forge/NeoForge);
-/// LoaderType only enumerates the two loaders Phase 6 implements.
+/// `LoaderType` enumerates all active loader pipelines.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LoaderType {
     Fabric,
     Quilt,
+    Forge,
+    /// `rename_all = "snake_case"` would produce `"neo_forge"`; the explicit rename
+    /// aligns this with `ModloaderKind::NeoForge` at the wire level (PATTERNS.md gotcha #1).
+    #[serde(rename = "neoforge")]
+    NeoForge,
 }
 
 /// One row in the loader version picker.
@@ -153,5 +158,55 @@ mod tests {
         let json = serde_json::to_string(&lib).unwrap();
         assert!(!json.contains("url"), "None url omitted: {json}");
         assert!(!json.contains("sha1"), "None sha1 omitted: {json}");
+    }
+
+    #[test]
+    fn test_loader_type_serde_roundtrip_forge() {
+        let f = LoaderType::Forge;
+        let json = serde_json::to_string(&f).unwrap();
+        assert_eq!(json, "\"forge\"");
+        let parsed: LoaderType = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, LoaderType::Forge);
+    }
+
+    #[test]
+    fn test_loader_type_serde_roundtrip_neoforge_uses_neoforge_not_neo_underscore_forge() {
+        let nf = LoaderType::NeoForge;
+        let json = serde_json::to_string(&nf).unwrap();
+        assert_eq!(json, "\"neoforge\"", "must serialize as 'neoforge', NOT 'neo_forge'");
+        let parsed: LoaderType = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, LoaderType::NeoForge);
+    }
+
+    #[test]
+    fn test_loader_info_neoforge_kind_serializes_as_neoforge() {
+        let li = LoaderInfo {
+            kind: ModloaderKind::NeoForge,
+            version: "21.1.228".into(),
+            version_id: "neoforge-21.1.228".into(),
+        };
+        let json = serde_json::to_string(&li).unwrap();
+        assert!(
+            json.contains("\"kind\":\"neoforge\""),
+            "ModloaderKind::NeoForge must serialize as 'neoforge', got: {json}"
+        );
+        let parsed: LoaderInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, li);
+    }
+
+    #[test]
+    fn test_loader_info_forge_kind_serializes_as_forge() {
+        let li = LoaderInfo {
+            kind: ModloaderKind::Forge,
+            version: "1.20.1-47.4.20".into(),
+            version_id: "1.20.1-forge-47.4.20".into(),
+        };
+        let json = serde_json::to_string(&li).unwrap();
+        assert!(
+            json.contains("\"kind\":\"forge\""),
+            "ModloaderKind::Forge must serialize as 'forge', got: {json}"
+        );
+        let parsed: LoaderInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, li);
     }
 }

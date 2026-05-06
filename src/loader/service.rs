@@ -68,6 +68,10 @@ impl LoaderService {
         match loader_type {
             LoaderType::Fabric => self.fabric.list_loader_versions().await,
             LoaderType::Quilt => self.quilt.list_loader_versions().await,
+            LoaderType::Forge | LoaderType::NeoForge => Err(LoaderError::MetaFetch {
+                loader: if loader_type == LoaderType::Forge { "forge" } else { "neoforge" },
+                reason: "Forge/NeoForge meta client not yet implemented (07-02)".into(),
+            }),
         }
     }
 
@@ -247,6 +251,8 @@ async fn install_loader_impl(
             kind: match loader_type {
                 LoaderType::Fabric => ModloaderKind::Fabric,
                 LoaderType::Quilt => ModloaderKind::Quilt,
+                LoaderType::Forge => ModloaderKind::Forge,
+                LoaderType::NeoForge => ModloaderKind::NeoForge,
             },
             version: loader_version.to_string(),
             version_id: profile_id.clone(),
@@ -278,6 +284,12 @@ async fn install_loader_impl(
             // Quilt's no-hash invariant is parse-time (asserted by 06-04-01) —
             // every sha1/sha256/sha512/md5 is already None on these entries.
             (p.id, p.raw_bytes, p.libraries, svc.quilt.http().clone())
+        }
+        LoaderType::Forge | LoaderType::NeoForge => {
+            return Err(LoaderError::MetaFetch {
+                loader: if loader_type == LoaderType::Forge { "forge" } else { "neoforge" },
+                reason: "Forge/NeoForge installer pipeline not yet implemented (07-03)".into(),
+            });
         }
     };
 
@@ -388,6 +400,8 @@ async fn install_loader_impl(
         kind: match loader_type {
             LoaderType::Fabric => ModloaderKind::Fabric,
             LoaderType::Quilt => ModloaderKind::Quilt,
+            LoaderType::Forge => ModloaderKind::Forge,
+            LoaderType::NeoForge => ModloaderKind::NeoForge,
         },
         version: loader_version.to_string(),
         version_id: profile_id.clone(), // VERBATIM from profile.id (Pitfall 7)
@@ -409,6 +423,8 @@ fn loader_label(t: LoaderType) -> &'static str {
     match t {
         LoaderType::Fabric => "Fabric",
         LoaderType::Quilt => "Quilt",
+        LoaderType::Forge => "Forge",
+        LoaderType::NeoForge => "NeoForge",
     }
 }
 
@@ -434,6 +450,14 @@ fn predict_version_id(loader_type: LoaderType, loader_version: &str, mc_version:
         }
         LoaderType::Quilt => {
             format!("quilt-loader-{loader_version}-{mc_version}")
+        }
+        // Forge/NeoForge version IDs are determined by the installer output;
+        // this prediction is unused for them (07-03 pipeline harvests the real ID).
+        LoaderType::Forge => {
+            format!("{mc_version}-forge-{loader_version}")
+        }
+        LoaderType::NeoForge => {
+            format!("neoforge-{loader_version}")
         }
     }
 }

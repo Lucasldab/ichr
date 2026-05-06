@@ -28,6 +28,8 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
     let kind = match loader {
         LoaderType::Fabric => "Fabric",
         LoaderType::Quilt => "Quilt",
+        LoaderType::Forge => "Forge",
+        LoaderType::NeoForge => "NeoForge",
     };
 
     let modal_w = area.width.min(70);

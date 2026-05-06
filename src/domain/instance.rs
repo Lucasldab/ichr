@@ -35,6 +35,9 @@ pub enum ModloaderKind {
     Fabric,
     Quilt,
     Forge,
+    /// `rename_all = "snake_case"` would produce `"neo_forge"`; the explicit rename
+    /// aligns this with `LoaderType::NeoForge` at the wire level (PATTERNS.md gotcha #1).
+    #[serde(rename = "neoforge")]
     NeoForge,
 }
 
