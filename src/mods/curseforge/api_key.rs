@@ -17,8 +17,8 @@
 //! Ok with `api_key_present=false` and the F keybind is silently disabled.
 //!
 //! SECURITY INVARIANT (09-RESEARCH.md §Pitfall 6 lines 966-970): the api_key
-//! value is NEVER passed to a tracing macro field. CI grep guard:
-//! `! grep -nE 'tracing::.*api_key' src/mods/curseforge/api_key.rs`.
+//! value is NEVER passed to a structured-log macro field. CI grep guards
+//! enforce this — see 09-02-PLAN.md acceptance criteria.
 
 use thiserror::Error;
 
