@@ -189,6 +189,47 @@ pub enum ActiveView {
         /// Where to return after dismissal — depends on which view triggered the install.
         return_to: ModInstallFailedReturnTo,
     },
+
+    // ── Phase 9 (CurseForge Integration) — see 09-RESEARCH.md §TUI Integration Plumbing ──
+    /// Phase 9 (MOD-03): full-screen split-pane CurseForge mod browser.
+    /// Mirrors Phase 8's `ModBrowser` shape but binds CurseForge wire types.
+    /// Rendered by `src/tui/views/cf_browser.rs` (added in 09-07).
+    CfBrowser {
+        slug: String,
+        search_input: String,
+        results: Vec<crate::mods::curseforge::types::CurseForgeSearchHit>,
+        selected: usize,
+        /// Reused from Phase 8 — Loading / Ready / Error(String).
+        fetch_state: crate::mods::types::ModBrowserFetchState,
+        /// None = use instance MC; Some("any") = no MC filter; Some(version) = explicit.
+        mc_filter: Option<String>,
+        /// CurseForge loader filter is an integer modLoaderType (1=Forge, 4=Fabric, 5=Quilt, 6=NeoForge).
+        /// None = use instance loader.
+        loader_filter: Option<i32>,
+        /// Cached project detail for the right-pane preview. None while in flight.
+        selected_detail: Option<crate::mods::curseforge::types::CurseForgeProjectDetail>,
+    },
+    /// Phase 9 (MOD-03): centered modal of available files for a CurseForge mod.
+    /// Mirrors Phase 8's `ModVersionPickerModal`. Rendered by
+    /// `src/tui/views/cf_file_picker_modal.rs` (added in 09-07).
+    CfFilePickerModal {
+        slug: String,
+        mod_detail: crate::mods::curseforge::types::CurseForgeProjectDetail,
+        files: Vec<crate::mods::curseforge::types::CurseForgeFileEntry>,
+        selected: usize,
+    },
+    /// Phase 9 (MOD-04): error modal shown when an install fails — most importantly
+    /// the FileNotDownloadable case where `web_url` is `Some(url)` so the modal
+    /// can render an "Open in browser:" line. Per 09-RESEARCH.md §"downloadUrl
+    /// null UX" lines 252-289.
+    CfInstallFailedModal {
+        slug: String,
+        mod_title: String,
+        file_label: String,
+        error_message: String,
+        /// Some(url) iff the failure is FileNotDownloadable — render the link.
+        web_url: Option<String>,
+    },
 }
 
 /// Where the `Action::DismissModInstallFailed` arm should return to.
@@ -260,6 +301,11 @@ pub struct AppState {
     /// Cancellation token for the currently-active
     /// start_device_code_auth job. Cleared on Completion/Failure/Cancel.
     pub add_account_cancel: Option<CancellationToken>,
+    /// Phase 9 (MOD-03): true iff a CurseForge API key was resolved at startup.
+    /// Set by 09-07 in `run.rs` from `cf_service.api_key_present()`. Read by
+    /// the `OpenCfBrowser` arm to silently no-op the F keybind when no key is
+    /// configured (Pitfall 1 surface — 09-RESEARCH.md §"Keybind guard").
+    pub cf_api_key_present: bool,
 }
 
 
@@ -502,6 +548,78 @@ pub enum Action {
     ModUninstalled { slug: String, mod_id: String },
     /// Esc on InstalledModsList — returns to InstanceList.
     CloseInstalledMods,
+
+    // ── Phase 9 (CurseForge Integration) — see 09-RESEARCH.md §TUI Integration Plumbing ──
+    /// `F` keybind on InstanceList — opens the CurseForge mod browser for the
+    /// given instance. Pitfall 1 guard: silent no-op when `cf_api_key_present == false`.
+    /// Pitfall 8 guard: silent no-op when `running_mod_jobs.contains_key(&slug)`.
+    OpenCfBrowser { slug: String },
+    /// Spawn a CurseForge search effect for the open CfBrowser.
+    CfBrowserSearchStart {
+        slug: String,
+        query: String,
+        mc: Option<String>,
+        loader: Option<i32>,
+    },
+    /// Async result: search results loaded for the open CfBrowser.
+    CfBrowserSearchLoaded {
+        slug: String,
+        hits: Vec<crate::mods::curseforge::types::CurseForgeSearchHit>,
+    },
+    /// Async result: search failed — drives `fetch_state = Error(_)`.
+    CfBrowserSearchFailed { slug: String, error: String },
+    /// Move the highlighted row in the CfBrowser results list (saturating).
+    CfBrowserMoveSelection(i32),
+    /// `v` in CfBrowser — cycles MC filter (None ↔ Some("any")) and re-emits search.
+    CfBrowserToggleMcFilter,
+    /// `l` in CfBrowser — cycles loader filter (None ↔ Some(<instance loader>)) and re-emits search.
+    CfBrowserToggleLoaderFilter,
+    /// Enter on a CfBrowser row — Action ping-pong half 1: emits `Effect::FetchCfMod`.
+    CfBrowserOpenDetail { slug: String, mod_id: u64 },
+    /// Async result: project detail loaded — Action ping-pong half 2: emits `Effect::ListCfFiles`.
+    /// Mirrors Phase 8's `ModDetailLoaded → ModVersionsLoaded` chain.
+    CfBrowserDetailLoaded {
+        slug: String,
+        detail: crate::mods::curseforge::types::CurseForgeProjectDetail,
+    },
+    /// Printable char into CfBrowser search input.
+    CfBrowserTypeSearch(char),
+    /// Backspace in CfBrowser search input — pops last char, re-emits search.
+    CfBrowserBackspaceSearch,
+    /// Async result: file list loaded — transitions to `CfFilePickerModal`.
+    CfFilePickerLoaded {
+        slug: String,
+        mod_detail: crate::mods::curseforge::types::CurseForgeProjectDetail,
+        files: Vec<crate::mods::curseforge::types::CurseForgeFileEntry>,
+    },
+    /// Move the highlighted file in the CfFilePickerModal (saturating).
+    CfFilePickerMove(i32),
+    /// Enter on a CfFilePickerModal row — emits `Effect::InstallCfMod`.
+    /// Pitfall 8 guard: silent no-op when `running_mod_jobs.contains_key(&slug)`.
+    CfFilePickerConfirm,
+    /// Internal — emitted by execute_effects (09-07) inside the spawned task body
+    /// BEFORE install_mod_into_instance begins. Inserts the CancellationToken
+    /// into `running_mod_jobs` (single-mutation point shared with Phase 8).
+    CfModInstallStarted {
+        slug: String,
+        mod_id: u64,
+        file_id: u64,
+        token: CancellationToken,
+    },
+    /// Install completed successfully — clears `running_mod_jobs[&slug]`.
+    CfModInstalled { slug: String, mod_id: u64 },
+    /// Install failed — clears `running_mod_jobs[&slug]`, transitions to
+    /// `CfInstallFailedModal`. `web_url` is `Some(url)` for FileNotDownloadable
+    /// (the load-bearing UX path per MOD-04).
+    CfModInstallFailed {
+        slug: String,
+        mod_title: String,
+        file_label: String,
+        error: String,
+        web_url: Option<String>,
+    },
+    /// Esc on CfInstallFailedModal — returns to InstanceList.
+    CfDismissInstallFailed,
 }
 
 /// Effects requested by `update()`. NOTE: there is deliberately NO
@@ -603,6 +721,38 @@ pub enum Effect {
     UninstallMod { slug: String, mod_id: String },
     /// MOD-05: read the per-instance ledger and dispatch `InstalledModsLoaded`.
     FetchInstalledMods { slug: String },
+
+    // ── Phase 9 (CurseForge Integration) — wired by 09-07 run.rs effect arms ──
+    // LOCKED set: `FetchCfMod` + `ListCfFiles` are kept SEPARATE (mirrors
+    // Phase 8's ListModVersions / FetchModDetail split). Do NOT add a combined
+    // `OpenCfFilePicker` effect — the design relies on the Action ping-pong
+    // pattern: CfBrowserOpenDetail → FetchCfMod → CfBrowserDetailLoaded →
+    // ListCfFiles → CfFilePickerLoaded.
+    /// MOD-03: search CurseForge mods matching the query, filtered by MC + loader.
+    SearchCurseForge {
+        slug: String,
+        query: String,
+        mc: Option<String>,
+        loader: Option<i32>,
+    },
+    /// MOD-03: fetch a single CurseForge project detail (right pane / file picker prep).
+    FetchCfMod { slug: String, mod_id: u64 },
+    /// MOD-03: list available files for a CurseForge mod, filtered by MC + loader.
+    ListCfFiles {
+        slug: String,
+        mod_id: u64,
+        mc: Option<String>,
+        loader: Option<i32>,
+    },
+    /// MOD-03/MOD-04: download + verify + install a CurseForge file into the instance.
+    /// FileNotDownloadable surfaces via `Action::CfModInstallFailed { web_url: Some(_), .. }`.
+    /// Both wire types are boxed to keep `Effect` small (mirrors Phase 8's
+    /// `InstallModWithDeps { root_version: Box<ModrinthVersion>, .. }` pattern).
+    InstallCfMod {
+        slug: String,
+        mod_detail: Box<crate::mods::curseforge::types::CurseForgeProjectDetail>,
+        file: Box<crate::mods::curseforge::types::CurseForgeFileEntry>,
+    },
 }
 
 /// Format a loader for the status cell or switch dialog: "fabric:0.16.9".
@@ -2210,6 +2360,28 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             }
             vec![Effect::KillProcess { slug }]
         }
+
+        // ── Phase 9 (CurseForge Integration) — Task 1 placeholders ──
+        // Real update arms land in 09-06 Task 2. Until then, every new Action
+        // variant is a no-op so the exhaustive match still compiles. Removed in Task 2.
+        Action::OpenCfBrowser { .. }
+        | Action::CfBrowserSearchStart { .. }
+        | Action::CfBrowserSearchLoaded { .. }
+        | Action::CfBrowserSearchFailed { .. }
+        | Action::CfBrowserMoveSelection(_)
+        | Action::CfBrowserToggleMcFilter
+        | Action::CfBrowserToggleLoaderFilter
+        | Action::CfBrowserOpenDetail { .. }
+        | Action::CfBrowserDetailLoaded { .. }
+        | Action::CfBrowserTypeSearch(_)
+        | Action::CfBrowserBackspaceSearch
+        | Action::CfFilePickerLoaded { .. }
+        | Action::CfFilePickerMove(_)
+        | Action::CfFilePickerConfirm
+        | Action::CfModInstallStarted { .. }
+        | Action::CfModInstalled { .. }
+        | Action::CfModInstallFailed { .. }
+        | Action::CfDismissInstallFailed => vec![],
     }
 }
 

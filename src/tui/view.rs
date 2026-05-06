@@ -89,6 +89,13 @@ pub fn view(state: &AppState, f: &mut Frame) {
         ActiveView::ModInstallFailedModal { .. } => {
             render_mod_install_failed_modal(f, main, state)
         }
+        // Phase 9 (CurseForge) — renderers wired in 09-07. Until then, no-op.
+        ActiveView::CfBrowser { .. }
+        | ActiveView::CfFilePickerModal { .. }
+        | ActiveView::CfInstallFailedModal { .. } => {
+            // Stub — render_cf_browser / render_cf_file_picker_modal /
+            // render_cf_install_failed_modal land in 09-07.
+        }
     }
 
     render_download_pane(f, dl, state);

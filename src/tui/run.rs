@@ -256,6 +256,10 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         ActiveView::ModInstallFailedModal { .. } => {
             super::views::mod_install_failed_modal::map_mod_install_failed_event(ev)
         }
+        // Phase 9 (CurseForge) — event mappers wired in 09-07. Until then, no-op.
+        ActiveView::CfBrowser { .. }
+        | ActiveView::CfFilePickerModal { .. }
+        | ActiveView::CfInstallFailedModal { .. } => None,
     }
 }
 
@@ -1350,6 +1354,17 @@ async fn execute_effects(
                         }
                     }
                 });
+            }
+
+            // Phase 9 (CurseForge) — effect handlers wired in 09-07. Until then,
+            // these are no-ops so the exhaustive match still compiles.
+            Effect::SearchCurseForge { .. }
+            | Effect::FetchCfMod { .. }
+            | Effect::ListCfFiles { .. }
+            | Effect::InstallCfMod { .. } => {
+                // Stub — real handlers in 09-07 will dispatch
+                // Action::CfBrowserSearchLoaded / CfBrowserDetailLoaded /
+                // CfFilePickerLoaded / CfModInstallStarted etc.
             }
         }
     }
