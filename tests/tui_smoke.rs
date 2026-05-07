@@ -1020,6 +1020,7 @@ fn test_loader_install_progress_action_updates_modal_fields() {
             bytes_done: 0,
             bytes_total: 0,
             cancel_token_key: "ti".into(),
+            log_tail: String::new(),
         },
         ..AppState::default()
     };
@@ -1126,6 +1127,7 @@ fn test_cancel_loader_install_cancels_token_and_returns_to_list() {
         bytes_done: 0,
         bytes_total: 0,
         cancel_token_key: "ti".into(),
+        log_tail: String::new(),
     };
     let effects = update(&mut s, Action::CancelLoaderInstall { slug: "ti".into() });
     assert!(t.is_cancelled());
