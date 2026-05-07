@@ -3,18 +3,22 @@
 //! Vendored from https://github.com/ZekerZhayard/ForgeWrapper at tag `1.6.0`
 //! (see `assets/forge_wrapper/README.md` for SHA-256 + license attribution).
 //!
-//! At install time (Phase 7) AND launch time (Phase 12), the wrapper's
-//! `Main` class is the JVM entry point. Install-time invocation:
+//! At launch time (Phase 12 — deferred), the wrapper's `Main` class is the
+//! JVM entry point. Install time (Phase 7) does NOT use ForgeWrapper as of
+//! 07.3-01 (GAP-7-A-v3): ForgeWrapper `Main` is a LAUNCH-time entry point
+//! that reads Mojang launch argv (`--fml.mcVersion`, `--launchTarget`, etc.)
+//! at Main.java:28 and cannot be invoked at install time (empty argv →
+//! IndexOutOfBoundsException). The install path instead invokes the official
+//! Forge/NeoForge installer JAR directly:
 //!
-//!     java -Dforgewrapper.librariesDir=<staging>/libraries \
-//!          -Dforgewrapper.installer=<installer.jar absolute> \
-//!          -Dforgewrapper.minecraft=<staging>/versions/<mc>/<mc>.jar \
-//!          -cp ForgeWrapper.jar:<installer.jar> \
-//!          io.github.zekerzhayard.forgewrapper.installer.Main
+//!     java -Djava.awt.headless=true
+//!          -jar <installer.jar>
+//!          --installClient <staging>      # Forge
+//!          # OR
+//!          --install-client <staging>     # NeoForge (canonical; both accepted)
 //!
-//! The three -Dforgewrapper.* properties feed `MultiMCFileDetector` and
-//! are required at install time. Launch-time wiring (Phase 12) supplies
-//! the same class as the version JSON `mainClass` override.
+//! Launch-time wiring (Phase 12) supplies `FORGE_WRAPPER_MAIN_CLASS` as the
+//! version JSON `mainClass` override.
 
 use std::path::PathBuf;
 
@@ -37,48 +41,38 @@ pub const FORGE_WRAPPER_SHA256: &str =
 /// Filename used both for the embedded jar and the on-disk extracted copy.
 pub const FORGE_WRAPPER_FILENAME: &str = "ForgeWrapper-mmc4.jar";
 
-/// Fully-qualified ForgeWrapper entry-point class — used at BOTH install
-/// time (this phase) AND launch time (Phase 12).
+/// Fully-qualified ForgeWrapper entry-point class — used ONLY at LAUNCH
+/// time (Phase 12). Install-time invocation does NOT route through
+/// ForgeWrapper as of 07.3-01 (see GAP-7-A-v3 in 07-UAT.md and
+/// `.planning/debug/forge-installer-deep-bytecode-diagnosis.md`).
 ///
-/// The single class with `main(String[])` in the entire bundled JAR
-/// (verified via `javap -public` against the `1.6.0` mmc4 release; debug
-/// session `.planning/debug/forge-installer-class-no-main.md`):
-/// ```text
-/// $ unzip -l assets/forge_wrapper/ForgeWrapper-mmc4.jar | grep installer/
-///   6275  io/github/zekerzhayard/forgewrapper/installer/Installer.class    <- library class, NO main()
-///   5802  io/github/zekerzhayard/forgewrapper/installer/Main.class          <- THIS — JVM entry point
-///   3150  io/github/zekerzhayard/forgewrapper/installer/Bootstrap.class    <- library class, NO main()
-/// ```
+/// Main is the LAUNCH-time entry point: it parses Mojang launch argv
+/// (`--fml.mcVersion`, `--launchTarget`, etc.) at `Main.java:28`
+/// (verbatim from upstream pinned commit 3c6712d6:
+/// `String mcVersion = argsList.get(argsList.indexOf("--fml.mcVersion") + 1);`),
+/// reflectively calls `Installer.install()` as an install-on-first-launch
+/// side effect, then transfers control to the modded game via
+/// `mainClass.main(args)`. It has NO install-only mode and CANNOT be
+/// invoked at install time (empty argv → IndexOutOfBoundsException).
 ///
-/// The companion `Installer.class` exposes `install(File, File, File)`
-/// for reflective invocation by `Main`; it is NOT a JVM entry point and
-/// has no `main()`. A previous gap-closure (07.1-02) swapped the install-
-/// time argv class to `Installer` based on a misread of the upstream
-/// README — that swap exhibited as `Error: Main method not found in
-/// class ...Installer` (07-UAT.md GAP-7-A-v2). The retraction is
-/// 07.2-01: revert to Main + supply the three -Dforgewrapper.* system
-/// properties that Main's `MultiMCFileDetector` requires to resolve
-/// install paths.
-///
-/// At install time (this phase, `loader/service.rs::install_subprocess_loader`
-/// Step 4): invoked via
-/// ```text
-/// java -Dforgewrapper.librariesDir=<staging>/libraries \
-///      -Dforgewrapper.installer=<installer JAR absolute> \
-///      -Dforgewrapper.minecraft=<staging>/versions/<mc>/<mc>.jar \
-///      -cp <ForgeWrapper.jar><sep><installer.jar> \
-///      io.github.zekerzhayard.forgewrapper.installer.Main
-/// ```
-/// The three -D properties feed `MultiMCFileDetector.enabled()`
-/// (`System.getProperty` lookups in its `enabled()` method) so Main can
-/// resolve install paths without the rest of the MultiMC environment.
-/// There are NO `--installer=...` or `--instance=...` argv flags on
-/// Main's CLI surface; paths come from the -D properties only.
-///
-/// At launch time (deferred to Phase 12): used as the `mainClass` field
+/// At launch time (Phase 12 — deferred): used as the `mainClass` field
 /// in the produced version JSON when launching modded MC. `Main` then
 /// resolves modlauncher via `setupBootstrapLauncher` and reflectively
 /// invokes the modded game.
+///
+/// At install time: NOT used. The install path invokes the official
+/// Forge/NeoForge installer JAR directly via
+/// `java -Djava.awt.headless=true -jar <installer> <install_flag> <staging>`
+/// where install_flag is `--installClient` for Forge and `--install-client`
+/// for NeoForge (NeoForge accepts both spellings; the canonical hyphen-form
+/// matches upstream NeoForge documentation). See
+/// `src/loader/service.rs::install_subprocess_loader` Step 4.
+///
+/// `#[allow(dead_code)]` is re-applied because no current code consumes
+/// this constant (Phase 12 will be the first consumer). Round-2 (07.1-02)
+/// removed the attribute when service.rs briefly consumed the constant;
+/// 07.3-01 removes that consumer and the attribute returns.
+#[allow(dead_code)]
 pub const FORGE_WRAPPER_MAIN_CLASS: &str =
     "io.github.zekerzhayard.forgewrapper.installer.Main";
 
