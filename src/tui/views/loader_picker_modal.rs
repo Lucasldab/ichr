@@ -11,10 +11,12 @@ use ratatui::Frame;
 
 use crate::tui::app::{Action, ActiveView, AppState};
 
-const ROW_LABELS: [&str; 3] = [
+const ROW_LABELS: [&str; 5] = [
     "None (vanilla — remove installed loader)",
     "Fabric Loader ▶",
     "Quilt Loader ▶",
+    "Forge ▶",
+    "NeoForge ▶",
 ];
 
 pub fn render_loader_picker_modal(f: &mut Frame, area: Rect, state: &AppState) {
@@ -24,7 +26,7 @@ pub fn render_loader_picker_modal(f: &mut Frame, area: Rect, state: &AppState) {
     };
 
     let modal_w = area.width.min(70);
-    let modal_h = 9u16.min(area.height.saturating_sub(4));
+    let modal_h = 11u16.min(area.height.saturating_sub(4));
     let x = area.x + area.width.saturating_sub(modal_w) / 2;
     let y = area.y + area.height.saturating_sub(modal_h) / 2;
     let modal_area = Rect { x, y, width: modal_w, height: modal_h };

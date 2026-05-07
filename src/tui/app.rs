@@ -100,6 +100,8 @@ pub enum ActiveView {
         bytes_done: u64,
         bytes_total: u64,
         cancel_token_key: String,
+        /// Phase 7: live log tail from installer subprocess output (D-02).
+        log_tail: String,
     },
     /// Phase 6: error modal when install fails (mirrors LaunchFailedModal).
     LoaderInstallFailedModal {
@@ -408,6 +410,9 @@ pub enum Action {
     LoaderInstallStarted { slug: String, token: CancellationToken },
     /// Progress update from the install task — updates the progress modal fields.
     LoaderInstallProgress { slug: String, pct: u8, step_label: String, bytes_done: u64, bytes_total: u64 },
+    /// Phase 7 (D-02): live log-tail line from the installer subprocess — updates
+    /// `LoaderInstallProgressModal.log_tail` without touching the gauge percentage.
+    LoaderInstallLogTail { slug: String, tail: String },
     /// Install completed successfully — clears running token, refreshes instances.
     LoaderInstalled { slug: String },
     /// Install failed — clears running token, transitions to failed modal.
@@ -1251,7 +1256,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
         Action::LoaderPickerMove(delta) => {
             if let ActiveView::LoaderPickerModal { selected, .. } = &mut state.active_view {
-                const ROWS: isize = 3; // None / Fabric / Quilt
+                const ROWS: isize = 5; // None / Fabric / Quilt / Forge / NeoForge
                 let new_idx = (*selected as isize + delta).rem_euclid(ROWS);
                 *selected = new_idx as usize;
             }
@@ -1319,6 +1324,42 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                         current_version,
                     };
                     vec![Effect::FetchLoaderVersions { slug, loader_type: LoaderType::Quilt }]
+                }
+                3 => {
+                    // Forge row
+                    let current_version = state.instances.iter()
+                        .find(|m| m.slug == slug)
+                        .and_then(|m| m.loader.as_ref())
+                        .filter(|l| l.kind == crate::domain::instance::ModloaderKind::Forge)
+                        .map(|l| l.version.clone());
+                    state.active_view = ActiveView::LoaderVersionPickerModal {
+                        slug: slug.clone(),
+                        loader: LoaderType::Forge,
+                        versions: vec![],
+                        filter_stable_only: true,
+                        search: String::new(),
+                        selected: 0,
+                        current_version,
+                    };
+                    vec![Effect::FetchLoaderVersions { slug, loader_type: LoaderType::Forge }]
+                }
+                4 => {
+                    // NeoForge row
+                    let current_version = state.instances.iter()
+                        .find(|m| m.slug == slug)
+                        .and_then(|m| m.loader.as_ref())
+                        .filter(|l| l.kind == crate::domain::instance::ModloaderKind::NeoForge)
+                        .map(|l| l.version.clone());
+                    state.active_view = ActiveView::LoaderVersionPickerModal {
+                        slug: slug.clone(),
+                        loader: LoaderType::NeoForge,
+                        versions: vec![],
+                        filter_stable_only: true,
+                        search: String::new(),
+                        selected: 0,
+                        current_version,
+                    };
+                    vec![Effect::FetchLoaderVersions { slug, loader_type: LoaderType::NeoForge }]
                 }
                 _ => vec![],
             }
@@ -1461,6 +1502,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     bytes_done: 0,
                     bytes_total: 0,
                     cancel_token_key: slug.clone(),
+                    log_tail: String::new(),
                 };
                 vec![Effect::InstallLoader {
                     slug,
@@ -1519,6 +1561,22 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             }
             vec![]
         }
+        Action::LoaderInstallLogTail { slug, tail } => {
+            // Phase 7 (D-02): update the live log tail in the progress modal without
+            // touching the gauge percentage — these events come from [log-tail]-prefixed
+            // TaskEvent::Progress messages filtered in the run.rs forwarder.
+            if let ActiveView::LoaderInstallProgressModal {
+                slug: modal_slug,
+                log_tail: ref mut lt,
+                ..
+            } = &mut state.active_view
+            {
+                if *modal_slug == slug {
+                    *lt = tail;
+                }
+            }
+            vec![]
+        }
         Action::LoaderInstalled { slug } => {
             state.running_loader_installs.remove(&slug);
             state.active_view = ActiveView::default();
@@ -1565,6 +1623,8 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             let loader_type = match kind_str {
                 "fabric" => LoaderType::Fabric,
                 "quilt" => LoaderType::Quilt,
+                "forge" => LoaderType::Forge,
+                "neoforge" => LoaderType::NeoForge,
                 _ => return vec![],
             };
             let mc_version = state.instances.iter()
@@ -1582,6 +1642,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 bytes_done: 0,
                 bytes_total: 0,
                 cancel_token_key: slug.clone(),
+                log_tail: String::new(),
             };
             vec![Effect::InstallLoader { slug, loader_type, mc_version, loader_version }]
         }
@@ -2873,13 +2934,20 @@ mod tests {
     }
 
     #[test]
-    fn test_loader_picker_move_wraps_three_rows() {
+    fn test_loader_picker_move_wraps_five_rows() {
+        // Now 5 rows: None / Fabric / Quilt / Forge / NeoForge
         let mut s = vanilla_state_with("ti", "1.21.4");
         let _ = update(&mut s, Action::OpenLoaderPicker { slug: "ti".into() });
         let _ = update(&mut s, Action::LoaderPickerMove(1));
         let _ = update(&mut s, Action::LoaderPickerMove(1));
         let _ = update(&mut s, Action::LoaderPickerMove(1));
-        // 3 rows total → moves wrap back to 0
+        // 3 moves → index 3 (Forge row)
+        if let ActiveView::LoaderPickerModal { selected, .. } = &s.active_view {
+            assert_eq!(*selected, 3);
+        } else { panic!("wrong view"); }
+        let _ = update(&mut s, Action::LoaderPickerMove(1));
+        let _ = update(&mut s, Action::LoaderPickerMove(1));
+        // 5 moves total → index 5 mod 5 = 0 (wraps back to None row)
         if let ActiveView::LoaderPickerModal { selected, .. } = s.active_view {
             assert_eq!(selected, 0);
         } else { panic!("wrong view"); }
@@ -3062,5 +3130,61 @@ mod tests {
         assert_eq!(visible, vec![0]);
         let all = loader_versions_visible_indices(&versions, LoaderType::Fabric, false, "");
         assert_eq!(all, vec![0, 1]);
+    }
+
+    #[test]
+    fn test_loader_install_log_tail_updates_modal_log_tail() {
+        let mut state = AppState {
+            active_view: ActiveView::LoaderInstallProgressModal {
+                slug: "test".into(),
+                loader: LoaderType::Forge,
+                version: "47.4.20".into(),
+                step_label: "Running installer".into(),
+                step_index: 1,
+                step_total: 5,
+                bytes_done: 0,
+                bytes_total: 0,
+                cancel_token_key: "test-key".into(),
+                log_tail: String::new(),
+            },
+            ..AppState::default()
+        };
+        let _ = update(&mut state, Action::LoaderInstallLogTail {
+            slug: "test".into(),
+            tail: "Running Processor 3/7".into(),
+        });
+        if let ActiveView::LoaderInstallProgressModal { log_tail, .. } = &state.active_view {
+            assert_eq!(log_tail, "Running Processor 3/7");
+        } else {
+            panic!("active view changed unexpectedly");
+        }
+    }
+
+    #[test]
+    fn test_loader_install_log_tail_ignored_for_other_slug() {
+        let mut state = AppState {
+            active_view: ActiveView::LoaderInstallProgressModal {
+                slug: "alpha".into(),
+                loader: LoaderType::Forge,
+                version: "1".into(),
+                step_label: "x".into(),
+                step_index: 0,
+                step_total: 1,
+                bytes_done: 0,
+                bytes_total: 0,
+                cancel_token_key: "k".into(),
+                log_tail: "original".into(),
+            },
+            ..AppState::default()
+        };
+        let _ = update(&mut state, Action::LoaderInstallLogTail {
+            slug: "beta".into(),
+            tail: "different".into(),
+        });
+        if let ActiveView::LoaderInstallProgressModal { log_tail, .. } = &state.active_view {
+            assert_eq!(log_tail, "original", "tail must not change for other slug");
+        } else {
+            panic!("active view changed");
+        }
     }
 }

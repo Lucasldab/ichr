@@ -998,6 +998,7 @@ async fn execute_effects(
 
             Effect::InstallLoader { slug, loader_type, mc_version, loader_version } => {
                 let svc = Arc::clone(&loader_service);
+                let java = Arc::clone(&java_service);
                 let paths2 = paths.clone();
                 let tx = action_tx.clone();
                 let job_id = task_manager.next_job_id();
@@ -1005,7 +1006,9 @@ async fn execute_effects(
                 let loader_version_for_task = loader_version.clone();
 
                 // Forwarder: install_loader emits TaskEvent::Progress through `lt_tx`.
-                // We translate each Progress into Action::LoaderInstallProgress.
+                // Phase 7 (D-02): filter [log-tail]-prefixed messages into
+                // Action::LoaderInstallLogTail (updates log_tail without clobbering gauge);
+                // non-prefixed messages flow into Action::LoaderInstallProgress as before.
                 let (lt_tx, mut lt_rx) = mpsc::channel::<TaskEvent>(64);
                 {
                     let tx_fwd = tx.clone();
@@ -1013,15 +1016,24 @@ async fn execute_effects(
                     tokio::spawn(async move {
                         while let Some(evt) = lt_rx.recv().await {
                             if let TaskEvent::Progress { pct, msg, .. } = evt {
-                                let _ = tx_fwd
-                                    .send(Action::LoaderInstallProgress {
-                                        slug: slug_fwd.clone(),
-                                        pct,
-                                        step_label: msg,
-                                        bytes_done: 0,
-                                        bytes_total: 0,
-                                    })
-                                    .await;
+                                if let Some(tail) = msg.strip_prefix("[log-tail] ") {
+                                    let _ = tx_fwd
+                                        .send(Action::LoaderInstallLogTail {
+                                            slug: slug_fwd.clone(),
+                                            tail: tail.to_string(),
+                                        })
+                                        .await;
+                                } else {
+                                    let _ = tx_fwd
+                                        .send(Action::LoaderInstallProgress {
+                                            slug: slug_fwd.clone(),
+                                            pct,
+                                            step_label: msg,
+                                            bytes_done: 0,
+                                            bytes_total: 0,
+                                        })
+                                        .await;
+                                }
                             }
                         }
                     });
@@ -1033,6 +1045,25 @@ async fn execute_effects(
                         .send(Action::LoaderInstallStarted { slug: slug.clone(), token: token.clone() })
                         .await;
 
+                    // Phase 7 (D-06): resolve the JRE for the installer subprocess BEFORE
+                    // calling install_loader. The vanilla version JSON must already be on
+                    // disk (Phase 2/3 install_version) — if not, surface a typed error.
+                    let jre_path = match java.resolve_jre_for_mc_version_install(&paths2, &mc_version).await {
+                        Ok(p) => p,
+                        Err(e) => {
+                            let _ = tx
+                                .send(Action::LoaderInstallFailed {
+                                    slug,
+                                    loader: loader_type,
+                                    version: loader_version_for_task,
+                                    error: format!("JRE resolution failed: {e}"),
+                                    log_tail: String::new(),
+                                })
+                                .await;
+                            return Ok(());
+                        }
+                    };
+
                     let res = svc
                         .install_loader(
                             &paths2,
@@ -1040,12 +1071,7 @@ async fn execute_effects(
                             &mc_version,
                             loader_type,
                             &loader_version_for_task,
-                            // TODO(Wave 5): resolve JRE via JavaService before calling
-                            // install_loader — this placeholder works for Fabric/Quilt
-                            // (jre_path ignored for HTTP-only loaders) but will fail for
-                            // Forge/NeoForge installs until Wave 5 wires up proper JRE
-                            // resolution. See JavaService::resolve_jre_for_mc_version_install.
-                            std::path::Path::new("."),
+                            &jre_path,
                             lt_tx,
                             token,
                             job_id,
@@ -1063,13 +1089,19 @@ async fn execute_effects(
                             let _ = tx.send(Action::LoaderInstalled { slug }).await;
                         }
                         Err(e) => {
+                            // Phase 7 (LOAD-06): extract subprocess stderr from
+                            // LoaderError::SubprocessExit to surface in the failure modal.
+                            let log_tail = match &e {
+                                crate::loader::error::LoaderError::SubprocessExit { tail, .. } => tail.clone(),
+                                _ => String::new(),
+                            };
                             let _ = tx
                                 .send(Action::LoaderInstallFailed {
                                     slug,
                                     loader: loader_type,
                                     version: loader_version_for_task,
                                     error: e.to_string(),
-                                    log_tail: String::new(),
+                                    log_tail,
                                 })
                                 .await;
                         }
