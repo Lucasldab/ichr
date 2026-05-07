@@ -422,6 +422,22 @@ async fn test_resolve_dependencies_through_full_service_stack() {
         );
     });
 
+    // GET /v2/projects?ids=[...] → title hydration (closes GAP-8-D).
+    // The resolver dedupes ids before this call; only `dep_project_id` is in
+    // the dep set (root is excluded from `deps`). Accept any ids order via
+    // query_param_exists — order depends on internal collection traversal.
+    server.mock(|when, then| {
+        when.method(GET)
+            .path("/v2/projects")
+            .query_param_exists("ids");
+        then.status(200).body(
+            serde_json::json!([
+                { "id": dep_project_id, "title": "Fabric API" }
+            ])
+            .to_string(),
+        );
+    });
+
     let client =
         ModrinthClient::new_with_base_url(server.base_url()).expect("client::new_with_base_url");
     let svc = ModrinthService::with_client(client);
@@ -456,4 +472,208 @@ async fn test_resolve_dependencies_through_full_service_stack() {
         graph.root.id, root_id,
         "graph root.id should match the requested root version"
     );
+}
+
+// ============================================================================
+// Test 4: Title hydration -> ledger display_name end-to-end (GAP-8-D)
+// ============================================================================
+
+#[tokio::test]
+async fn test_dep_resolve_titles_propagate_to_ledger_display_name() {
+    // GAP-8-D end-to-end: the BFS resolver must populate ResolvedDep.project_title
+    // from the new /v2/projects?ids=[...] endpoint, and build_install_plan must
+    // surface that title as InstalledModRow.display_name in the ledger so the
+    // Installed Mods List + dep-confirm modal show "Fabric API" instead of an
+    // opaque project_id like "P-fabric".
+    //
+    // The test mocks: root version, dep version listing, batch project titles,
+    // CDN bodies (with computed sha512 so install verification passes). After
+    // resolve + install, asserts the ledger has BOTH non-opaque display_name rows.
+    let server = MockServer::start();
+
+    // CDN bodies + their sha512 hashes (computed inline so install verification passes).
+    let sodium_body = b"sodium-jar-bytes-for-gap-8d".to_vec();
+    let fabric_body = b"fabric-api-jar-bytes-for-gap-8d".to_vec();
+    let sodium_sha = sha512_hex_of(&sodium_body);
+    let fabric_sha = sha512_hex_of(&fabric_body);
+
+    let root_id = "v-sodium-1";
+    let dep_pid = "P-fabric";
+    let root_pid = "P-sodium";
+
+    // Mock /v2/version/{root_id} — Sodium with one Required dep on P-fabric.
+    {
+        let server_url = server.base_url();
+        let sodium_sha_for_root = sodium_sha.clone();
+        let sodium_size = sodium_body.len() as u64;
+        server.mock(move |when, then| {
+            when.method(GET).path(format!("/v2/version/{root_id}"));
+            then.status(200).body(
+                serde_json::json!({
+                    "id": root_id,
+                    "project_id": root_pid,
+                    "name": "Sodium 0.5.8",
+                    "version_number": "0.5.8",
+                    "version_type": "release",
+                    "game_versions": ["1.20.4"],
+                    "loaders": ["fabric"],
+                    "downloads": 100,
+                    "date_published": "2026-01-01T00:00:00Z",
+                    "dependencies": [{
+                        "project_id": dep_pid,
+                        "dependency_type": "required"
+                    }],
+                    "files": [{
+                        "url": format!("{server_url}/cdn/sodium.jar"),
+                        "filename": "sodium.jar",
+                        "primary": true,
+                        "size": sodium_size,
+                        "hashes": { "sha1": "x", "sha512": sodium_sha_for_root }
+                    }]
+                })
+                .to_string(),
+            );
+        });
+    }
+
+    // Mock /v2/project/P-fabric/version — one Fabric API version.
+    {
+        let server_url = server.base_url();
+        let fabric_sha_for_dep = fabric_sha.clone();
+        let fabric_size = fabric_body.len() as u64;
+        server.mock(move |when, then| {
+            when.method(GET).path(format!("/v2/project/{dep_pid}/version"));
+            then.status(200).body(
+                serde_json::json!([{
+                    "id": "v-fabric-1",
+                    "project_id": dep_pid,
+                    "name": "Fabric API 0.92.0",
+                    "version_number": "0.92.0",
+                    "version_type": "release",
+                    "game_versions": ["1.20.4"],
+                    "loaders": ["fabric"],
+                    "downloads": 100,
+                    "date_published": "2026-01-01T00:00:00Z",
+                    "dependencies": [],
+                    "files": [{
+                        "url": format!("{server_url}/cdn/fabric-api.jar"),
+                        "filename": "fabric-api.jar",
+                        "primary": true,
+                        "size": fabric_size,
+                        "hashes": { "sha1": "x", "sha512": fabric_sha_for_dep }
+                    }]
+                }])
+                .to_string(),
+            );
+        });
+    }
+
+    // Mock /v2/projects?ids=[...] — title hydration endpoint (closes GAP-8-D).
+    // Note: the resolver only batch-fetches titles for `deps`, NOT the root —
+    // root_pid is not in the dep set. We still return both ids in the response
+    // body so the test exercises the realistic shape Modrinth would return if
+    // we ever batch root + deps together later.
+    server.mock(|when, then| {
+        when.method(GET)
+            .path("/v2/projects")
+            .query_param_exists("ids");
+        then.status(200).body(
+            serde_json::json!([
+                { "id": root_pid, "title": "Sodium" },
+                { "id": dep_pid,  "title": "Fabric API" },
+            ])
+            .to_string(),
+        );
+    });
+
+    // CDN mocks — bodies whose sha512 matches the manifest entries above.
+    {
+        let body = sodium_body.clone();
+        server.mock(move |when, then| {
+            when.method(GET).path("/cdn/sodium.jar");
+            then.status(200).body(body.clone());
+        });
+    }
+    {
+        let body = fabric_body.clone();
+        server.mock(move |when, then| {
+            when.method(GET).path("/cdn/fabric-api.jar");
+            then.status(200).body(body.clone());
+        });
+    }
+
+    let client = ModrinthClient::new_with_base_url(server.base_url())
+        .expect("client::new_with_base_url");
+    let svc = ModrinthService::with_client(client);
+
+    let td = TempDir::new().unwrap();
+    let paths = paths_for(&td);
+    let slug = "title-test";
+    tokio::fs::create_dir_all(paths.instance_minecraft_dir(slug).join("mods"))
+        .await
+        .unwrap();
+
+    let loader = mineltui::loader::types::LoaderInfo {
+        kind: mineltui::domain::instance::ModloaderKind::Fabric,
+        version: "0.16.9".into(),
+        version_id: "fabric-loader-0.16.9-1.20.4".into(),
+    };
+
+    let graph = svc
+        .resolve_dependencies(&paths, slug, root_id, "1.20.4", Some(&loader))
+        .await
+        .expect("resolve_dependencies");
+
+    // Asserts the resolver populated the dep title via post-BFS hydration.
+    let dep_with_title = graph
+        .deps
+        .iter()
+        .find(|d| d.project_id == dep_pid)
+        .expect("Fabric API dep missing from graph");
+    assert_eq!(
+        dep_with_title.project_title, "Fabric API",
+        "GAP-8-D: project_title must be populated by post-BFS title hydration"
+    );
+
+    // Now install: expect 2 ledger rows (root + 1 dep) with non-opaque display_name fields.
+    let (tx, mut rx) = mpsc::channel(64);
+    tokio::spawn(async move { while rx.recv().await.is_some() {} });
+    let token = CancellationToken::new();
+    svc.install_mod_into_instance(
+        &paths,
+        slug,
+        "sodium",
+        "Sodium",
+        &graph.root,
+        &graph,
+        tx,
+        token,
+        JobId(0),
+    )
+    .await
+    .expect("install");
+
+    let mods = svc.list_installed_mods(&paths, slug).await.unwrap();
+    assert_eq!(
+        mods.len(),
+        2,
+        "expected root + 1 dep, got {}: {mods:?}",
+        mods.len()
+    );
+    let fabric_row = mods
+        .iter()
+        .find(|m| m.mod_id == dep_pid)
+        .expect("Fabric API row missing from ledger");
+    assert_eq!(
+        fabric_row.display_name, "Fabric API",
+        "GAP-8-D: ledger display_name must surface project_title, not project_id"
+    );
+    // Sodium row's display_name comes from `root_project_title` arg above ("Sodium"),
+    // not via title hydration (root_pid is not in the dep set). Asserting both
+    // proves the end-to-end title path covers both code branches.
+    let sodium_row = mods
+        .iter()
+        .find(|m| m.mod_id == root_pid)
+        .expect("Sodium row missing from ledger");
+    assert_eq!(sodium_row.display_name, "Sodium");
 }

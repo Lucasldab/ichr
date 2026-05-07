@@ -208,6 +208,24 @@ impl ModrinthService {
             async move { client.get_version(&version_id).await }
         };
 
+        // Title hydration closure (closes GAP-8-D). Called once after BFS to
+        // batch-fetch (id, title) pairs so ResolvedDep.project_title surfaces
+        // human-readable mod names in the dep-confirm modal + Installed Mods
+        // List, instead of opaque project_ids.
+        let client_for_titles = self.client.clone();
+        let fetch_titles = move |ids: Vec<String>| {
+            let client = client_for_titles.clone();
+            async move {
+                let refs: Vec<&str> = ids.iter().map(|s| s.as_str()).collect();
+                let pairs = client.get_projects_batch(&refs).await?;
+                let map: HashMap<String, String> = pairs
+                    .into_iter()
+                    .map(|p| (p.id, p.title))
+                    .collect();
+                Ok(map)
+            }
+        };
+
         resolve_required_deps(
             root,
             mc,
@@ -215,6 +233,7 @@ impl ModrinthService {
             &installed,
             fetch_latest,
             fetch_by_id,
+            fetch_titles,
         )
         .await
     }

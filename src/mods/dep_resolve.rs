@@ -48,19 +48,29 @@ pub struct ResolvedDepGraph {
 ///   For 08-06, this is `client.list_versions(...).map(pick_latest_by_date)`.
 /// - `fetch_version_by_id`: resolves a version_id to a ModrinthVersion (Q2 path).
 ///   For 08-06, this is `client.get_version(version_id)`.
-pub async fn resolve_required_deps<F1, Fut1, F2, Fut2>(
+/// - `fetch_project_titles`: resolves a `Vec<project_id>` to a `HashMap<project_id, title>`.
+///   Called once after BFS completes to hydrate `ResolvedDep.project_title` so the
+///   dep-confirm modal and Installed Mods List surface human-readable mod names
+///   instead of opaque project_ids (closes GAP-8-D). Missing keys fall back to
+///   the project_id itself — strictly better than the old `String::new()` outcome.
+///   For the production wiring, this is `client.get_projects_batch(ids)` mapped
+///   into a `(id -> title)` HashMap.
+pub async fn resolve_required_deps<F1, Fut1, F2, Fut2, F3, Fut3>(
     root: ModrinthVersion,
     mc: &str,
     loaders: &[String],
     installed: &HashMap<String, String>,
     fetch_latest_for_project: F1,
     fetch_version_by_id: F2,
+    fetch_project_titles: F3,
 ) -> Result<ResolvedDepGraph, ModrinthError>
 where
     F1: Fn(String, String, Vec<String>) -> Fut1 + Sync,
     Fut1: std::future::Future<Output = Result<Option<ModrinthVersion>, ModrinthError>> + Send,
     F2: Fn(String) -> Fut2 + Sync,
     Fut2: std::future::Future<Output = Result<ModrinthVersion, ModrinthError>> + Send,
+    F3: FnOnce(Vec<String>) -> Fut3,
+    Fut3: std::future::Future<Output = Result<HashMap<String, String>, ModrinthError>>,
 {
     let mut deps: Vec<ResolvedDep> = Vec::new();
     let mut seen: HashSet<String> = installed.keys().cloned().collect();
@@ -95,6 +105,32 @@ where
                 &fetch_latest_for_project,
             )
             .await?;
+        }
+    }
+
+    // Title hydration: collect unique project_ids, batch-fetch titles, write back.
+    // Closes GAP-8-D — without this, the construction sites in `process_dep` leave
+    // `project_title = String::new()`, and the dep-confirm modal + Installed Mods
+    // List surface opaque project_ids instead of human-readable names. Fallback to
+    // `project_id` for any id missing from the response keeps the resolver robust
+    // when Modrinth omits titles (strictly better than empty string).
+    let unique_ids: Vec<String> = {
+        let mut seen_titles: HashSet<String> = HashSet::new();
+        let mut out = Vec::new();
+        for d in &deps {
+            if seen_titles.insert(d.project_id.clone()) {
+                out.push(d.project_id.clone());
+            }
+        }
+        out
+    };
+    if !unique_ids.is_empty() {
+        let titles = fetch_project_titles(unique_ids).await?;
+        for d in deps.iter_mut() {
+            d.project_title = titles
+                .get(&d.project_id)
+                .cloned()
+                .unwrap_or_else(|| d.project_id.clone());
         }
     }
 
@@ -257,6 +293,16 @@ mod tests {
         panic!("fetch_version_by_id should not be called in this test")
     }
 
+    /// Title-fetch closure for tests that don't care about title hydration.
+    /// Returns an empty map; the resolver's fallback writes `project_id` into
+    /// `project_title`, which preserves the legacy "no human-readable title"
+    /// shape these tests were written against (assertions key off `project_id`,
+    /// never `project_title`). Inlined at each call site as
+    /// `|_ids: Vec<String>| async { Ok::<_, ModrinthError>(HashMap::new()) }`.
+    async fn no_titles_async(_ids: Vec<String>) -> Result<HashMap<String, String>, ModrinthError> {
+        Ok(HashMap::new())
+    }
+
     // 1. Linear chain: root(A) -> required(B). Result: 1 dep, 1 file new.
     #[tokio::test]
     async fn test_linear_chain() {
@@ -273,6 +319,7 @@ mod tests {
                 }
             },
             never_fetch_by_id,
+            no_titles_async,
         ).await.unwrap();
 
         assert_eq!(g.deps.len(), 1);
@@ -306,6 +353,7 @@ mod tests {
                 }
             },
             never_fetch_by_id,
+            no_titles_async,
         ).await.unwrap();
 
         // BFS layer order: root visits B and C; then B visits D (new) then C visits D (already seen).
@@ -338,6 +386,7 @@ mod tests {
                 }
             },
             never_fetch_by_id,
+            no_titles_async,
         ).await.unwrap();
 
         // Critical invariant: the function returns. Bounded by `seen` so cycles cannot diverge.
@@ -355,6 +404,7 @@ mod tests {
             root, "1.20.4", &["fabric".into()], &installed,
             |_pid, _mc, _l| async { Ok(None) },
             never_fetch_by_id,
+            no_titles_async,
         ).await;
 
         match r {
@@ -375,6 +425,7 @@ mod tests {
             root, "1.20.4", &["fabric".into()], &installed,
             |_pid, _mc, _l| async { panic!("fetch_latest must not be called for optional deps") },
             never_fetch_by_id,
+            no_titles_async,
         ).await.unwrap();
 
         assert_eq!(g.deps.len(), 1);
@@ -392,6 +443,7 @@ mod tests {
             root, "1.20.4", &["fabric".into()], &installed,
             |_pid, _mc, _l| async { panic!("fetch_latest must not be called for embedded deps") },
             never_fetch_by_id,
+            no_titles_async,
         ).await.unwrap();
 
         assert_eq!(g.deps.len(), 1);
@@ -411,6 +463,7 @@ mod tests {
             root, "1.20.4", &["fabric".into()], &installed,
             |_pid, _mc, _l| async { panic!("must not fetch already-installed dep") },
             never_fetch_by_id,
+            no_titles_async,
         ).await.unwrap();
 
         assert_eq!(g.deps.len(), 1);
@@ -429,8 +482,40 @@ mod tests {
             root, "1.20.4", &["fabric".into()], &installed,
             |_pid, _mc, _l| async { Ok(None) },
             never_fetch_by_id,
+            no_titles_async,
         ).await;
         assert!(matches!(r, Err(ModrinthError::NoCompatibleVersion { .. })), "got {r:?}");
+    }
+
+    // GAP-8-D: project_title must be populated by post-BFS title hydration so the
+    // dep-confirm modal renders human-readable mod names instead of opaque project_ids.
+    #[tokio::test]
+    async fn test_project_title_populated_after_bfs() {
+        let b = mk_version("b1", "B", 100, vec![]);
+        let root = mk_version("a1", "A", 200, vec![dep("B", DepKind::Required)]);
+        let installed = HashMap::<String, String>::new();
+        let g = resolve_required_deps(
+            root, "1.20.4", &["fabric".into()], &installed,
+            |pid, _mc, _l| {
+                let b = b.clone();
+                async move { if pid == "B" { Ok(Some(b)) } else { Ok(None) } }
+            },
+            never_fetch_by_id,
+            |ids| async move {
+                let mut m = HashMap::new();
+                for id in ids {
+                    m.insert(id.clone(), format!("Display {id}"));
+                }
+                Ok(m)
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(g.deps.len(), 1);
+        assert_eq!(
+            g.deps[0].project_title, "Display B",
+            "GAP-8-D: project_title should be populated from fetch_project_titles, not String::new()"
+        );
     }
 
     // Q2: Dep with version_id only (no project_id) -- fetch_version_by_id called and resolved project_id deduped.
@@ -457,6 +542,7 @@ mod tests {
                     Ok(b)
                 }
             },
+            no_titles_async,
         ).await.unwrap();
 
         assert_eq!(g.deps.len(), 1);

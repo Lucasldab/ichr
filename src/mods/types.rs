@@ -103,6 +103,19 @@ pub struct ModrinthProjectDetail {
     pub categories: Vec<String>,
 }
 
+/// Lightweight projection of `/v2/projects?ids=[...]` for title hydration.
+///
+/// We only need (id, title) pairs to populate `ResolvedDep.project_title`;
+/// the full `ModrinthProjectDetail` (with body, license, etc.) is fetched
+/// on demand from the detail-pane code path. Used by the dep-resolver to
+/// close GAP-8-D — without this, the dep-confirm modal and Installed Mods
+/// List surface opaque project_ids instead of human-readable titles.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectIdTitle {
+    pub id: String,
+    pub title: String,
+}
+
 /// One row in the version-picker modal.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModrinthVersionEntry {
