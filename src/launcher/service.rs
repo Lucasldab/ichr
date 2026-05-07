@@ -68,12 +68,17 @@ pub async fn launch_instance(
         None => manifest.mc_version_id.as_str(),
     };
 
-    // Step 2 — verify client.jar present before we do anything expensive
-    send_progress(&tx, job_id, 5, "checking version installed").await;
-    let client_jar = paths.version_jar(launch_version_id);
-    if !tokio::fs::try_exists(&client_jar).await.unwrap_or(false) {
-        return Err(AppError::VersionNotInstalled { slug: slug.to_string() });
-    }
+    // GAP-LAUNCH-JAR-08 (Phase 8.2 gap closure): the up-front version_jar
+    // existence guard previously here is removed. For Fabric/Quilt/Forge/
+    // NeoForge instances the loader's `.jar` STRUCTURALLY NEVER EXISTS on
+    // disk (loader version JSONs are metadata-only; the JAR is inherited
+    // via `inheritsFrom`). Step 3's `read_version_json_from_disk` already
+    // returns `VersionNotInstalled` when the version JSON is absent, which
+    // is the authoritative install marker for both vanilla and loader
+    // paths. The resolved root vanilla JAR is later referenced by the
+    // classpath builder (Step 6 → `compose` → `build_classpath`); a
+    // missing client JAR will surface from the spawn layer when the JVM
+    // fails to find the class on its classpath.
 
     // Step 3 — load root version JSON from disk (no network)
     send_progress(&tx, job_id, 10, "loading version JSON").await;
@@ -257,21 +262,34 @@ mod tests {
         );
     }
 
-    /// GAP-8-E regression: a manifest carrying `loader=Some(_)` MUST cause the
-    /// launcher to look up the loader's version_id (e.g.
-    /// `fabric-loader-0.16.9-1.20.4`) — NOT `manifest.mc_version_id` (vanilla).
+    /// GAP-8-E regression (reconciled in Phase 8.2 GAP-LAUNCH-JAR-08): a
+    /// manifest carrying `loader=Some(_)` MUST cause the launcher to look up
+    /// the loader's version_id (e.g. `fabric-loader-0.16.9-1.20.4`) — NOT
+    /// `manifest.mc_version_id` (vanilla).
     ///
-    /// Setup: vanilla `1.20.4/1.20.4.jar` is pre-created on disk so the buggy
-    /// code (which reads `manifest.mc_version_id`) would advance past the
-    /// jar-presence check and ultimately fail later at the version JSON read,
-    /// producing `VersionNotInstalled { slug: "1.20.4" }`. The fixed code reads
-    /// the loader's version_id, finds no jar at the loader path, and returns
-    /// `VersionNotInstalled { slug: "modded" }` (the instance slug — set at
-    /// the version_jar check site, which uses `slug.to_string()`).
+    /// Setup: vanilla `1.20.4/1.20.4.jar` is pre-created on disk; NO version
+    /// JSON exists for either id, and NO loader JAR/JSON exists.
     ///
-    /// Asserting on the slug field is what gives this test teeth: a wildcard
-    /// `VersionNotInstalled { .. }` match would pass under BOTH the bug and
-    /// the fix and would not be a real regression test.
+    /// Pre-08.2-01 expectation (the OLD bug surface): the broken Step 2 guard
+    /// fired at `paths.version_jar(launch_version_id)`. Because the loader JAR
+    /// path (`fabric-loader-0.16.9-1.20.4.jar`) was absent, it returned
+    /// `VersionNotInstalled { slug: <instance slug> }` (== "modded"), since
+    /// the guard sourced its slug from `slug.to_string()` (the instance slug).
+    ///
+    /// Post-08.2-01 expectation (the CHOSEN fix surface): the Step 2 guard is
+    /// removed. The launcher progresses to Step 3
+    /// (`read_version_json_from_disk(paths, launch_version_id)`), which fires
+    /// `VersionNotInstalled { slug: version_id.to_string() }` when the loader
+    /// JSON is absent — i.e. `slug == "fabric-loader-0.16.9-1.20.4"` (the
+    /// loader version_id, NOT the instance slug).
+    ///
+    /// Asserting `slug == "fabric-loader-0.16.9-1.20.4"` is what gives this
+    /// test teeth post-fix: it proves the launcher resolved to the LOADER
+    /// version_id (not vanilla). A wildcard `VersionNotInstalled { .. }` match
+    /// would pass under the original GAP-8-E bug too (which fired with
+    /// `slug == "1.21.4"` from a vanilla-only read) — so the slug-equality
+    /// assertion remains the real regression guard, just at a new firing
+    /// site (Step 3 instead of the now-removed Step 2 guard).
     #[tokio::test]
     async fn test_launch_reads_loader_version_id_when_loader_some() {
         use crate::domain::instance::ModloaderKind;
@@ -280,14 +298,19 @@ mod tests {
         let td = TempDir::new().unwrap();
         let paths = paths_in(&td);
 
-        // Pre-create the vanilla 1.20.4 client.jar so the buggy code path would
-        // NOT bail at the jar-presence check.
+        // Pre-create the vanilla 1.20.4 client.jar so a (hypothetical)
+        // vanilla-only read would advance past the jar-presence check. With
+        // the Step 2 guard now removed, this jar is no longer consulted; we
+        // keep it to preserve the historical fixture shape that distinguishes
+        // GAP-8-E bug from fix.
         let vanilla_jar = paths.version_jar("1.20.4");
         tokio::fs::create_dir_all(vanilla_jar.parent().unwrap()).await.unwrap();
         tokio::fs::write(&vanilla_jar, b"fake client.jar").await.unwrap();
 
-        // Manifest declares a Fabric loader. The loader's version_id JAR does
-        // NOT exist on disk — this is the lever that distinguishes bug from fix.
+        // Manifest declares a Fabric loader. NO loader version JSON exists on
+        // disk — this is the lever that fires `VersionNotInstalled` from
+        // Step 3 (`read_version_json_from_disk`) with the LOADER version_id
+        // as the slug, proving the launcher routed via `launch_version_id`.
         let mut m = InstanceManifest::new("modded".into(), "modded".into(), "1.20.4".into());
         m.loader = Some(LoaderInfo {
             kind: ModloaderKind::Fabric,
@@ -305,26 +328,171 @@ mod tests {
             &paths, "modded", auth_ctx, None, &java_service, tx, token, JobId(2),
         ).await;
 
-        // The fix: the version_jar check uses `paths.version_jar(loader.version_id)`,
-        // which doesn't exist, so the launcher returns
-        // `VersionNotInstalled { slug: <instance slug> }` (== "modded").
-        //
-        // The bug would advance past the jar check (vanilla jar exists), then
-        // fail at the version JSON read with slug == "1.20.4". So asserting
-        // slug == "modded" is what makes this a real regression guard.
         match result {
             Err(AppError::VersionNotInstalled { slug }) => {
                 assert_eq!(
-                    slug, "modded",
-                    "expected VersionNotInstalled at the loader-aware version_jar \
-                     check (slug=instance), but got slug={slug:?} — this likely \
-                     means the launcher fell through to the vanilla version JSON \
-                     read (the GAP-8-E bug)",
+                    slug, "fabric-loader-0.16.9-1.20.4",
+                    "expected VersionNotInstalled at Step 3 \
+                     read_version_json_from_disk with slug=loader_version_id \
+                     (proving the launcher looked up the loader's JSON, not \
+                     vanilla); got slug={slug:?} — under the pre-08.2-01 \
+                     buggy code this would have been \"modded\" (firing from \
+                     the now-removed Step 2 jar guard)",
                 );
             }
             other => panic!(
-                "expected Err(VersionNotInstalled {{ slug: \"modded\" }}); got {other:?}",
+                "expected Err(VersionNotInstalled {{ slug: \"fabric-loader-0.16.9-1.20.4\" }}); got {other:?}",
             ),
+        }
+    }
+
+    /// GAP-LAUNCH-JAR-08 regression (Phase 8.2): with a Phase-6-shaped on-disk
+    /// fixture (loader dir has only `.json` with `inheritsFrom='1.20.4'`;
+    /// vanilla dir has both `.jar` AND `.json` with `inheritsFrom=None`),
+    /// `launch_instance` MUST progress past Steps 2-4 (jar/json existence,
+    /// inheritsFrom resolve) and fail at Step 5 or later for an unrelated
+    /// reason — NOT with `VersionNotInstalled` fired from a jar-existence
+    /// guard.
+    ///
+    /// This is the test the original 08.1-01 plan should have shipped. The
+    /// sibling test (`test_launch_reads_loader_version_id_when_loader_some`)
+    /// only proves the launcher LOOKS at the loader's path; this test proves
+    /// the launcher can actually GET PAST the loader path when the install
+    /// is real.
+    ///
+    /// Implementation note: we set `MINELTUI_JAVA` to a non-existent path so
+    /// `JavaService::resolve_jre_for_launch` short-circuits with that path
+    /// (Step 5 succeeds), `compose` succeeds (pure-sync), and Step 7 then
+    /// fails with `JavaNotFound` because the path doesn't exist on disk.
+    /// This is deterministic and avoids any network calls. Critically, the
+    /// post-fix code MUST reach Step 5+ — only the bug would short-circuit
+    /// at Step 2 with `VersionNotInstalled`.
+    #[tokio::test]
+    async fn test_launch_modded_passes_jar_check_with_realistic_fixture() {
+        use crate::domain::instance::ModloaderKind;
+        use crate::loader::types::LoaderInfo;
+
+        let td = TempDir::new().unwrap();
+        let paths = paths_in(&td);
+
+        // --- Vanilla 1.20.4 fixture (both .jar AND .json) -------------------
+        let vanilla_id = "1.20.4";
+        let vanilla_jar = paths.version_jar(vanilla_id);
+        tokio::fs::create_dir_all(vanilla_jar.parent().unwrap()).await.unwrap();
+        tokio::fs::write(&vanilla_jar, b"fake vanilla client.jar").await.unwrap();
+
+        // Minimum vanilla VersionJson — must parse as VersionJson and serve
+        // as a leaf parent (inherits_from = None). Modeled on the
+        // `vjson_stub` helper in tests/mojang_protocol.rs (which has the
+        // same minimum-parseable shape this struct demands: id, type,
+        // mainClass, assetIndex (full), assets, downloads, libraries,
+        // releaseTime, time).
+        let vanilla_json_path = paths.version_json(vanilla_id);
+        let vanilla_json = r#"{
+            "id": "1.20.4",
+            "type": "release",
+            "mainClass": "net.minecraft.client.main.Main",
+            "assetIndex": {
+                "id": "12",
+                "sha1": "0000000000000000000000000000000000000000",
+                "size": 0,
+                "totalSize": 0,
+                "url": "http://example.com/12.json"
+            },
+            "assets": "12",
+            "downloads": {},
+            "libraries": [],
+            "releaseTime": "2023-12-07T00:00:00Z",
+            "time": "2023-12-07T00:00:00Z"
+        }"#;
+        tokio::fs::write(&vanilla_json_path, vanilla_json).await.unwrap();
+
+        // --- Loader 0.16.9 fixture (ONLY .json, with inheritsFrom='1.20.4') -
+        let loader_id = "fabric-loader-0.16.9-1.20.4";
+        let loader_json_path = paths.version_json(loader_id);
+        tokio::fs::create_dir_all(loader_json_path.parent().unwrap()).await.unwrap();
+        // Loader JSON inherits from vanilla and carries Fabric mainClass.
+        // resolve_inherits walks `inherits_from`, fetches the parent from
+        // the parents map, and merges. Required field shape mirrors what
+        // Phase 6's install_loader actually writes.
+        let loader_json = r#"{
+            "id": "fabric-loader-0.16.9-1.20.4",
+            "inheritsFrom": "1.20.4",
+            "type": "release",
+            "mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+            "assetIndex": {
+                "id": "12",
+                "sha1": "0000000000000000000000000000000000000000",
+                "size": 0,
+                "totalSize": 0,
+                "url": "http://example.com/12.json"
+            },
+            "assets": "12",
+            "downloads": {},
+            "libraries": [],
+            "releaseTime": "2024-12-15T00:00:00Z",
+            "time": "2024-12-15T00:00:00Z"
+        }"#;
+        tokio::fs::write(&loader_json_path, loader_json).await.unwrap();
+        // INTENTIONALLY: NO `versions/fabric-loader-0.16.9-1.20.4/...jar`.
+        // The fix relies on the launcher NOT looking for one.
+
+        // --- InstanceManifest with the Fabric loader -----------------------
+        let mut m = InstanceManifest::new("modded".into(), "modded".into(), "1.20.4".into());
+        m.loader = Some(LoaderInfo {
+            kind: ModloaderKind::Fabric,
+            version: "0.16.9".into(),
+            version_id: loader_id.into(),
+        });
+        write_instance_manifest(&paths, &m).await.unwrap();
+
+        // --- Hermetic Java path: short-circuit Step 5 to a non-existent
+        //     binary so Step 7 fails cleanly with JavaNotFound (no network). ---
+        let prior_java = std::env::var("MINELTUI_JAVA").ok();
+        let fake_java = td.path().join("nonexistent-java-binary");
+        std::env::set_var("MINELTUI_JAVA", fake_java.to_str().unwrap());
+
+        let (tx, _rx) = mpsc::channel::<TaskEvent>(16);
+        let token = CancellationToken::new();
+        let auth_ctx = crate::auth::AuthContext::Offline { username: "TestUser".to_string() };
+        let java_service = JavaService::new().expect("JavaService::new");
+
+        let result = launch_instance(
+            &paths, "modded", auth_ctx, None, &java_service, tx, token, JobId(3),
+        ).await;
+
+        // Restore env BEFORE assertions so a panic doesn't leak state.
+        match prior_java {
+            Some(v) => std::env::set_var("MINELTUI_JAVA", v),
+            None => std::env::remove_var("MINELTUI_JAVA"),
+        }
+
+        // Pin the negative assertion: any AppError variant is fine EXCEPT
+        // VersionNotInstalled. If we get VersionNotInstalled here, either
+        // (a) the fixture is wrong (e.g. resolve_inherits rejected it), or
+        // (b) the bug was reintroduced. Both deserve a loud failure.
+        match result {
+            Ok(_) => {
+                // Highly unlikely without a real JRE + spawn ability in the
+                // test env. If it somehow succeeds, the test is still valid:
+                // we got past the guard.
+            }
+            Err(AppError::VersionNotInstalled { slug }) => panic!(
+                "GAP-LAUNCH-JAR-08 REGRESSION: launch_instance returned \
+                 VersionNotInstalled (slug={slug:?}) on a realistic loader \
+                 fixture — the launcher should have progressed past Steps \
+                 2-4. Either the Step 2 guard was re-introduced or the \
+                 fixture layout drifted from what Phase 6 writes."
+            ),
+            Err(other) => {
+                // Acceptable: any other error variant proves we got past
+                // the early jar/json existence checks. With MINELTUI_JAVA
+                // set to a non-existent path, the expected variant is
+                // JavaNotFound (Step 7). Log for diagnosis:
+                eprintln!(
+                    "[gap-08-launch-jar] post-guard failure (expected): {other:?}"
+                );
+            }
         }
     }
 }
