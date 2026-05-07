@@ -384,8 +384,18 @@ async fn install_subprocess_loader(
         }
 
         // Classpath: ForgeWrapper.jar<sep>installer.jar
-        // Per 07-RESEARCH.md Pattern 5 / ForgeWrapper README (tag 1.6.0):
-        //   java -cp <wrapper>:<installer> <MAIN_CLASS> --installer=<jar> --instance=<staging>
+        // Per 07-RESEARCH.md Pattern 5 + ForgeWrapper 1.6.0 README install invocation:
+        //   java -cp <wrapper>:<installer> \
+        //     io.github.zekerzhayard.forgewrapper.installer.Installer \
+        //     --installer=<jar> --instance=<staging>
+        //
+        // INSTALL-TIME class: forgewrapper.installer.Installer (calls
+        // PostProcessors.process() directly; bypasses SimpleInstaller.main()
+        // GUI/server branch). NOT forgewrapper.installer.Main, which is the
+        // LAUNCH-TIME mainClass override (Phase 12 wiring). GAP-7-A: pre-7.1-02
+        // wired Main here, throwing NoClassDefFoundError: cpw/mods/modlauncher/Launcher
+        // because Main's static init resolves modlauncher (absent from the
+        // install-time classpath).
         let sep = if cfg!(windows) { ";" } else { ":" };
         let classpath = format!(
             "{}{sep}{}",
@@ -395,7 +405,7 @@ async fn install_subprocess_loader(
         let args: Vec<String> = vec![
             "-cp".into(),
             classpath,
-            forgewrapper::FORGE_WRAPPER_MAIN_CLASS.to_string(),
+            forgewrapper::FORGE_WRAPPER_INSTALLER_CLASS.to_string(),
             format!("--installer={}", installer_dst.display()),
             format!("--instance={}", staging.root().display()),
         ];
