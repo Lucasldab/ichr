@@ -206,3 +206,131 @@ async fn live_forge_install_1_20_1() {
         loader_version, loader.version_id
     );
 }
+
+/// GAP-7-A regression — fast-fail live test for the install-time class swap.
+///
+/// Pre-7.1-02: this test fails almost immediately (~5s after JRE warmup) with
+/// `NoClassDefFoundError: cpw/mods/modlauncher/Launcher` from the JVM, which
+/// surfaces as `LoaderError::SubprocessExit { code: 1, .. }` because
+/// ForgeWrapper.installer.Main exits 1 at static init.
+///
+/// Post-7.1-02: the install proceeds normally; the test passes once the
+/// subprocess exits 0 and the manifest's `loader.version_id` is non-empty.
+///
+/// This test is FASTER than `live_forge_install_1_20_1` because it asserts
+/// the EARLY behaviour (subprocess class load) rather than the full pipeline,
+/// but it is NOT a substitute — `live_forge_install_1_20_1` exercises the
+/// full install + harvest + manifest + library copy chain. Both tests are
+/// `#[ignore]`-gated; both run during HUMAN-UAT.
+#[tokio::test]
+#[ignore = "requires internet access — see module docs"]
+async fn live_forge_install_does_not_throw_noclassdef() {
+    let td = TempDir::new().expect("tempdir");
+    let paths = make_paths(&td);
+    let slug = "forge-noclassdef-canary";
+    let mc = "1.20.1";
+
+    // 1) Write vanilla InstanceManifest
+    let m = InstanceManifest::new(slug.into(), slug.into(), mc.into());
+    mineltui::instance::store::write_instance_manifest(&paths, &m)
+        .await
+        .expect("write manifest");
+
+    // 2) Pre-fetch vanilla MC
+    let mojang = MojangClient::new().expect("MojangClient::new");
+    let manifest = mojang
+        .fetch_manifest(&paths.cache_dir.join("manifest_v2.json"))
+        .await
+        .expect("fetch_manifest");
+    let version_entry = manifest
+        .versions
+        .iter()
+        .find(|v| v.id == mc)
+        .expect("MC 1.20.1 in manifest")
+        .clone();
+    let (vt_tx, _vt_rx) = mpsc::channel::<TaskEvent>(256);
+    install_version(
+        JobId(99),
+        &paths,
+        &mojang,
+        vt_tx,
+        CancellationToken::new(),
+        slug,
+        &version_entry,
+    )
+    .await
+    .expect("install_version vanilla");
+
+    // 3) JRE
+    let java_svc = JavaService::new().expect("JavaService::new");
+    let _ = java_svc
+        .install_mojang(&paths, "java-runtime-gamma")
+        .await
+        .expect("install_mojang java-runtime-gamma");
+    let jre_path = java_svc
+        .resolve_jre_for_mc_version_install(&paths, mc)
+        .await
+        .expect("resolve JRE");
+
+    // 4) Pick latest stable Forge
+    let svc = Arc::new(LoaderService::new().expect("LoaderService::new"));
+    let versions = svc
+        .list_loader_versions(LoaderType::Forge, mc)
+        .await
+        .expect("list_loader_versions Forge");
+    assert!(!versions.is_empty(), "Forge must publish loaders for {mc}");
+    let loader_version = versions
+        .iter()
+        .find(|v| v.stable)
+        .map(|v| v.version.clone())
+        .unwrap_or_else(|| versions[0].version.clone());
+
+    // 5) Run install. Pre-7.1-02 raises SubprocessExit { code: 1 } here
+    //    because Main throws NoClassDefFoundError; post-7.1-02 succeeds
+    //    because Installer is the correct install-time class.
+    let progress = make_progress_drain("forge_canary");
+    let r = svc
+        .install_loader(
+            &paths,
+            slug,
+            mc,
+            LoaderType::Forge,
+            &loader_version,
+            &jre_path,
+            progress,
+            CancellationToken::new(),
+            JobId(0),
+        )
+        .await;
+
+    match &r {
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("NoClassDefFoundError")
+                || msg.contains("modlauncher")
+                || msg.contains("forgewrapper.installer.Main")
+            {
+                panic!(
+                    "GAP-7-A regression detected — install subprocess threw \
+                     NoClassDefFoundError. Did FORGE_WRAPPER_INSTALLER_CLASS \
+                     get reverted to FORGE_WRAPPER_MAIN_CLASS in service.rs? \
+                     Full error: {msg}"
+                );
+            }
+            panic!("install_loader failed for non-GAP-7-A reason: {msg}");
+        }
+        Ok(()) => {
+            println!("[forge_canary] install_loader succeeded — GAP-7-A closed");
+        }
+    }
+
+    let m = mineltui::instance::store::read_instance_manifest(&paths, slug)
+        .await
+        .expect("read manifest");
+    let loader = m.loader.expect("manifest.loader must be Some after install");
+    assert_eq!(loader.kind, ModloaderKind::Forge);
+    assert!(
+        !loader.version_id.is_empty(),
+        "loader.version_id must be non-empty (GAP-7-A canary): {loader:?}"
+    );
+}
