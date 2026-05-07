@@ -246,4 +246,75 @@ mod tests {
             "expected VersionNotInstalled; got {result:?}"
         );
     }
+
+    /// GAP-8-E regression: a manifest carrying `loader=Some(_)` MUST cause the
+    /// launcher to look up the loader's version_id (e.g.
+    /// `fabric-loader-0.16.9-1.20.4`) — NOT `manifest.mc_version_id` (vanilla).
+    ///
+    /// Setup: vanilla `1.20.4/1.20.4.jar` is pre-created on disk so the buggy
+    /// code (which reads `manifest.mc_version_id`) would advance past the
+    /// jar-presence check and ultimately fail later at the version JSON read,
+    /// producing `VersionNotInstalled { slug: "1.20.4" }`. The fixed code reads
+    /// the loader's version_id, finds no jar at the loader path, and returns
+    /// `VersionNotInstalled { slug: "modded" }` (the instance slug — set at
+    /// the version_jar check site, which uses `slug.to_string()`).
+    ///
+    /// Asserting on the slug field is what gives this test teeth: a wildcard
+    /// `VersionNotInstalled { .. }` match would pass under BOTH the bug and
+    /// the fix and would not be a real regression test.
+    #[tokio::test]
+    async fn test_launch_reads_loader_version_id_when_loader_some() {
+        use crate::domain::instance::ModloaderKind;
+        use crate::loader::types::LoaderInfo;
+
+        let td = TempDir::new().unwrap();
+        let paths = paths_in(&td);
+
+        // Pre-create the vanilla 1.20.4 client.jar so the buggy code path would
+        // NOT bail at the jar-presence check.
+        let vanilla_jar = paths.version_jar("1.20.4");
+        tokio::fs::create_dir_all(vanilla_jar.parent().unwrap()).await.unwrap();
+        tokio::fs::write(&vanilla_jar, b"fake client.jar").await.unwrap();
+
+        // Manifest declares a Fabric loader. The loader's version_id JAR does
+        // NOT exist on disk — this is the lever that distinguishes bug from fix.
+        let mut m = InstanceManifest::new("modded".into(), "modded".into(), "1.20.4".into());
+        m.loader = Some(LoaderInfo {
+            kind: ModloaderKind::Fabric,
+            version: "0.16.9".into(),
+            version_id: "fabric-loader-0.16.9-1.20.4".into(),
+        });
+        write_instance_manifest(&paths, &m).await.unwrap();
+
+        let (tx, _rx) = mpsc::channel::<TaskEvent>(16);
+        let token = CancellationToken::new();
+        let auth_ctx = crate::auth::AuthContext::Offline { username: "TestUser".to_string() };
+        let java_service = JavaService::new().expect("JavaService::new");
+
+        let result = launch_instance(
+            &paths, "modded", auth_ctx, None, &java_service, tx, token, JobId(2),
+        ).await;
+
+        // The fix: the version_jar check uses `paths.version_jar(loader.version_id)`,
+        // which doesn't exist, so the launcher returns
+        // `VersionNotInstalled { slug: <instance slug> }` (== "modded").
+        //
+        // The bug would advance past the jar check (vanilla jar exists), then
+        // fail at the version JSON read with slug == "1.20.4". So asserting
+        // slug == "modded" is what makes this a real regression guard.
+        match result {
+            Err(AppError::VersionNotInstalled { slug }) => {
+                assert_eq!(
+                    slug, "modded",
+                    "expected VersionNotInstalled at the loader-aware version_jar \
+                     check (slug=instance), but got slug={slug:?} — this likely \
+                     means the launcher fell through to the vanilla version JSON \
+                     read (the GAP-8-E bug)",
+                );
+            }
+            other => panic!(
+                "expected Err(VersionNotInstalled {{ slug: \"modded\" }}); got {other:?}",
+            ),
+        }
+    }
 }
