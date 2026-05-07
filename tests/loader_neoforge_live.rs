@@ -257,3 +257,184 @@ async fn live_neoforge_meta_lists_versions() {
         println!("[neoforge_meta_live]   {} (stable={})", v.version, v.stable);
     }
 }
+
+/// GAP-7-C end-to-end pin — asserts NeoForge install for MC 1.21.4
+/// reaches 100% progress (NOT just `Ok(())`). The round-1 GAP-7-C
+/// trigger panicked at 85% with `InvalidMavenCoord { coord: "net.neoforged:mergetool:2.0.0:api" }`;
+/// post-07.2-02 the install reaches 100% and writes the manifest.
+///
+/// This test is ADDITIVE to `live_neoforge_install_1_21_4` (which
+/// asserts Ok-result + manifest + libraries dir + log file). The
+/// progress-100 assertion catches a class of regressions where
+/// `install_loader` returns `Ok(())` but a future refactor adds an
+/// early-return short-circuit that bypasses `send_progress!(100, ...)`.
+/// This is defense-in-depth.
+///
+/// Capture command if upstream NeoForge JSON shape drifts (rare):
+///     curl -s 'https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge'
+/// Re-capture `tests/fixtures/neoforge_meta_versions.json` per 07.1-01.
+#[tokio::test]
+#[ignore = "requires internet access — see module docs"]
+async fn live_neoforge_install_1_21_4_reaches_100_percent() {
+    let td = TempDir::new().expect("tempdir");
+    let paths = make_paths(&td);
+    let slug = "neoforge-100-percent-canary";
+    let mc = "1.21.4";
+
+    // 1) Vanilla manifest
+    let m = InstanceManifest::new(slug.into(), slug.into(), mc.into());
+    mineltui::instance::store::write_instance_manifest(&paths, &m)
+        .await
+        .expect("write manifest");
+
+    // 2) Pre-fetch vanilla MC
+    let mojang = MojangClient::new().expect("MojangClient::new");
+    let manifest = mojang
+        .fetch_manifest(&paths.cache_dir.join("manifest_v2.json"))
+        .await
+        .expect("fetch_manifest");
+    let version_entry = manifest
+        .versions
+        .iter()
+        .find(|v| v.id == mc)
+        .expect("MC 1.21.4 in manifest")
+        .clone();
+    let (vt_tx, _vt_rx) = mpsc::channel::<TaskEvent>(256);
+    install_version(
+        JobId(99),
+        &paths,
+        &mojang,
+        vt_tx,
+        CancellationToken::new(),
+        slug,
+        &version_entry,
+    )
+    .await
+    .expect("install_version vanilla");
+
+    // 3) JRE — NeoForge 1.21.x needs Java 21 (java-runtime-delta)
+    let java_svc = JavaService::new().expect("JavaService::new");
+    let _ = java_svc
+        .install_mojang(&paths, "java-runtime-delta")
+        .await
+        .expect("install_mojang java-runtime-delta");
+    let jre_path = java_svc
+        .resolve_jre_for_mc_version_install(&paths, mc)
+        .await
+        .expect("resolve JRE");
+
+    // 4) Pick a stable NeoForge for MC 1.21.4
+    let svc = Arc::new(LoaderService::new().expect("LoaderService::new"));
+    let versions = svc
+        .list_loader_versions(LoaderType::NeoForge, mc)
+        .await
+        .expect("list_loader_versions NeoForge");
+    assert!(
+        !versions.is_empty(),
+        "NeoForge must publish loaders for MC {mc}"
+    );
+    let loader_version = versions
+        .iter()
+        .find(|v| v.stable)
+        .map(|v| v.version.clone())
+        .unwrap_or_else(|| versions[0].version.clone());
+
+    // 5) Custom progress collector — captures every Progress event so we
+    //    can assert on the 100% milestone after install_loader returns.
+    let (tx, mut rx) = mpsc::channel::<TaskEvent>(256);
+    let collected = std::sync::Arc::new(std::sync::Mutex::new(Vec::<u8>::new()));
+    let collected_clone = std::sync::Arc::clone(&collected);
+    let drain_handle = tokio::spawn(async move {
+        while let Some(evt) = rx.recv().await {
+            if let TaskEvent::Progress { pct, .. } = evt {
+                collected_clone.lock().expect("lock progress").push(pct);
+            }
+        }
+    });
+
+    // 6) Run install. Pre-07.2-02 panics inside harvest with
+    //    InvalidMavenCoord { coord: "net.neoforged:mergetool:2.0.0:api" };
+    //    post-07.2-02 reaches 100%.
+    let r = svc
+        .install_loader(
+            &paths,
+            slug,
+            mc,
+            LoaderType::NeoForge,
+            &loader_version,
+            &jre_path,
+            tx,
+            CancellationToken::new(),
+            JobId(0),
+        )
+        .await;
+
+    match &r {
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("InvalidMavenCoord") && msg.contains(":api") {
+                panic!(
+                    "GAP-7-C regression detected — harvest rejected a 4-segment \
+                     classifier-bearing Maven coord. Did src/loader/maven.rs revert \
+                     to splitn(3, ':')? Or is_safe_maven_segment failing on the \
+                     classifier? Full error: {msg}"
+                );
+            }
+            panic!("install_loader failed for non-GAP-7-C reason: {msg}");
+        }
+        Ok(()) => {
+            println!("[neoforge_100pct] install_loader succeeded");
+        }
+    }
+
+    // 7) Assert 100% reached. Drop the sender side (already done by
+    //    moving `tx` into `install_loader`); wait for the drain task
+    //    to terminate, then read the collected pct vector.
+    drain_handle
+        .await
+        .expect("progress drain task panicked");
+    let pcts = collected.lock().expect("lock progress").clone();
+    assert!(
+        pcts.contains(&100u8),
+        "GAP-7-C end-to-end pin: install_loader returned Ok(()) but progress \
+         never reached 100. Collected pcts: {pcts:?}. A future early-return \
+         short-circuit may be bypassing send_progress!(100, ...)."
+    );
+    // Also assert the non-trivial milestones to catch a regression where
+    // 100 is sent without 30/85 (i.e., the install was somehow skipped).
+    assert!(
+        pcts.iter().any(|&p| p >= 30),
+        "progress never reached 30 (Running installer): {pcts:?}"
+    );
+    assert!(
+        pcts.iter().any(|&p| p >= 85),
+        "progress never reached 85 (Harvesting libraries): {pcts:?}"
+    );
+
+    // 8) Assert manifest write
+    let m = mineltui::instance::store::read_instance_manifest(&paths, slug)
+        .await
+        .expect("read manifest");
+    let loader = m.loader.expect("manifest.loader must be Some after install");
+    assert_eq!(loader.kind, ModloaderKind::NeoForge);
+    assert!(
+        loader.version_id.starts_with("neoforge-"),
+        "version_id must be neoforge-prefixed: {loader:?}"
+    );
+
+    // 9) Assert NeoForge libraries landed in shared libraries tree
+    let neoforge_libs_dir = paths
+        .libraries_dir()
+        .join("net")
+        .join("neoforged");
+    assert!(
+        neoforge_libs_dir.is_dir(),
+        "NeoForge libraries dir missing — harvest did not copy libraries: {}",
+        neoforge_libs_dir.display()
+    );
+
+    println!(
+        "[neoforge_100pct] SUCCESS — installed NeoForge {} (id={}); reached 100%",
+        loader_version, loader.version_id
+    );
+}
