@@ -80,7 +80,9 @@ pub fn render_cf_file_picker_modal(f: &mut Frame, area: Rect, state: &AppState) 
             .borders(Borders::ALL)
             .title(format!("{} — files", mod_detail.name)),
     );
-    f.render_widget(list, chunks[0]);
+    let mut list_state = ratatui::widgets::ListState::default();
+    list_state.select(Some(*selected));
+    f.render_stateful_widget(list, chunks[0], &mut list_state);
 
     // ---- Footer hint (DIM) ----
     let hint = Paragraph::new("↑/k ↓/j  Enter install  Esc cancel")

@@ -135,7 +135,9 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
 
     let list_block = Block::default().borders(Borders::ALL).title("Versions (Enter / Esc)");
     let list = List::new(items).block(list_block);
-    f.render_widget(list, chunks[2]);
+    let mut list_state = ratatui::widgets::ListState::default();
+    list_state.select(Some(*selected));
+    f.render_stateful_widget(list, chunks[2], &mut list_state);
 }
 
 pub fn map_loader_version_picker_event(

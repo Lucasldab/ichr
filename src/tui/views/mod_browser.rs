@@ -211,7 +211,9 @@ fn render_results_pane(
         .collect();
 
     let list = List::new(items);
-    f.render_widget(list, inner);
+    let mut list_state = ratatui::widgets::ListState::default();
+    list_state.select(Some(selected));
+    f.render_stateful_widget(list, inner, &mut list_state);
 }
 
 fn render_detail_pane(

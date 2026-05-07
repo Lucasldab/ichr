@@ -65,7 +65,9 @@ pub fn render_java_picker_modal(f: &mut Frame, area: Rect, state: &AppState) {
         .collect();
 
     let list = List::new(items);
-    f.render_widget(list, chunks[0]);
+    let mut list_state = ratatui::widgets::ListState::default();
+    list_state.select(Some(selected));
+    f.render_stateful_widget(list, chunks[0], &mut list_state);
 
     let hint = Paragraph::new("↑/k up  ↓/j down  Enter select  Esc cancel")
         .style(Style::default().add_modifier(Modifier::DIM));

@@ -75,7 +75,9 @@ pub fn render_mod_version_picker_modal(f: &mut Frame, area: Rect, state: &AppSta
             .borders(Borders::ALL)
             .title(format!("{project_title} — versions")),
     );
-    f.render_widget(list, chunks[0]);
+    let mut list_state = ratatui::widgets::ListState::default();
+    list_state.select(Some(*selected));
+    f.render_stateful_widget(list, chunks[0], &mut list_state);
 
     // ---- Footer hint (DIM) ----
     let hint = Paragraph::new("↑/k ↓/j  Enter resolve deps  Esc cancel")

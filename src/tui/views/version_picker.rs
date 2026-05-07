@@ -93,7 +93,13 @@ pub fn render_version_picker(f: &mut Frame, area: Rect, state: &AppState) {
         .collect();
 
     let list = List::new(items).block(error_block);
-    f.render_widget(list, chunks[2]);
+    // Note: CreateStep::VersionPicker currently has no `selected` cursor field —
+    // the row highlight is hard-coded to row 0 above. Render stateful for the
+    // ratatui auto-scroll API (uniform with the other 7 list views) and anchor
+    // at index 0; behaviour is unchanged until a future plan adds a cursor.
+    let mut list_state = ratatui::widgets::ListState::default();
+    list_state.select(Some(0));
+    f.render_stateful_widget(list, chunks[2], &mut list_state);
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
