@@ -327,6 +327,11 @@ pub enum Action {
 
     // Create flow
     TypeName(char),
+    /// Pasted text into the CreateModal name-input field — applies on
+    /// terminals that emit `Event::Paste(String)` (bracketed-paste mode,
+    /// enabled at terminal init in 08.1-04). Buffer-mutation only; no
+    /// downstream effect (mirrors `TypeName` behaviour).
+    PasteName(String),
     BackspaceName,
     SubmitInstanceName(String),
     SetVersionFilter(VersionFilter),
@@ -474,6 +479,11 @@ pub enum Action {
     /// Printable char into ModBrowser search input. j/k disambiguation lives in the
     /// keymap (08-08): when search is empty, j/k navigate; otherwise they type.
     ModBrowserTypeSearch(char),
+    /// Pasted text into ModBrowser search input — applies on terminals that
+    /// emit `Event::Paste(String)` (bracketed-paste mode, enabled at terminal
+    /// init in 08.1-04). Mirror of `ModBrowserTypeSearch(char)` but appends
+    /// the full pasted string and re-emits the search effect once.
+    ModBrowserPasteSearch(String),
     /// Async result: project detail (right-pane preview) loaded.
     ModDetailLoaded { slug: String, detail: ModrinthProjectDetail },
 
@@ -589,6 +599,11 @@ pub enum Action {
     },
     /// Printable char into CfBrowser search input.
     CfBrowserTypeSearch(char),
+    /// Pasted text into CfBrowser search input — applies on terminals that
+    /// emit `Event::Paste(String)` (bracketed-paste mode, enabled at terminal
+    /// init in 08.1-04). Mirror of `CfBrowserTypeSearch(char)` but appends
+    /// the full pasted string and re-emits the search effect once.
+    CfBrowserPasteSearch(String),
     /// Backspace in CfBrowser search input — pops last char, re-emits search.
     CfBrowserBackspaceSearch,
     /// Async result: file list loaded — transitions to `CfFilePickerModal`.
@@ -877,6 +892,18 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 &mut state.active_view
             {
                 current.push(c);
+                *error = None;
+            }
+            vec![]
+        }
+        Action::PasteName(s) => {
+            // Bracketed-paste payload: append full pasted string in one
+            // dispatch (08.1-04 / GAP-8-C). Mirrors TypeName: pure buffer
+            // mutation, no effect emitted.
+            if let ActiveView::CreateModal(CreateStep::NameInput { current, error }) =
+                &mut state.active_view
+            {
+                current.push_str(&s);
                 *error = None;
             }
             vec![]
@@ -1906,6 +1933,43 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![Effect::SearchModrinth { slug, query, mc, loader }]
         }
 
+        Action::ModBrowserPasteSearch(s) => {
+            // Bracketed-paste payload: append the full pasted string in one
+            // dispatch (08.1-04 / GAP-8-C). Mirrors ModBrowserTypeSearch
+            // including the search re-fire.
+            let captured = match &mut state.active_view {
+                ActiveView::ModBrowser {
+                    slug,
+                    search,
+                    mc_filter_override,
+                    loader_filter_override,
+                    ..
+                } => {
+                    search.push_str(&s);
+                    Some((
+                        slug.clone(),
+                        search.clone(),
+                        mc_filter_override.clone(),
+                        loader_filter_override.clone(),
+                    ))
+                }
+                _ => None,
+            };
+            let Some((slug, query, mc_override, loader_override)) = captured else {
+                return vec![];
+            };
+            let inst = state.instances.iter().find(|m| m.slug == slug);
+            let mc = match mc_override.as_deref() {
+                Some("any") => None,
+                _ => inst.map(|m| m.mc_version_id.clone()),
+            };
+            let loader = match loader_override.as_deref() {
+                Some("any") => None,
+                _ => inst.and_then(|m| m.loader.clone()),
+            };
+            vec![Effect::SearchModrinth { slug, query, mc, loader }]
+        }
+
         Action::ModDetailLoaded { slug, detail } => {
             if let ActiveView::ModBrowser { slug: cur_slug, selected_detail, .. } =
                 &mut state.active_view
@@ -2638,6 +2702,36 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     slug, search_input, mc_filter, loader_filter, ..
                 } => {
                     search_input.push(c);
+                    Some((slug.clone(), search_input.clone(), mc_filter.clone(), *loader_filter))
+                }
+                _ => None,
+            };
+            let Some((slug, query, mc_override, loader_override)) = captured else {
+                return vec![];
+            };
+            let inst = state.instances.iter().find(|m| m.slug == slug);
+            let mc = match mc_override.as_deref() {
+                Some("any") => None,
+                _ => inst.map(|m| m.mc_version_id.clone()),
+            };
+            let loader = match loader_override {
+                None => inst.and_then(|m| {
+                    crate::mods::curseforge::filter::curseforge_loader_type(m.loader.as_ref())
+                }),
+                Some(v) => Some(v),
+            };
+            vec![Effect::SearchCurseForge { slug, query, mc, loader }]
+        }
+
+        Action::CfBrowserPasteSearch(s) => {
+            // Bracketed-paste payload: append the full pasted string in one
+            // dispatch (08.1-04 / GAP-8-C). Mirrors CfBrowserTypeSearch
+            // including the search re-fire.
+            let captured = match &mut state.active_view {
+                ActiveView::CfBrowser {
+                    slug, search_input, mc_filter, loader_filter, ..
+                } => {
+                    search_input.push_str(&s);
                     Some((slug.clone(), search_input.clone(), mc_filter.clone(), *loader_filter))
                 }
                 _ => None,
