@@ -209,3 +209,51 @@ async fn live_neoforge_install_1_21_4() {
         loader_version, loader.version_id
     );
 }
+
+/// GAP-7-B canary — exercises the LIVE JSON endpoint (no env override).
+///
+/// Capture command (re-run if upstream shape drifts):
+///     curl -s 'https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge'
+///
+/// This test asserts SHAPE invariants only — never specific version counts
+/// (NeoForge ships new builds weekly). If this test fails:
+///   1. Re-run the capture command above and inspect the response shape.
+///   2. If `isSnapshot` is missing or renamed, update
+///      `src/loader/neoforge_meta.rs::list_loader_versions::VersionsResponse`.
+///   3. Re-capture `tests/fixtures/neoforge_meta_versions.json` (Phase 7.1-01
+///      docs the exact `python3 -c` trim command).
+#[tokio::test]
+#[ignore = "requires internet access — see module docs"]
+async fn live_neoforge_meta_lists_versions() {
+    use mineltui::loader::neoforge_meta::NeoForgeMetaClient;
+
+    let client = NeoForgeMetaClient::new()
+        .expect("NeoForgeMetaClient::new (no env override; production endpoints)");
+
+    // The 1.21.4 prefix is a current MC version — production must list ≥1.
+    let versions = client
+        .list_loader_versions("1.21.4")
+        .await
+        .expect("live JSON endpoint must respond 200 with parseable body");
+
+    assert!(
+        !versions.is_empty(),
+        "live endpoint returned 0 versions for MC 1.21.4 — endpoint shape may have drifted; \
+         re-capture tests/fixtures/neoforge_meta_versions.json and re-verify the parser"
+    );
+    assert!(
+        versions.iter().all(|v| v.version.starts_with("21.4.")),
+        "filter post-condition broken: {:?}",
+        versions.iter().map(|v| &v.version).collect::<Vec<_>>()
+    );
+    assert!(
+        versions.iter().all(|v| !v.version.is_empty()),
+        "no empty-string versions: {:?}",
+        versions.iter().map(|v| &v.version).collect::<Vec<_>>()
+    );
+
+    println!("[neoforge_meta_live] {} versions for MC 1.21.4", versions.len());
+    for v in versions.iter().take(5) {
+        println!("[neoforge_meta_live]   {} (stable={})", v.version, v.stable);
+    }
+}
