@@ -178,8 +178,15 @@ pub struct LibraryDownloads {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LibraryArtifact {
     pub path: String,
-    pub sha1: String,
-    pub size: u64,
+    /// Optional SHA-1 hex. Mojang vanilla JSONs always populate this; Quilt
+    /// loader libraries do not (Quilt-meta API has no per-library hashes).
+    /// When None, version_installer.rs::download_libraries skips verify_sha1
+    /// and logs the trade-off via tracing::info!.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha1: Option<String>,
+    /// Optional byte size. Same Mojang/Quilt asymmetry as `sha1`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
     pub url: String,
 }
 

@@ -190,27 +190,52 @@ async fn download_libraries(
         // Main artifact (if present).
         if let Some(art) = lib.downloads.artifact.as_ref() {
             let url = art.url.clone();
-            let sha1 = art.sha1.clone();
             let dest = paths.library_path(&art.path);
             let client = mojang.clone();
             let sem = Arc::clone(&sem);
+            let coord = lib.name.clone();
+            let sha1_opt = art.sha1.clone();
             futs.push(tokio::spawn(async move {
                 let _permit = sem.acquire_owned().await.map_err(|_| AppError::Cancelled)?;
-                client.download_verified(&url, &dest, &sha1).await
+                match sha1_opt.as_deref() {
+                    Some(sha1) => client.download_verified(&url, &dest, sha1).await,
+                    None => {
+                        // Phase 8.4 GAP-LIBRARY-SHAPE-08: Quilt loader libraries
+                        // have no upstream sha1 (Quilt-meta API limitation). We
+                        // download without checksum verification and log the
+                        // trade-off; this is a deliberate compromise documented
+                        // in 8.4-01-PLAN.md.
+                        tracing::info!(
+                            coord = %coord,
+                            "library downloaded without sha1 verification (Quilt loader API has no checksums)"
+                        );
+                        client.download_unverified(&url, &dest).await
+                    }
+                }
             }));
         }
         // Classifier artifact for legacy natives.
         if needs_native_extraction(lib) {
             if let Some(cl) = native_classifier_artifact(lib, os) {
                 let url = cl.url.clone();
-                let sha1 = cl.sha1.clone();
                 let dest = paths.library_path(&cl.path);
                 let client = mojang.clone();
                 let sem = Arc::clone(&sem);
+                let coord = lib.name.clone();
+                let sha1_opt = cl.sha1.clone();
                 futs.push(tokio::spawn(async move {
                     let _permit =
                         sem.acquire_owned().await.map_err(|_| AppError::Cancelled)?;
-                    client.download_verified(&url, &dest, &sha1).await
+                    match sha1_opt.as_deref() {
+                        Some(sha1) => client.download_verified(&url, &dest, sha1).await,
+                        None => {
+                            tracing::info!(
+                                coord = %coord,
+                                "classifier downloaded without sha1 verification (Phase 8.4 Quilt-loader path)"
+                            );
+                            client.download_unverified(&url, &dest).await
+                        }
+                    }
                 }));
             }
         }

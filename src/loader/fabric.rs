@@ -1,4 +1,4 @@
-//! Fabric meta API HTTP client.
+//! Fabric meta API HTTP client. (8.4-marker)
 //!
 //! Endpoints (verified 2026-04-26 — see 06-RESEARCH.md §API Reference):
 //!   GET /v2/versions/loader
@@ -174,6 +174,114 @@ impl FabricMetaClient {
 }
 
 // -----------------------------------------------------------------------
+// to_mojang_shape — translate fabric-meta wire shape to Mojang on-disk shape.
+//
+// Phase 8.4 (round-4 BLOCKER closure GAP-LIBRARY-SHAPE-08): the launcher's
+// Library struct deserialises ONLY the Mojang shape (downloads.artifact.{path,
+// url, sha1?, size?}). Phase 6 used to write the verbatim fabric-meta wire
+// shape (top-level url/sha1/size per library, no `downloads` block) into
+// versions/{loader-id}/{loader-id}.json — silently dropping every library's
+// hash + url on the launcher's deserialise step, leaving downloads.artifact
+// == None, leaving the loader's own JAR off the classpath, leaving JVM unable
+// to find KnotClient. This translator runs at the atomic_write boundary so
+// the on-disk JSON is Mojang shape; the launcher reads ONE shape.
+//
+// FORBIDS (round-4 plan):
+//   1. NEVER drop a library entry. count_in_translated == count_in_source.
+//   2. NEVER add Optional flat fields to Library. Translation is the path.
+// -----------------------------------------------------------------------
+
+pub fn to_mojang_shape(raw_bytes: &[u8]) -> Result<Vec<u8>, LoaderError> {
+    use serde_json::{Map, Value};
+
+    let mut root: Value = serde_json::from_slice(raw_bytes).map_err(|e| {
+        LoaderError::MetaParse {
+            loader: "fabric",
+            reason: format!("translate: parse profile json: {e}"),
+        }
+    })?;
+    let obj = root.as_object_mut().ok_or_else(|| LoaderError::MetaParse {
+        loader: "fabric",
+        reason: "translate: top-level not an object".into(),
+    })?;
+
+    let Some(libs_value) = obj.get_mut("libraries") else {
+        // No libraries field — pass through unchanged (Mojang accepts this).
+        return serde_json::to_vec(&root).map_err(|e| LoaderError::MetaParse {
+            loader: "fabric",
+            reason: format!("translate: serialize: {e}"),
+        });
+    };
+    let libs = libs_value.as_array_mut().ok_or_else(|| LoaderError::MetaParse {
+        loader: "fabric",
+        reason: "translate: libraries is not an array".into(),
+    })?;
+
+    for (idx, entry) in libs.iter_mut().enumerate() {
+        let entry_obj = entry.as_object_mut().ok_or_else(|| LoaderError::MetaParse {
+            loader: "fabric",
+            reason: format!("translate: libraries[{idx}] is not an object"),
+        })?;
+        let name = entry_obj
+            .get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| LoaderError::MetaParse {
+                loader: "fabric",
+                reason: format!("translate: libraries[{idx}] missing `name`"),
+            })?
+            .to_string();
+
+        let path = crate::loader::maven::maven_coord_to_path(&name)?;
+        let entry_url = entry_obj
+            .get("url")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let repo = entry_url
+            .clone()
+            .unwrap_or_else(|| fabric_default_repo(&name).to_string());
+        let url = crate::loader::maven::maven_download_url(&repo, &name)?;
+
+        let sha1 = entry_obj.get("sha1").and_then(|v| v.as_str()).map(String::from);
+        let size = entry_obj.get("size").and_then(|v| v.as_u64());
+
+        let mut artifact = Map::new();
+        artifact.insert("path".into(), Value::String(path));
+        artifact.insert("url".into(), Value::String(url));
+        if let Some(s) = sha1 {
+            artifact.insert("sha1".into(), Value::String(s));
+        }
+        if let Some(sz) = size {
+            artifact.insert("size".into(), Value::Number(sz.into()));
+        }
+        let mut downloads = Map::new();
+        downloads.insert("artifact".into(), Value::Object(artifact));
+
+        // Replace the entry: keep `name`, replace everything else with `downloads`.
+        let mut new_entry = Map::new();
+        new_entry.insert("name".into(), Value::String(name));
+        new_entry.insert("downloads".into(), Value::Object(downloads));
+        *entry = Value::Object(new_entry);
+    }
+
+    serde_json::to_vec(&root).map_err(|e| LoaderError::MetaParse {
+        loader: "fabric",
+        reason: format!("translate: serialize: {e}"),
+    })
+}
+
+/// Repository fallback for Fabric library entries that omit `url`.
+/// Quilt-coordinate libraries appear in some Fabric profiles when a future
+/// Fabric release imports a Quilt artifact (rare but observed); fall back to
+/// Quilt's repo in that case to keep the URL valid.
+fn fabric_default_repo(name: &str) -> &'static str {
+    if name.starts_with("org.quiltmc:") {
+        "https://maven.quiltmc.org/"
+    } else {
+        "https://maven.fabricmc.net/"
+    }
+}
+
+// -----------------------------------------------------------------------
 // Tests — httpmock-driven, no env-var mutation
 // -----------------------------------------------------------------------
 
@@ -326,5 +434,88 @@ mod tests {
 
         result.expect("list_loader_versions via env should succeed");
         api_mock.assert_calls(1);
+    }
+
+    // ---- to_mojang_shape ----
+
+    /// Real fabric-meta JSON sample BYTE-EQUIVALENT to a fragment of
+    /// ~/.local/share/mineltui/versions/fabric-loader-0.19.2-1.20.4/
+    ///   fabric-loader-0.19.2-1.20.4.json (round-4 plan FORBID #4: production
+    /// shape only; do not synthesise; do not fatten).
+    const REAL_FABRIC_META_BYTES: &[u8] = br#"{"id":"fabric-loader-0.19.2-1.20.4","inheritsFrom":"1.20.4","releaseTime":"2026-05-07T02:57:33+0000","time":"2026-05-07T02:57:33+0000","type":"release","mainClass":"net.fabricmc.loader.impl.launch.knot.KnotClient","arguments":{"game":[],"jvm":["-DFabricMcEmu= net.minecraft.client.main.Main "]},"libraries":[{"name":"org.ow2.asm:asm:9.9","url":"https://maven.fabricmc.net/","md5":"6d1dd0482c03a6dc1807d9d004456021","sha1":"c29635c8a7afa03d74b33c1884df8abb2b3f3dcc","sha256":"03d99a74ad1ee5c71334ef67437f4ef4fe3488caa7c96d8645abc73c8e2017d4","sha512":"197a4fb3ecb34d05ac555c6a510e69affcb1e476f24c5e935ad513ecdabf74b45aa1b0e0b25dbe91224fc6db7959b2677ea5876ee49e7487265e2a29c560c21c","size":126122},{"name":"net.fabricmc:sponge-mixin:0.17.2+mixin.0.8.7","url":"https://maven.fabricmc.net/","md5":"4b6b96074976cc7aa096b9e569ca623e","sha1":"edf98d1d98229e46e36c61774ae2b54dcd852981","sha256":"95cef6aebd9da1559cf9c4624eafae2ce1242d0167e3587d5d62c488e45b6999","sha512":"89044dca9a63bd5f2ceec09bfcb5807f1b294026665294bae7a9a980da89bd86c6d441eb38c92c89ca0efe86884c0730dab348d27633ef1e3970ed9eb5c30a4e","size":1540039},{"name":"net.fabricmc:intermediary:1.20.4","url":"https://maven.fabricmc.net/"},{"name":"net.fabricmc:fabric-loader:0.19.2","url":"https://maven.fabricmc.net/"}]}"#;
+
+    #[test]
+    fn test_to_mojang_shape_translates_real_fabric_sample_into_mojang_library() {
+        let translated = to_mojang_shape(REAL_FABRIC_META_BYTES).expect("translate ok");
+
+        // Library count invariant (round-4 FORBID #1):
+        // count_in_translated == count_in_source.
+        let source_v: serde_json::Value = serde_json::from_slice(REAL_FABRIC_META_BYTES).unwrap();
+        let translated_v: serde_json::Value = serde_json::from_slice(&translated).unwrap();
+        let source_n = source_v["libraries"].as_array().unwrap().len();
+        let translated_n = translated_v["libraries"].as_array().unwrap().len();
+        assert_eq!(source_n, translated_n, "library count must be preserved");
+        assert_eq!(source_n, 4);
+
+        // The translated JSON must deserialise into the launcher's
+        // Mojang VersionJson with downloads.artifact populated for every entry.
+        use crate::mojang::types::VersionJson;
+        let v: VersionJson = serde_json::from_slice(&translated)
+            .expect("translated bytes parse as Mojang VersionJson");
+        assert_eq!(v.id, "fabric-loader-0.19.2-1.20.4");
+        assert_eq!(v.inherits_from.as_deref(), Some("1.20.4"));
+        for lib in &v.libraries {
+            let art = lib.downloads.artifact.as_ref().unwrap_or_else(|| {
+                panic!("library {} must have downloads.artifact after translation", lib.name)
+            });
+            // Path matches the Maven-coord transform.
+            let expected_path = crate::loader::maven::maven_coord_to_path(&lib.name).unwrap();
+            assert_eq!(art.path, expected_path, "path for {}", lib.name);
+            // URL ends with the path (a regular Maven repo URL).
+            assert!(art.url.ends_with(&art.path),
+                "url {} should end with {}", art.url, art.path);
+        }
+    }
+
+    #[test]
+    fn test_to_mojang_shape_preserves_sha1_and_size_when_present() {
+        let translated = to_mojang_shape(REAL_FABRIC_META_BYTES).expect("translate ok");
+        use crate::mojang::types::VersionJson;
+        let v: VersionJson = serde_json::from_slice(&translated).unwrap();
+
+        // org.ow2.asm:asm:9.9 has full hashes in fabric-meta.
+        let asm = v.libraries.iter().find(|l| l.name == "org.ow2.asm:asm:9.9").unwrap();
+        let art = asm.downloads.artifact.as_ref().unwrap();
+        assert_eq!(art.sha1.as_deref(), Some("c29635c8a7afa03d74b33c1884df8abb2b3f3dcc"));
+        assert_eq!(art.size, Some(126122));
+    }
+
+    #[test]
+    fn test_to_mojang_shape_emits_none_sha1_when_source_has_no_sha1() {
+        let translated = to_mojang_shape(REAL_FABRIC_META_BYTES).expect("translate ok");
+        use crate::mojang::types::VersionJson;
+        let v: VersionJson = serde_json::from_slice(&translated).unwrap();
+
+        // intermediary has only name + url (no sha1) in fabric-meta.
+        let inter = v.libraries.iter().find(|l| l.name == "net.fabricmc:intermediary:1.20.4").unwrap();
+        let art = inter.downloads.artifact.as_ref().unwrap();
+        assert!(art.sha1.is_none(), "intermediary has no upstream sha1");
+        assert!(art.size.is_none(), "intermediary has no upstream size");
+        // path + url are still populated.
+        assert_eq!(art.path, "net/fabricmc/intermediary/1.20.4/intermediary-1.20.4.jar");
+        assert!(art.url.starts_with("https://maven.fabricmc.net/"));
+    }
+
+    #[test]
+    fn test_to_mojang_shape_preserves_top_level_fields() {
+        let translated = to_mojang_shape(REAL_FABRIC_META_BYTES).expect("translate ok");
+        let v: serde_json::Value = serde_json::from_slice(&translated).unwrap();
+        // Top-level fields preserved verbatim.
+        assert_eq!(v["id"], "fabric-loader-0.19.2-1.20.4");
+        assert_eq!(v["inheritsFrom"], "1.20.4");
+        assert_eq!(v["mainClass"], "net.fabricmc.loader.impl.launch.knot.KnotClient");
+        assert_eq!(v["type"], "release");
+        // arguments.jvm preserved as-is.
+        assert_eq!(v["arguments"]["jvm"][0], "-DFabricMcEmu= net.minecraft.client.main.Main ");
     }
 }

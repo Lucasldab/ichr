@@ -186,6 +186,107 @@ impl QuiltMetaClient {
 }
 
 // -----------------------------------------------------------------------
+// to_mojang_shape — translate quilt-meta wire shape to Mojang on-disk shape.
+//
+// Phase 8.4 (round-4 BLOCKER closure GAP-LIBRARY-SHAPE-08). Quilt-meta
+// library entries are uniformly {name, url} (no upstream hashes — verified
+// by test_fetch_profile_no_hashes_on_libraries / Pattern 6). The translated
+// entries emit downloads.artifact.sha1 = None and .size = None; the
+// launcher's LibraryArtifact has those fields as Option<_> per 8.4.
+//
+// Identical to fabric::to_mojang_shape modulo the default repo (Quilt
+// libraries default to the Quilt Maven; some pull from Fabric Maven).
+// -----------------------------------------------------------------------
+
+pub fn to_mojang_shape(raw_bytes: &[u8]) -> Result<Vec<u8>, LoaderError> {
+    use serde_json::{Map, Value};
+
+    let mut root: Value = serde_json::from_slice(raw_bytes).map_err(|e| {
+        LoaderError::MetaParse {
+            loader: "quilt",
+            reason: format!("translate: parse profile json: {e}"),
+        }
+    })?;
+    let obj = root.as_object_mut().ok_or_else(|| LoaderError::MetaParse {
+        loader: "quilt",
+        reason: "translate: top-level not an object".into(),
+    })?;
+    let Some(libs_value) = obj.get_mut("libraries") else {
+        return serde_json::to_vec(&root).map_err(|e| LoaderError::MetaParse {
+            loader: "quilt",
+            reason: format!("translate: serialize: {e}"),
+        });
+    };
+    let libs = libs_value.as_array_mut().ok_or_else(|| LoaderError::MetaParse {
+        loader: "quilt",
+        reason: "translate: libraries is not an array".into(),
+    })?;
+
+    for (idx, entry) in libs.iter_mut().enumerate() {
+        let entry_obj = entry.as_object_mut().ok_or_else(|| LoaderError::MetaParse {
+            loader: "quilt",
+            reason: format!("translate: libraries[{idx}] is not an object"),
+        })?;
+        let name = entry_obj
+            .get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| LoaderError::MetaParse {
+                loader: "quilt",
+                reason: format!("translate: libraries[{idx}] missing `name`"),
+            })?
+            .to_string();
+
+        let path = crate::loader::maven::maven_coord_to_path(&name)?;
+        let entry_url = entry_obj
+            .get("url")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let repo = entry_url
+            .clone()
+            .unwrap_or_else(|| quilt_default_repo(&name).to_string());
+        let url = crate::loader::maven::maven_download_url(&repo, &name)?;
+
+        // Quilt-meta does not carry sha1/size — but tolerate them anyway
+        // (forward-compat if Quilt ever adds them).
+        let sha1 = entry_obj.get("sha1").and_then(|v| v.as_str()).map(String::from);
+        let size = entry_obj.get("size").and_then(|v| v.as_u64());
+
+        let mut artifact = Map::new();
+        artifact.insert("path".into(), Value::String(path));
+        artifact.insert("url".into(), Value::String(url));
+        if let Some(s) = sha1 {
+            artifact.insert("sha1".into(), Value::String(s));
+        }
+        if let Some(sz) = size {
+            artifact.insert("size".into(), Value::Number(sz.into()));
+        }
+        let mut downloads = Map::new();
+        downloads.insert("artifact".into(), Value::Object(artifact));
+
+        let mut new_entry = Map::new();
+        new_entry.insert("name".into(), Value::String(name));
+        new_entry.insert("downloads".into(), Value::Object(downloads));
+        *entry = Value::Object(new_entry);
+    }
+
+    serde_json::to_vec(&root).map_err(|e| LoaderError::MetaParse {
+        loader: "quilt",
+        reason: format!("translate: serialize: {e}"),
+    })
+}
+
+/// Repository fallback for Quilt library entries that omit `url`.
+/// Most Quilt profiles do declare per-entry url; fallback covers the
+/// edge case where they don't (defensive).
+fn quilt_default_repo(name: &str) -> &'static str {
+    if name.starts_with("net.fabricmc:") {
+        "https://maven.fabricmc.net/"
+    } else {
+        "https://maven.quiltmc.org/repository/release/"
+    }
+}
+
+// -----------------------------------------------------------------------
 // Tests
 // -----------------------------------------------------------------------
 
@@ -349,5 +450,77 @@ mod tests {
 
         result.expect("env-override list_loader_versions");
         api_mock.assert_calls(1);
+    }
+
+    // ---- to_mojang_shape ----
+
+    /// Real quilt-meta JSON sample BYTE-EQUIVALENT to a fragment of
+    /// ~/.local/share/mineltui/versions/quilt-loader-0.30.0-beta.7-1.20.4/
+    ///   quilt-loader-0.30.0-beta.7-1.20.4.json (round-4 FORBID #4).
+    const REAL_QUILT_META_BYTES: &[u8] = br#"{"id":"quilt-loader-0.30.0-beta.7-1.20.4","inheritsFrom":"1.20.4","type":"release","mainClass":"org.quiltmc.loader.impl.launch.knot.KnotClient","arguments":{"game":[]},"libraries":[{"name":"net.fabricmc:sponge-mixin:0.17.0+mixin.0.8.7","url":"https://maven.fabricmc.net/"},{"name":"org.quiltmc:quilt-json5:1.0.4+final","url":"https://maven.quiltmc.org/repository/release/"},{"name":"org.ow2.asm:asm:9.9","url":"https://maven.fabricmc.net/"},{"name":"org.quiltmc:quilt-loader:0.30.0-beta.7","url":"https://maven.quiltmc.org/repository/release/"}],"releaseTime":"2023-12-07T12:56:20+00:00","time":"2026-04-21T06:25:58+00:00"}"#;
+
+    #[test]
+    fn test_to_mojang_shape_translates_real_quilt_sample_with_no_hashes() {
+        let translated = to_mojang_shape(REAL_QUILT_META_BYTES).expect("translate ok");
+
+        let source_v: serde_json::Value = serde_json::from_slice(REAL_QUILT_META_BYTES).unwrap();
+        let translated_v: serde_json::Value = serde_json::from_slice(&translated).unwrap();
+        assert_eq!(
+            source_v["libraries"].as_array().unwrap().len(),
+            translated_v["libraries"].as_array().unwrap().len(),
+            "library count preserved (FORBID #1)"
+        );
+
+        use crate::mojang::types::VersionJson;
+        let v: VersionJson = serde_json::from_slice(&translated)
+            .expect("translated quilt bytes parse as Mojang VersionJson");
+        assert_eq!(v.id, "quilt-loader-0.30.0-beta.7-1.20.4");
+        for lib in &v.libraries {
+            let art = lib.downloads.artifact.as_ref()
+                .unwrap_or_else(|| panic!("library {} must have artifact", lib.name));
+            // Quilt has NO upstream hashes — sha1 + size MUST be None.
+            assert!(art.sha1.is_none(), "quilt {} sha1 must be None", lib.name);
+            assert!(art.size.is_none(), "quilt {} size must be None", lib.name);
+            // path + url are still populated.
+            let expected_path = crate::loader::maven::maven_coord_to_path(&lib.name).unwrap();
+            assert_eq!(art.path, expected_path);
+            assert!(art.url.ends_with(&art.path));
+        }
+    }
+
+    #[test]
+    fn test_to_mojang_shape_quilt_url_dispatches_repo_by_coordinate() {
+        let translated = to_mojang_shape(REAL_QUILT_META_BYTES).expect("translate ok");
+        use crate::mojang::types::VersionJson;
+        let v: VersionJson = serde_json::from_slice(&translated).unwrap();
+
+        // sponge-mixin pulls from Fabric Maven (per-entry url override).
+        let mixin = v.libraries.iter()
+            .find(|l| l.name == "net.fabricmc:sponge-mixin:0.17.0+mixin.0.8.7").unwrap();
+        assert!(
+            mixin.downloads.artifact.as_ref().unwrap().url
+                .starts_with("https://maven.fabricmc.net/"),
+            "sponge-mixin url must come from per-entry override"
+        );
+
+        // quilt-loader pulls from Quilt Maven (per-entry url override).
+        let loader = v.libraries.iter()
+            .find(|l| l.name == "org.quiltmc:quilt-loader:0.30.0-beta.7").unwrap();
+        assert!(
+            loader.downloads.artifact.as_ref().unwrap().url
+                .starts_with("https://maven.quiltmc.org/"),
+            "quilt-loader url must come from per-entry override"
+        );
+    }
+
+    #[test]
+    fn test_to_mojang_shape_quilt_top_level_fields_preserved() {
+        let translated = to_mojang_shape(REAL_QUILT_META_BYTES).expect("translate ok");
+        let v: serde_json::Value = serde_json::from_slice(&translated).unwrap();
+        assert_eq!(v["id"], "quilt-loader-0.30.0-beta.7-1.20.4");
+        assert_eq!(v["inheritsFrom"], "1.20.4");
+        assert_eq!(v["mainClass"], "org.quiltmc.loader.impl.launch.knot.KnotClient");
+        // arguments.game empty array preserved.
+        assert!(v["arguments"]["game"].is_array());
     }
 }

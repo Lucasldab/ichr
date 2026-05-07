@@ -146,6 +146,22 @@ impl MojangClient {
         unreachable!("loop exits via return after 2 attempts")
     }
 
+    /// Download `url` to `dest` WITHOUT SHA-1 verification.
+    ///
+    /// Use ONLY when the upstream API does not provide a sha1 (Quilt loader
+    /// libraries — see Phase 8.4 GAP-LIBRARY-SHAPE-08). All Mojang-protocol
+    /// callers MUST use `download_verified` instead. The caller is responsible
+    /// for logging the trade-off (e.g. tracing::info!) at the call site.
+    pub async fn download_unverified(
+        &self,
+        url: &str,
+        dest: &Path,
+    ) -> Result<(), AppError> {
+        let bytes = self.download_stream(url).await?;
+        atomic_write(dest, &bytes).await?;
+        Ok(())
+    }
+
     /// Private: fetch `url`, return SHA1-verified bytes or AppError. Used by
     /// fetch_version_json / fetch_asset_index.
     async fn get_bytes_verified(

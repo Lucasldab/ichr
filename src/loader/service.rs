@@ -724,7 +724,17 @@ async fn install_loader_impl(
         // -----------------------------------------------------------
         check_cancel!();
         send_progress(95, "Writing version JSON".to_string()).await;
-        atomic_write(&version_json_path, &raw_bytes)
+        // Phase 8.4 GAP-LIBRARY-SHAPE-08 (round-4 BLOCKER closure): translate
+        // fabric-meta / quilt-meta wire shape to Mojang on-disk shape BEFORE
+        // atomic_write. The launcher reads ONE shape (Mojang); the loader's
+        // upstream API shape stops at this boundary. Forge/NeoForge harvests
+        // already write Mojang shape (07-RESEARCH.md §640) and pass through.
+        let mojang_bytes: Vec<u8> = match loader_type {
+            LoaderType::Fabric => crate::loader::fabric::to_mojang_shape(&raw_bytes)?,
+            LoaderType::Quilt => crate::loader::quilt::to_mojang_shape(&raw_bytes)?,
+            LoaderType::Forge | LoaderType::NeoForge => raw_bytes.to_vec(),
+        };
+        atomic_write(&version_json_path, &mojang_bytes)
             .await
             .map_err(|e| LoaderError::ProfileWrite {
                 path: version_json_path.display().to_string(),
@@ -808,9 +818,12 @@ fn predict_version_id(loader_type: LoaderType, loader_version: &str, mc_version:
 
 /// Try to perform a re-attach purely from on-disk state.
 ///
-/// Reads the on-disk version JSON, parses its library list, and checks every
-/// library path exists. Returns `Some((version_id, libs))` if all are present,
-/// `None` otherwise (fall through to full install).
+/// Reads the on-disk version JSON, parses Mojang shape (Phase 8.4 invariant),
+/// extracts each library's maven coord (`name`), and checks the per-coord
+/// JAR exists. Returns `Some((version_id, libs))` on full presence; `None`
+/// otherwise. The returned LoaderLibrary entries have ONLY `name` populated
+/// — re-attach callers must NOT depend on sha1/url/size being Some for
+/// post-reattach reads.
 async fn try_reattach_from_disk(
     paths: &AppPaths,
     _loader_type: LoaderType,
@@ -819,25 +832,42 @@ async fn try_reattach_from_disk(
     let version_json_path = paths.version_json(version_id);
     let bytes = tokio::fs::read(&version_json_path).await.ok()?;
 
+    // Phase 8.4 GAP-LIBRARY-SHAPE-08: on-disk JSON is now Mojang shape; the
+    // re-attach existence check only needs the maven coord (`name`) per library
+    // entry — derived path comes from maven_coord_to_path(&lib.name) below,
+    // which is what download_one_library uses to write the file in the first
+    // place. The Mojang-shape `downloads.artifact.path` field would yield the
+    // SAME relative path; either is acceptable. We derive from `name` to keep
+    // the existence check decoupled from the download artifact (one source of
+    // truth).
     #[derive(serde::Deserialize)]
     struct MinimalProfile {
         id: String,
         #[serde(default)]
-        libraries: Vec<crate::loader::types::LoaderLibrary>,
+        libraries: Vec<MinimalLibrary>,
+    }
+    #[derive(serde::Deserialize)]
+    struct MinimalLibrary {
+        name: String,
     }
 
     let parsed: MinimalProfile = serde_json::from_slice(&bytes).ok()?;
 
-    // Check every library is on disk
+    // Check every library is on disk (existence-only after re-attach).
+    let mut libs: Vec<crate::loader::types::LoaderLibrary> = Vec::with_capacity(parsed.libraries.len());
     for lib in &parsed.libraries {
         let rel = maven_coord_to_path(&lib.name).ok()?;
         let dest = paths.library_path(&rel);
         if !tokio::fs::try_exists(&dest).await.unwrap_or(false) {
             return None;
         }
+        libs.push(crate::loader::types::LoaderLibrary {
+            name: lib.name.clone(),
+            url: None, sha1: None, sha256: None, sha512: None, md5: None, size: None,
+        });
     }
 
-    Some((parsed.id, parsed.libraries))
+    Some((parsed.id, libs))
 }
 
 /// Re-attach detection: version JSON present AND every library present on disk.
