@@ -10,13 +10,18 @@
 
 use crate::loader::error::LoaderError;
 
-/// Returns true iff every byte of `s` is in `[A-Za-z0-9._-]`, `s` is non-empty,
+/// Returns true iff every byte of `s` is in `[A-Za-z0-9._+-]`, `s` is non-empty,
 /// and `s` is not the path-traversal sentinel `..`.
+///
+/// `+` is allowed because Fabric ships transitive Maven coords with build-metadata
+/// versions like `net.fabricmc:sponge-mixin:0.15.4+mixin.0.8.7`. `+` has no special
+/// meaning on Linux or Windows path components, so traversal protection (no `..`,
+/// no `/`, no `\`) is preserved.
 fn is_safe_maven_segment(s: &str) -> bool {
     !s.is_empty()
         && s != ".."
         && s.bytes().all(|b| {
-            b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-'
+            b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-' || b == b'+'
         })
 }
 
@@ -147,5 +152,23 @@ mod tests {
         assert_eq!(g, "net.fabricmc");
         assert_eq!(a, "fabric-loader");
         assert_eq!(v, "0.16.9");
+    }
+
+    #[test]
+    fn test_maven_coord_to_path_accepts_plus_in_version() {
+        // Fabric ships transitive deps with build-metadata versions:
+        //   net.fabricmc:sponge-mixin:0.15.4+mixin.0.8.7
+        // The `+` must round-trip into the on-disk path.
+        let p = maven_coord_to_path("net.fabricmc:sponge-mixin:0.15.4+mixin.0.8.7").unwrap();
+        assert_eq!(
+            p,
+            "net/fabricmc/sponge-mixin/0.15.4+mixin.0.8.7/sponge-mixin-0.15.4+mixin.0.8.7.jar"
+        );
+
+        let q = maven_coord_to_path("net.fabricmc:sponge-mixin:0.17.0+mixin.0.8.7").unwrap();
+        assert_eq!(
+            q,
+            "net/fabricmc/sponge-mixin/0.17.0+mixin.0.8.7/sponge-mixin-0.17.0+mixin.0.8.7.jar"
+        );
     }
 }
