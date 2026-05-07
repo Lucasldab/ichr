@@ -3,13 +3,18 @@
 //! Vendored from https://github.com/ZekerZhayard/ForgeWrapper at tag `1.6.0`
 //! (see `assets/forge_wrapper/README.md` for SHA-256 + license attribution).
 //!
-//! At install time, the wrapper is invoked via
-//! `java -jar ForgeWrapper.jar --installer=<installer.jar> --instance=<staging>`
-//! to bypass the Forge installer's `SimpleInstaller.main()` GUI/server-only branch
-//! (07-RESEARCH.md §Critical Finding).
+//! At install time (Phase 7) AND launch time (Phase 12), the wrapper's
+//! `Main` class is the JVM entry point. Install-time invocation:
 //!
-//! At launch time, the wrapper's main class is injected into the version JSON
-//! classpath via `FORGE_WRAPPER_MAIN_CLASS`.
+//!     java -Dforgewrapper.librariesDir=<staging>/libraries \
+//!          -Dforgewrapper.installer=<installer.jar absolute> \
+//!          -Dforgewrapper.minecraft=<staging>/versions/<mc>/<mc>.jar \
+//!          -cp ForgeWrapper.jar:<installer.jar> \
+//!          io.github.zekerzhayard.forgewrapper.installer.Main
+//!
+//! The three -Dforgewrapper.* properties feed `MultiMCFileDetector` and
+//! are required at install time. Launch-time wiring (Phase 12) supplies
+//! the same class as the version JSON `mainClass` override.
 
 use std::path::PathBuf;
 
@@ -32,56 +37,50 @@ pub const FORGE_WRAPPER_SHA256: &str =
 /// Filename used both for the embedded jar and the on-disk extracted copy.
 pub const FORGE_WRAPPER_FILENAME: &str = "ForgeWrapper-mmc4.jar";
 
-/// Fully-qualified launch-time class. Used as `mainClass` in the version
-/// JSON when launching modded MC (07-RESEARCH.md §640 contract).
+/// Fully-qualified ForgeWrapper entry-point class — used at BOTH install
+/// time (this phase) AND launch time (Phase 12).
 ///
-/// **Sourced from the upstream `1.6.0` release JAR contents at vendor time.**
-/// Verified via `unzip -l ForgeWrapper-1.6.0.jar | grep installer/Main.class`
-/// AND from the upstream README usage section.
-///
-/// **DEFERRED:** The launch-time wiring is scheduled for Phase 12 (Windows
-/// Polish + launch integration); until then this constant is unused at runtime
-/// and marked `#[allow(dead_code)]`. DO NOT confuse with
-/// [`FORGE_WRAPPER_INSTALLER_CLASS`] (below), which is the INSTALL-TIME class.
-/// See the GAP-7-A SUMMARY (`07.1-02-forge-installer-cli-driver-SUMMARY.md`)
-/// for the distinction. `Main`'s static init references
-/// `cpw.mods.modlauncher.Launcher` via `MultiMCFileDetector.getLibraryDir`
-/// — modlauncher is only on the classpath at launch time, not install time,
-/// so invoking `Main` at install raises `NoClassDefFoundError`. The
-/// install-time entry point is [`FORGE_WRAPPER_INSTALLER_CLASS`].
-#[allow(dead_code)]
-pub const FORGE_WRAPPER_MAIN_CLASS: &str =
-    "io.github.zekerzhayard.forgewrapper.installer.Main";
-
-/// Fully-qualified install-time class to invoke from the wrapper JAR.
-///
-/// **Sourced from the upstream `1.6.0` release JAR contents at vendor time:**
+/// The single class with `main(String[])` in the entire bundled JAR
+/// (verified via `javap -public` against the `1.6.0` mmc4 release; debug
+/// session `.planning/debug/forge-installer-class-no-main.md`):
 /// ```text
 /// $ unzip -l assets/forge_wrapper/ForgeWrapper-mmc4.jar | grep installer/
-///   6275  io/github/zekerzhayard/forgewrapper/installer/Installer.class
-///   5802  io/github/zekerzhayard/forgewrapper/installer/Main.class
+///   6275  io/github/zekerzhayard/forgewrapper/installer/Installer.class    <- library class, NO main()
+///   5802  io/github/zekerzhayard/forgewrapper/installer/Main.class          <- THIS — JVM entry point
+///   3150  io/github/zekerzhayard/forgewrapper/installer/Bootstrap.class    <- library class, NO main()
 /// ```
-/// AND from the upstream README usage section (which shows
-/// `java -cp <ForgeWrapper.jar>:<installer.jar> io.github.zekerzhayard.forgewrapper.installer.Installer ...`
-/// as the headless install invocation).
 ///
-/// This constant is consumed by `loader/service.rs::install_subprocess_loader`
-/// Step 4 (the only install-time invocation site). The companion constant
-/// [`FORGE_WRAPPER_MAIN_CLASS`] (above) is the LAUNCH-TIME class, deferred to
-/// Phase 12 wiring.
+/// The companion `Installer.class` exposes `install(File, File, File)`
+/// for reflective invocation by `Main`; it is NOT a JVM entry point and
+/// has no `main()`. A previous gap-closure (07.1-02) swapped the install-
+/// time argv class to `Installer` based on a misread of the upstream
+/// README — that swap exhibited as `Error: Main method not found in
+/// class ...Installer` (07-UAT.md GAP-7-A-v2). The retraction is
+/// 07.2-01: revert to Main + supply the three -Dforgewrapper.* system
+/// properties that Main's `MultiMCFileDetector` requires to resolve
+/// install paths.
 ///
-/// `Installer` calls `PostProcessors.process()` directly, bypassing the
-/// installer's `SimpleInstaller.main()` GUI/server-only branch and avoiding
-/// any reference to `cpw.mods.modlauncher.Launcher` (which is absent from
-/// the install-time classpath).
+/// At install time (this phase, `loader/service.rs::install_subprocess_loader`
+/// Step 4): invoked via
+/// ```text
+/// java -Dforgewrapper.librariesDir=<staging>/libraries \
+///      -Dforgewrapper.installer=<installer JAR absolute> \
+///      -Dforgewrapper.minecraft=<staging>/versions/<mc>/<mc>.jar \
+///      -cp <ForgeWrapper.jar><sep><installer.jar> \
+///      io.github.zekerzhayard.forgewrapper.installer.Main
+/// ```
+/// The three -D properties feed `MultiMCFileDetector.enabled()`
+/// (`System.getProperty` lookups in its `enabled()` method) so Main can
+/// resolve install paths without the rest of the MultiMC environment.
+/// There are NO `--installer=...` or `--instance=...` argv flags on
+/// Main's CLI surface; paths come from the -D properties only.
 ///
-/// **GAP-7-A history:** Phase 7 originally vendored only `MAIN_CLASS` and
-/// 07-04 wired it at the install site by mistake — `Main`'s static init
-/// references `cpw.mods.modlauncher.Launcher` which is absent at install
-/// time, throwing `NoClassDefFoundError`. This constant + the swap in
-/// service.rs is the GAP-7-A closure (round 1, 7.1-02).
-pub const FORGE_WRAPPER_INSTALLER_CLASS: &str =
-    "io.github.zekerzhayard.forgewrapper.installer.Installer";
+/// At launch time (deferred to Phase 12): used as the `mainClass` field
+/// in the produced version JSON when launching modded MC. `Main` then
+/// resolves modlauncher via `setupBootstrapLauncher` and reflectively
+/// invokes the modded game.
+pub const FORGE_WRAPPER_MAIN_CLASS: &str =
+    "io.github.zekerzhayard.forgewrapper.installer.Main";
 
 /// Path where the wrapper JAR lives after extraction:
 /// `<cache_dir>/forge_wrapper/ForgeWrapper-mmc4.jar`.
