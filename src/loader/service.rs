@@ -383,36 +383,82 @@ async fn install_subprocess_loader(
             let _ = tokio::fs::create_dir_all(parent).await;
         }
 
-        // Classpath: ForgeWrapper.jar<sep>installer.jar
-        // Per 07-RESEARCH.md Pattern 5 + ForgeWrapper 1.6.0 README install invocation:
-        //   java -cp <wrapper>:<installer> \
-        //     io.github.zekerzhayard.forgewrapper.installer.Installer \
-        //     --installer=<jar> --instance=<staging>
+        // ForgeWrapper invocation per upstream README + PrismLauncher MetaServer
+        // forge-1.20.x.json `+jvm` args (verified 2026-05-07):
         //
-        // INSTALL-TIME class: forgewrapper.installer.Installer (calls
-        // PostProcessors.process() directly; bypasses SimpleInstaller.main()
-        // GUI/server branch). NOT forgewrapper.installer.Main, which is the
-        // LAUNCH-TIME mainClass override (Phase 12 wiring). GAP-7-A: pre-7.1-02
-        // wired Main here, throwing NoClassDefFoundError: cpw/mods/modlauncher/Launcher
-        // because Main's static init resolves modlauncher (absent from the
-        // install-time classpath).
+        //   java -Dforgewrapper.librariesDir=<staging>/libraries \
+        //        -Dforgewrapper.installer=<installer.jar absolute> \
+        //        -Dforgewrapper.minecraft=<staging>/versions/<mc>/<mc>.jar \
+        //        -cp <ForgeWrapper.jar><sep><installer.jar> \
+        //        io.github.zekerzhayard.forgewrapper.installer.Main
+        //
+        // The three -D properties feed MultiMCFileDetector
+        // (`System.getProperty` in its `enabled()` method) so Main can
+        // resolve install paths without the rest of the MultiMC environment.
+        // Main has the only main(String[]) in the JAR (debug session
+        // 2026-05-07: Installer.class has no main; only install(File,File,File)
+        // for reflective invocation by Main).
+        //
+        // NO --installer=... or --instance=... argv flags — they are not part
+        // of Main's CLI surface; paths come from the -D properties only.
+        //
+        // GAP-7-A umbrella (single gap, three rounds):
+        //   round-1 (07-04): missing -D properties → NoClassDefFoundError on
+        //                    modlauncher (MultiMCFileDetector.getLibraryDir
+        //                    fell back to introspecting modlauncher's class).
+        //   round-2 (07.1-02): mis-swap to Installer (no main) → "Main method
+        //                      not found in .Installer".
+        //   round-3 (07.2-01, this commit): revert to Main + add three -D
+        //                                    properties that should have been
+        //                                    there from the start.
+        let staging_libs = staging.libraries_dir();
+        // Defensive: staging.populate_vanilla already creates this; idempotent.
+        if let Err(e) = tokio::fs::create_dir_all(&staging_libs).await {
+            return Err(LoaderError::StagingPopulate {
+                reason: format!("mkdir {}: {e}", staging_libs.display()),
+            });
+        }
+        let staging_vanilla_jar = staging
+            .versions_dir()
+            .join(mc_version)
+            .join(format!("{mc_version}.jar"));
+        if !tokio::fs::try_exists(&staging_vanilla_jar)
+            .await
+            .unwrap_or(false)
+        {
+            return Err(LoaderError::StagingPopulate {
+                reason: format!(
+                    "vanilla jar absent at {}; aborting Forge subprocess (forgewrapper.minecraft \
+                     cannot be resolved without the vanilla client.jar pre-populated by \
+                     staging.populate_vanilla)",
+                    staging_vanilla_jar.display()
+                ),
+            });
+        }
+
         let sep = if cfg!(windows) { ";" } else { ":" };
         let classpath = format!(
             "{}{sep}{}",
             wrapper_jar.display(),
             installer_dst.display()
         );
+
+        // Three -D properties for MultiMCFileDetector. Order is irrelevant
+        // to the JVM but kept stable here for log readability + grep gates.
+        let jvm_args: Vec<String> = vec![
+            format!("-Dforgewrapper.librariesDir={}", staging_libs.display()),
+            format!("-Dforgewrapper.installer={}", installer_dst.display()),
+            format!("-Dforgewrapper.minecraft={}", staging_vanilla_jar.display()),
+        ];
         let args: Vec<String> = vec![
             "-cp".into(),
             classpath,
-            forgewrapper::FORGE_WRAPPER_INSTALLER_CLASS.to_string(),
-            format!("--installer={}", installer_dst.display()),
-            format!("--instance={}", staging.root().display()),
+            forgewrapper::FORGE_WRAPPER_MAIN_CLASS.to_string(),
         ];
 
         installer_subprocess::run_installer(
             jre_path,
-            &[],
+            &jvm_args,
             &args,
             staging.root(),
             &log_path,

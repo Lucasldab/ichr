@@ -207,27 +207,34 @@ async fn live_forge_install_1_20_1() {
     );
 }
 
-/// GAP-7-A regression — fast-fail live test for the install-time class swap.
+/// GAP-7-A umbrella regression — fast-fail live test that guards against
+/// any ForgeWrapper install-blocker (class load, entry point, or class
+/// resolution failure).
 ///
-/// Pre-7.1-02: this test fails almost immediately (~5s after JRE warmup) with
-/// `NoClassDefFoundError: cpw/mods/modlauncher/Launcher` from the JVM, which
-/// surfaces as `LoaderError::SubprocessExit { code: 1, .. }` because
-/// ForgeWrapper.installer.Main exits 1 at static init.
+/// Three historical signatures detected (any one of which fires the banner):
+///   - round-1 (pre-07.1-02): `NoClassDefFoundError: cpw/mods/modlauncher/Launcher`
+///     — Main was invoked without the three -Dforgewrapper.* properties so
+///     MultiMCFileDetector.getLibraryDir fell back to introspecting modlauncher.
+///   - round-2 (post-07.1-02 / pre-07.2-01): `Main method not found in
+///     class io.github.zekerzhayard.forgewrapper.installer.Installer`
+///     — argv class swapped to Installer (a library class with no main()).
+///   - any future regression that reverts back to either of the above
+///     (or invents a new ForgeWrapper class-related blocker).
 ///
-/// Post-7.1-02: the install proceeds normally; the test passes once the
+/// Post-07.2-01: the install proceeds normally; the test passes once the
 /// subprocess exits 0 and the manifest's `loader.version_id` is non-empty.
 ///
 /// This test is FASTER than `live_forge_install_1_20_1` because it asserts
-/// the EARLY behaviour (subprocess class load) rather than the full pipeline,
-/// but it is NOT a substitute — `live_forge_install_1_20_1` exercises the
-/// full install + harvest + manifest + library copy chain. Both tests are
+/// EARLY behaviour (subprocess class load / entry point) rather than full
+/// pipeline, but it is NOT a substitute — `live_forge_install_1_20_1`
+/// exercises full install + harvest + manifest + library copy. Both are
 /// `#[ignore]`-gated; both run during HUMAN-UAT.
 #[tokio::test]
 #[ignore = "requires internet access — see module docs"]
-async fn live_forge_install_does_not_throw_noclassdef() {
+async fn live_forge_install_does_not_throw_install_blocker() {
     let td = TempDir::new().expect("tempdir");
     let paths = make_paths(&td);
-    let slug = "forge-noclassdef-canary";
+    let slug = "forge-install-blocker-canary";
     let mc = "1.20.1";
 
     // 1) Write vanilla InstanceManifest
@@ -285,10 +292,10 @@ async fn live_forge_install_does_not_throw_noclassdef() {
         .map(|v| v.version.clone())
         .unwrap_or_else(|| versions[0].version.clone());
 
-    // 5) Run install. Pre-7.1-02 raises SubprocessExit { code: 1 } here
-    //    because Main throws NoClassDefFoundError; post-7.1-02 succeeds
-    //    because Installer is the correct install-time class.
-    let progress = make_progress_drain("forge_canary");
+    // 5) Run install. Pre-07.2-01 raises SubprocessExit { code: 1 } here
+    //    with one of two banners (round-1 or round-2 of GAP-7-A);
+    //    post-07.2-01 succeeds.
+    let progress = make_progress_drain("forge_install_blocker");
     let r = svc
         .install_loader(
             &paths,
@@ -306,21 +313,35 @@ async fn live_forge_install_does_not_throw_noclassdef() {
     match &r {
         Err(e) => {
             let msg = e.to_string();
-            if msg.contains("NoClassDefFoundError")
-                || msg.contains("modlauncher")
-                || msg.contains("forgewrapper.installer.Main")
-            {
+            // round-1 signature
+            let r1_classdef = msg.contains("NoClassDefFoundError")
+                || msg.contains("modlauncher");
+            // round-2 signature
+            let r2_no_main = msg.contains("Main method not found");
+            // any forgewrapper class reference in an Err message is suspect
+            let any_wrapper_class = msg.contains("forgewrapper.installer.Main")
+                || msg.contains("forgewrapper.installer.Installer");
+            if r1_classdef || r2_no_main || any_wrapper_class {
                 panic!(
-                    "GAP-7-A regression detected — install subprocess threw \
-                     NoClassDefFoundError. Did FORGE_WRAPPER_INSTALLER_CLASS \
-                     get reverted to FORGE_WRAPPER_MAIN_CLASS in service.rs? \
-                     Full error: {msg}"
+                    "GAP-7-A umbrella regression detected — install subprocess \
+                     threw a ForgeWrapper class-related blocker. Round-1 signal: \
+                     NoClassDefFoundError/modlauncher = {r1_classdef}. Round-2 \
+                     signal: 'Main method not found' = {r2_no_main}. Any-class \
+                     signal: forgewrapper.installer.{{Main,Installer}} = \
+                     {any_wrapper_class}. Verify (a) FORGE_WRAPPER_MAIN_CLASS is \
+                     the install-time argv class in service.rs Step 4, (b) all \
+                     three -Dforgewrapper.{{librariesDir,installer,minecraft}} \
+                     properties are in jvm_args, and (c) <staging>/versions/{{mc}}/{{mc}}.jar \
+                     exists (pre-populated by staging.populate_vanilla). Full \
+                     error: {msg}"
                 );
             }
             panic!("install_loader failed for non-GAP-7-A reason: {msg}");
         }
         Ok(()) => {
-            println!("[forge_canary] install_loader succeeded — GAP-7-A closed");
+            println!(
+                "[forge_install_blocker] install_loader succeeded — GAP-7-A umbrella closed"
+            );
         }
     }
 
@@ -331,6 +352,6 @@ async fn live_forge_install_does_not_throw_noclassdef() {
     assert_eq!(loader.kind, ModloaderKind::Forge);
     assert!(
         !loader.version_id.is_empty(),
-        "loader.version_id must be non-empty (GAP-7-A canary): {loader:?}"
+        "loader.version_id must be non-empty (GAP-7-A umbrella canary): {loader:?}"
     );
 }
