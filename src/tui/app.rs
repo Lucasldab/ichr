@@ -3281,4 +3281,78 @@ mod tests {
             panic!("active view changed");
         }
     }
+
+    // ------------------------------------------------------------------------
+    // GAP-8-F (08.1-05): Modrinth search-failure dispatch.
+    //
+    // When Effect::SearchModrinth's Err arm fires, the action chain must transition
+    // ModBrowser fetch_state to Error(message) -- NOT to Ready with empty hits, which
+    // the view would render as "No mods found" (masking unreachable Modrinth).
+    // Mirrors the existing CfBrowserSearchFailed pattern.
+    // ------------------------------------------------------------------------
+
+    #[test]
+    fn mod_browser_search_failed_sets_error_fetch_state() {
+        use crate::mods::types::{ModBrowserFetchState, ModrinthSearchHit};
+        let mut state = AppState {
+            active_view: ActiveView::ModBrowser {
+                slug: "myinst".into(),
+                search: String::new(),
+                mc_filter_override: None,
+                loader_filter_override: None,
+                results: Vec::<ModrinthSearchHit>::new(),
+                selected: 0,
+                fetch_state: ModBrowserFetchState::Loading,
+                selected_detail: None,
+            },
+            ..AppState::default()
+        };
+        let effects = update(
+            &mut state,
+            Action::ModBrowserSearchFailed {
+                slug: "myinst".into(),
+                message: "connection refused".into(),
+            },
+        );
+        assert!(effects.is_empty());
+        match &state.active_view {
+            ActiveView::ModBrowser { fetch_state, .. } => match fetch_state {
+                ModBrowserFetchState::Error(m) => assert_eq!(m, "connection refused"),
+                other => panic!("expected Error, got {other:?}"),
+            },
+            other => panic!("expected ModBrowser view, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn mod_browser_search_failed_for_other_slug_is_noop() {
+        use crate::mods::types::{ModBrowserFetchState, ModrinthSearchHit};
+        let mut state = AppState {
+            active_view: ActiveView::ModBrowser {
+                slug: "myinst".into(),
+                search: String::new(),
+                mc_filter_override: None,
+                loader_filter_override: None,
+                results: Vec::<ModrinthSearchHit>::new(),
+                selected: 0,
+                fetch_state: ModBrowserFetchState::Loading,
+                selected_detail: None,
+            },
+            ..AppState::default()
+        };
+        let _ = update(
+            &mut state,
+            Action::ModBrowserSearchFailed {
+                slug: "OTHER".into(),
+                message: "irrelevant".into(),
+            },
+        );
+        // Slug mismatch: fetch_state stays Loading.
+        match &state.active_view {
+            ActiveView::ModBrowser { fetch_state, .. } => {
+                assert!(matches!(fetch_state, ModBrowserFetchState::Loading));
+            }
+            other => panic!("expected ModBrowser view, got {other:?}"),
+        }
+    }
 }
