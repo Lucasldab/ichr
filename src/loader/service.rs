@@ -205,7 +205,7 @@ async fn install_subprocess_loader(
     token: CancellationToken,
     job_id: crate::tasks::JobId,
 ) -> Result<(), LoaderError> {
-    use crate::loader::{forgewrapper, harvest, installer_subprocess, staging};
+    use crate::loader::{harvest, installer_subprocess, staging};
 
     let modloader_kind = match loader_type {
         LoaderType::Forge => ModloaderKind::Forge,
@@ -362,14 +362,18 @@ async fn install_subprocess_loader(
     let outcome: Result<harvest::HarvestedInstall, LoaderError> = async {
         staging.populate_vanilla(paths, mc_version).await?;
         staging.write_launcher_profiles().await?;
-        let wrapper_jar = forgewrapper::ensure_extracted(paths).await?;
+        // NOTE: forgewrapper::ensure_extracted is NO LONGER called here.
+        // The wrapper is retained in the codebase for Phase 12 launch-time
+        // wiring (the version JSON's `mainClass` override) but the install
+        // path no longer routes through ForgeWrapper at all. See GAP-7-A
+        // history below for why.
 
         if token.is_cancelled() {
             return Err(LoaderError::Cancelled);
         }
 
         // --------------------------------------------------------------
-        // STEP 4 — Run installer subprocess
+        // STEP 4 — Run installer subprocess via installer-JAR-direct invocation
         // --------------------------------------------------------------
         send_progress!(30, "Running installer");
         let unix_ts = std::time::SystemTime::now()
@@ -383,77 +387,59 @@ async fn install_subprocess_loader(
             let _ = tokio::fs::create_dir_all(parent).await;
         }
 
-        // ForgeWrapper invocation per upstream README + PrismLauncher MetaServer
-        // forge-1.20.x.json `+jvm` args (verified 2026-05-07):
+        // GAP-7-A umbrella (single gap, FOUR rounds — three retracted, one shipping):
+        //   round-1 (07-04, GAP-7-A): Main + no -D properties + bogus
+        //                              --installer=/--instance= flags →
+        //                              NoClassDefFoundError on modlauncher.
+        //                              Diagnosed as "wrong class".
+        //   round-2 (07.1-02, GAP-7-A-v2): swapped Main → Installer (no main()) →
+        //                                   "Main method not found in .Installer".
+        //                                   Diagnosed as "swap back, add -D props".
+        //   round-3 (07.2-01, GAP-7-A-v3): Main + three -Dforgewrapper.* +
+        //                                   no positional argv → IndexOutOfBoundsException
+        //                                   at Main.java:28
+        //                                   `argsList.get(argsList.indexOf("--fml.mcVersion") + 1)`
+        //                                   because Main expects Mojang LAUNCH argv.
+        //                                   Diagnosed via bytecode + JAR --help: ForgeWrapper
+        //                                   Main is launch-time-only; install must skip
+        //                                   ForgeWrapper entirely.
+        //   round-4 (07.3-01, this commit): drop ForgeWrapper at install-time;
+        //                                    invoke the official installer JAR directly.
         //
-        //   java -Dforgewrapper.librariesDir=<staging>/libraries \
-        //        -Dforgewrapper.installer=<installer.jar absolute> \
-        //        -Dforgewrapper.minecraft=<staging>/versions/<mc>/<mc>.jar \
-        //        -cp <ForgeWrapper.jar><sep><installer.jar> \
-        //        io.github.zekerzhayard.forgewrapper.installer.Main
+        // Recipe (verbatim from .planning/debug/forge-installer-deep-bytecode-diagnosis.md):
         //
-        // The three -D properties feed MultiMCFileDetector
-        // (`System.getProperty` in its `enabled()` method) so Main can
-        // resolve install paths without the rest of the MultiMC environment.
-        // Main has the only main(String[]) in the JAR (debug session
-        // 2026-05-07: Installer.class has no main; only install(File,File,File)
-        // for reflective invocation by Main).
+        //   <jre>/bin/java
+        //     -Djava.awt.headless=true
+        //     -jar <installer_jar_absolute_path>
+        //     --installClient <staging_root_absolute_path>      # for ModloaderKind::Forge
+        //     # OR
+        //     --install-client <staging_root_absolute_path>     # for ModloaderKind::NeoForge
+        //                                                        # (canonical; NeoForge accepts both)
         //
-        // NO --installer=... or --instance=... argv flags — they are not part
-        // of Main's CLI surface; paths come from the -D properties only.
+        // Pre-subprocess filesystem setup is UNCHANGED:
+        //   <staging>/launcher_profiles.json   (skeleton, by staging.write_launcher_profiles)
+        //   <staging>/versions/<mc>/<mc>.json  (Mojang version JSON, by staging.populate_vanilla)
+        //   <staging>/versions/<mc>/<mc>.jar   (Mojang client.jar, by staging.populate_vanilla;
+        //                                       SHA-1 verified by the installer JAR's own checksum step)
         //
-        // GAP-7-A umbrella (single gap, three rounds):
-        //   round-1 (07-04): missing -D properties → NoClassDefFoundError on
-        //                    modlauncher (MultiMCFileDetector.getLibraryDir
-        //                    fell back to introspecting modlauncher's class).
-        //   round-2 (07.1-02): mis-swap to Installer (no main) → "Main method
-        //                      not found in .Installer".
-        //   round-3 (07.2-01, this commit): revert to Main + add three -D
-        //                                    properties that should have been
-        //                                    there from the start.
-        let staging_libs = staging.libraries_dir();
-        // Defensive: staging.populate_vanilla already creates this; idempotent.
-        if let Err(e) = tokio::fs::create_dir_all(&staging_libs).await {
-            return Err(LoaderError::StagingPopulate {
-                reason: format!("mkdir {}: {e}", staging_libs.display()),
-            });
-        }
-        let staging_vanilla_jar = staging
-            .versions_dir()
-            .join(mc_version)
-            .join(format!("{mc_version}.jar"));
-        if !tokio::fs::try_exists(&staging_vanilla_jar)
-            .await
-            .unwrap_or(false)
-        {
-            return Err(LoaderError::StagingPopulate {
-                reason: format!(
-                    "vanilla jar absent at {}; aborting Forge subprocess (forgewrapper.minecraft \
-                     cannot be resolved without the vanilla client.jar pre-populated by \
-                     staging.populate_vanilla)",
-                    staging_vanilla_jar.display()
-                ),
-            });
-        }
-
-        let sep = if cfg!(windows) { ";" } else { ":" };
-        let classpath = format!(
-            "{}{sep}{}",
-            wrapper_jar.display(),
-            installer_dst.display()
-        );
-
-        // Three -D properties for MultiMCFileDetector. Order is irrelevant
-        // to the JVM but kept stable here for log readability + grep gates.
-        let jvm_args: Vec<String> = vec![
-            format!("-Dforgewrapper.librariesDir={}", staging_libs.display()),
-            format!("-Dforgewrapper.installer={}", installer_dst.display()),
-            format!("-Dforgewrapper.minecraft={}", staging_vanilla_jar.display()),
-        ];
+        // The pre-flight `staging_vanilla_jar` try_exists check from 07.2-01 is REMOVED:
+        // the installer's own SHA-1 verifier surfaces a clearer error if the staged
+        // client.jar is missing or corrupt; the redundant Rust pre-flight masked
+        // installer diagnostics. Empirical verification:
+        //   `java -jar forge-1.20.1-47.4.0-installer.jar --installClient <staging>` →
+        //   exit 0, "Successfully installed client into launcher.", produces
+        //   versions/<loader-id>/<loader-id>.{json,jar} + libraries/ tree.
+        let install_flag = match modloader_kind {
+            ModloaderKind::Forge => "--installClient",
+            ModloaderKind::NeoForge => "--install-client",
+            _ => unreachable!("install_subprocess_loader only handles Forge/NeoForge"),
+        };
+        let jvm_args: Vec<String> = vec!["-Djava.awt.headless=true".to_string()];
         let args: Vec<String> = vec![
-            "-cp".into(),
-            classpath,
-            forgewrapper::FORGE_WRAPPER_MAIN_CLASS.to_string(),
+            "-jar".to_string(),
+            installer_dst.display().to_string(),
+            install_flag.to_string(),
+            staging.root().display().to_string(),
         ];
 
         installer_subprocess::run_installer(

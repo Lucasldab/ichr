@@ -318,25 +318,34 @@ async fn live_forge_install_does_not_throw_install_blocker() {
                 || msg.contains("modlauncher");
             // round-2 signature
             let r2_no_main = msg.contains("Main method not found");
+            // round-3 signature (GAP-7-A-v3): Main reaches its body but throws
+            // IndexOutOfBoundsException at line 28 because argv is empty.
+            // (`argsList.get(argsList.indexOf("--fml.mcVersion") + 1)`).
+            let r3_main_iooobe = msg.contains("IndexOutOfBoundsException")
+                && msg.contains("forgewrapper.installer.Main");
             // any forgewrapper class reference in an Err message is suspect
             let any_wrapper_class = msg.contains("forgewrapper.installer.Main")
                 || msg.contains("forgewrapper.installer.Installer");
-            if r1_classdef || r2_no_main || any_wrapper_class {
+            if r1_classdef || r2_no_main || r3_main_iooobe || any_wrapper_class {
                 panic!(
                     "GAP-7-A umbrella regression detected — install subprocess \
                      threw a ForgeWrapper class-related blocker. Round-1 signal: \
                      NoClassDefFoundError/modlauncher = {r1_classdef}. Round-2 \
-                     signal: 'Main method not found' = {r2_no_main}. Any-class \
-                     signal: forgewrapper.installer.{{Main,Installer}} = \
-                     {any_wrapper_class}. Verify (a) FORGE_WRAPPER_MAIN_CLASS is \
-                     the install-time argv class in service.rs Step 4, (b) all \
-                     three -Dforgewrapper.{{librariesDir,installer,minecraft}} \
-                     properties are in jvm_args, and (c) <staging>/versions/{{mc}}/{{mc}}.jar \
-                     exists (pre-populated by staging.populate_vanilla). Full \
-                     error: {msg}"
+                     signal: 'Main method not found' = {r2_no_main}. Round-3 signal: \
+                     IndexOutOfBoundsException + forgewrapper.installer.Main = \
+                     {r3_main_iooobe}. Any-class signal: forgewrapper.installer.{{Main,Installer}} = \
+                     {any_wrapper_class}. The structurally correct fix (07.3-01) is: do \
+                     NOT route the install subprocess through ForgeWrapper at all. \
+                     Verify (a) install_subprocess_loader Step 4 invokes the installer \
+                     JAR directly via `java -Djava.awt.headless=true -jar <installer> \
+                     <install_flag> <staging>` where install_flag is `--installClient` \
+                     for Forge and `--install-client` for NeoForge, (b) NO -cp / NO \
+                     FORGE_WRAPPER_MAIN_CLASS / NO -Dforgewrapper.* in the argv, and \
+                     (c) staging.populate_vanilla + staging.write_launcher_profiles \
+                     still run before the subprocess. Full error: {msg}"
                 );
             }
-            panic!("install_loader failed for non-GAP-7-A reason: {msg}");
+            panic!("install_loader failed for non-GAP-7-A-v3 reason: {msg}");
         }
         Ok(()) => {
             println!(

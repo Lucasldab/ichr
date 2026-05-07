@@ -143,3 +143,49 @@ fn forgewrapper_main_class_constant_ends_with_dot_main() {
          {FORGE_WRAPPER_MAIN_CLASS}"
     );
 }
+
+/// Pins Main.class as the LAUNCH-time entry point — its bytecode constant pool
+/// MUST contain the literal UTF-8 sequence `--fml.mcVersion`. This is the FML
+/// argv flag Main parses at line 28 of the upstream source
+/// (https://raw.githubusercontent.com/ZekerZhayard/ForgeWrapper/3c6712d64a42e4ec200909912e72749499aaca79/src/main/java/io/github/zekerzhayard/forgewrapper/installer/Main.java):
+///     String mcVersion = argsList.get(argsList.indexOf("--fml.mcVersion") + 1);
+///
+/// GAP-7-A-v3 (round 3) regression history: invoking Main at install-time with
+/// empty argv produces `IndexOutOfBoundsException: Index 0 out of bounds for
+/// length 0` because `indexOf` returns -1, +1 = 0, `get(0)` on length-0 list
+/// throws. The structurally correct fix (07.3-01) is to NOT invoke Main at
+/// install time — invoke the installer JAR directly via `java -jar <installer>
+/// --installClient <staging>`. This pin locks the structural reason install-time
+/// invocation is wrong: Main reads Mojang LAUNCH argv, period.
+///
+/// If a future re-vendoring removes `--fml.mcVersion` from the constant pool
+/// (would only happen if upstream rewrites Main to not parse FML argv — extremely
+/// unlikely), this test fails loudly and the developer can decide whether the
+/// new shape changes the launch-vs-install-time distinction. The Phase 12 launch
+/// wiring will still need this constant-pool fact to compose the version JSON
+/// argument template.
+#[test]
+fn forgewrapper_main_class_is_launch_time_entry_point() {
+    let main_bytes = read_class_bytes(
+        "io/github/zekerzhayard/forgewrapper/installer/Main.class",
+    );
+    assert_eq!(
+        &main_bytes[..4],
+        &[0xCA, 0xFE, 0xBA, 0xBE],
+        "Main.class missing JVM class-file magic"
+    );
+    // The literal `--fml.mcVersion` is loaded via ldc at offset 27 of Main.main
+    // (verified via `javap -v Main.class` LineNumberTable line 28: 25). Constant-
+    // pool UTF-8 entries are stored as length-prefixed bytes, so a byte-substring
+    // scan over the full .class bytes is sound.
+    const FML_MC_VERSION: &[u8] = b"--fml.mcVersion";
+    assert!(
+        contains_bytes(&main_bytes, FML_MC_VERSION),
+        "Main.class constant pool missing UTF-8 entry `--fml.mcVersion` — \
+         Main is no longer the FML-argv-parsing launch-time entry point. \
+         GAP-7-A-v3 structural pin: re-vendored ForgeWrapper may have moved \
+         FML argv parsing elsewhere (or removed it). Re-evaluate whether \
+         FORGE_WRAPPER_MAIN_CLASS is still launch-time-only and whether the \
+         07.3-01 invariant (install does not use ForgeWrapper) still holds."
+    );
+}
