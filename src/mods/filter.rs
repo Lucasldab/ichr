@@ -207,6 +207,52 @@ mod tests {
         assert!(f.contains("project_type:resourcepack"), "got: {f}");
     }
 
+    /// GAP-FACETS-EMPTY-08 (Phase 8.2): empty loaders + non-empty mc must NOT
+    /// emit an empty AND group `[]`. Modrinth treats `[]` inside an outer AND
+    /// as "match nothing" → zero hits even when other groups would match.
+    /// Round-2 UAT test 3a regression: loader='any' + mc='1.20.4' returned
+    /// zero results because of this bug.
+    #[test]
+    fn test_search_facets_empty_loaders_with_mc_no_empty_and_group() {
+        let f = search_facets(&[], &["1.20.4".to_string()], "mod");
+        assert_eq!(
+            f,
+            "[[\"versions:1.20.4\"],[\"project_type:mod\"]]",
+            "empty loaders must drop the categories AND group entirely; got: {f}"
+        );
+        assert!(
+            !f.contains("[]"),
+            "facets string MUST NOT contain an empty AND group `[]`; got: {f}"
+        );
+    }
+
+    /// Inverse: non-empty loaders + empty mc must also drop the empty
+    /// versions group (today this is unreachable from client.rs because
+    /// search() short-circuits, but the function is callable from
+    /// list_versions and Phase 11 entry points; lock the contract).
+    #[test]
+    fn test_search_facets_with_loader_no_mc_no_empty_and_group() {
+        let f = search_facets(&["fabric"], &[], "mod");
+        assert_eq!(
+            f,
+            "[[\"categories:fabric\"],[\"project_type:mod\"]]",
+            "empty mc_versions must drop the versions AND group entirely; got: {f}"
+        );
+        assert!(!f.contains("[]"), "got: {f}");
+    }
+
+    /// Both empty: only the always-present project_type group remains.
+    #[test]
+    fn test_search_facets_both_empty_only_project_type() {
+        let f = search_facets(&[], &[], "mod");
+        assert_eq!(
+            f,
+            "[[\"project_type:mod\"]]",
+            "both empty: only project_type AND group remains; got: {f}"
+        );
+        assert!(!f.contains("[]"), "got: {f}");
+    }
+
     // --- pick_primary_file ----------------------------------------------------
 
     fn mk_file(name: &str, primary: bool) -> ModrinthFile {
