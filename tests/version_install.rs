@@ -207,15 +207,15 @@ fn test_resolve_inherits_with_no_parent_is_noop() {
         id: "1.21.4".into(),
         version_type: "release".into(),
         main_class: "net.minecraft.client.main.Main".into(),
-        asset_index: AssetIndex {
+        asset_index: Some(AssetIndex {
             id: "21".into(),
             sha1: "abc".into(),
             size: 0,
             total_size: 0,
             url: "https://example.com/assets.json".into(),
-        },
-        assets: "21".into(),
-        downloads: VersionDownloads::default(),
+        }),
+        assets: Some("21".into()),
+        downloads: Some(VersionDownloads::default()),
         libraries: vec![],
         java_version: None,
         logging: None,
@@ -231,10 +231,19 @@ fn test_resolve_inherits_with_no_parent_is_noop() {
     let parents: HashMap<String, VersionJson> = HashMap::new();
     let resolved = resolve_inherits(&version, &parents).unwrap();
 
-    // When there is no parent, resolve_inherits returns the version unchanged.
+    // When there is no parent, resolve_inherits returns the version unchanged
+    // (post-merge ResolvedVersion has no `inherits_from` field — the chain is
+    // resolved). For a vanilla input, root_id == id (the chain has length 1).
     assert_eq!(resolved.id, "1.21.4");
+    assert_eq!(
+        resolved.root_id, "1.21.4",
+        "vanilla input has root_id == id (no inheritsFrom chain to walk)"
+    );
     assert_eq!(resolved.main_class, "net.minecraft.client.main.Main");
-    assert!(resolved.inherits_from.is_none(), "resolved version should have no inheritsFrom");
+    assert_eq!(
+        resolved.asset_index.id, "21",
+        "asset_index hydrated from input (no parent merge needed)"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

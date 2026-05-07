@@ -142,19 +142,22 @@ async fn test_launch_fails_early_on_java_mismatch() {
     tokio::fs::write(paths.version_jar("1.21.4"), b"fake").await.unwrap();
 
     // Write a minimal version JSON requiring Java 21.
+    // Note: VersionJson::asset_index/assets/downloads are Option<_> after
+    // Phase 8.3 (loader JSONs lack them and inherit from vanilla); vanilla
+    // version JSONs declare them, so we wrap in Some(...) at construction.
     let version = VersionJson {
         id: "1.21.4".into(),
         version_type: "release".into(),
         main_class: "net.minecraft.client.main.Main".into(),
-        asset_index: AssetIndex {
+        asset_index: Some(AssetIndex {
             id: "17".into(),
             sha1: "aaaa".into(),
             size: 0,
             total_size: 0,
             url: "http://example.com/assets.json".into(),
-        },
-        assets: "17".into(),
-        downloads: VersionDownloads::default(),
+        }),
+        assets: Some("17".into()),
+        downloads: Some(VersionDownloads::default()),
         libraries: vec![],
         java_version: Some(JavaVersion {
             component: "java-runtime-delta".into(),

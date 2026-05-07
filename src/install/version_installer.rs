@@ -13,7 +13,7 @@ use crate::mojang::client::{MojangClient, ASSET_CDN_BASE};
 use crate::mojang::inherits::{resolve_inherits, MAX_INHERITS_DEPTH};
 use crate::mojang::natives::{native_classifier_artifact, needs_native_extraction};
 use crate::mojang::rules::{evaluate_rules, RuleContext};
-use crate::mojang::types::{AssetIndexFile, Library, VersionEntry, VersionJson};
+use crate::mojang::types::{AssetIndexFile, Library, ResolvedVersion, VersionEntry, VersionJson};
 use crate::persistence::paths::AppPaths;
 use crate::tasks::job::{JobId, TaskEvent};
 
@@ -130,7 +130,7 @@ pub async fn install_version(
 
 /// Return the subset of `version.libraries` that pass rule evaluation for `ctx`.
 /// Pub for testability.
-pub fn selected_libraries<'a>(version: &'a VersionJson, ctx: &RuleContext) -> Vec<&'a Library> {
+pub fn selected_libraries<'a>(version: &'a ResolvedVersion, ctx: &RuleContext) -> Vec<&'a Library> {
     version.libraries.iter().filter(|lib| evaluate_rules(&lib.rules, ctx)).collect()
 }
 

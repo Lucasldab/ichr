@@ -12,10 +12,10 @@
 //! If both are None, returns an empty vec.
 
 use super::rules::{evaluate_rules, RuleContext};
-use super::types::{ArgValue, ArgumentEntry, VersionJson};
+use super::types::{ArgValue, ArgumentEntry, ResolvedVersion};
 
 /// Resolve the ordered list of game-arg tokens for a given rule context.
-pub fn resolve_game_args(version: &VersionJson, ctx: &RuleContext) -> Vec<String> {
+pub fn resolve_game_args(version: &ResolvedVersion, ctx: &RuleContext) -> Vec<String> {
     if let Some(args) = version.arguments.as_ref() {
         return resolve_arg_entries(&args.game, ctx);
     }
@@ -32,7 +32,7 @@ pub fn resolve_game_args(version: &VersionJson, ctx: &RuleContext) -> Vec<String
 /// / etc.) at launch time. For Phase 2, when the version provides no JVM
 /// args, return an empty Vec — Phase 3 will fall back to its hard-coded
 /// legacy baseline if the returned vec is empty.
-pub fn resolve_jvm_args(version: &VersionJson, ctx: &RuleContext) -> Vec<String> {
+pub fn resolve_jvm_args(version: &ResolvedVersion, ctx: &RuleContext) -> Vec<String> {
     if let Some(args) = version.arguments.as_ref() {
         return resolve_arg_entries(&args.jvm, ctx);
     }
@@ -40,7 +40,7 @@ pub fn resolve_jvm_args(version: &VersionJson, ctx: &RuleContext) -> Vec<String>
 }
 
 /// Resolve both game and JVM args in a single sweep. Returns `(game, jvm)`.
-pub fn resolve_arguments(version: &VersionJson, ctx: &RuleContext) -> (Vec<String>, Vec<String>) {
+pub fn resolve_arguments(version: &ResolvedVersion, ctx: &RuleContext) -> (Vec<String>, Vec<String>) {
     (resolve_game_args(version, ctx), resolve_jvm_args(version, ctx))
 }
 

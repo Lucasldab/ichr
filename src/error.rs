@@ -26,6 +26,15 @@ pub enum AppError {
     #[error("inheritsFrom parent {0} not present in parents map (caller must pre-fetch)")]
     InheritsFromParentMissing(String),
 
+    /// The `inheritsFrom` chain resolved without populating a vanilla-required
+    /// field (`asset_index`, `assets`, or `downloads`). Real Fabric/Quilt/Forge/
+    /// NeoForge loader JSONs are metadata-only and depend on the vanilla parent
+    /// supplying these fields; if the vanilla parent is itself missing the field
+    /// (truncated install, hand-rolled JSON, future Mojang format change) we
+    /// surface a typed error instead of panicking on `.unwrap()`.
+    #[error("version `{version_id}` and its inheritsFrom chain do not declare required field `{field}` (Fabric/Quilt loaders inherit this from vanilla — install the parent vanilla version first)")]
+    InheritsFromMissingRequired { field: String, version_id: String },
+
     #[error("HTTP error: {0}")]
     Http(String),
 

@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use crate::error::AppError;
 use crate::mojang::args::{resolve_game_args, resolve_jvm_args};
 use crate::mojang::rules::RuleContext;
-use crate::mojang::types::VersionJson;
+use crate::mojang::types::ResolvedVersion;
 use crate::persistence::paths::AppPaths;
 
 use super::classpath::{build_classpath, classpath_separator};
@@ -55,7 +55,7 @@ pub struct LaunchCommand {
 /// 5. Run `substitute_all` over both sets.
 /// 6. Return `LaunchCommand`.
 pub fn compose(
-    version: &VersionJson,
+    version: &ResolvedVersion,
     auth: &OfflineAuth,
     paths: &AppPaths,
     slug: &str,
@@ -115,7 +115,7 @@ pub fn compose(
 /// Identical structure to `compose` but populates `SubstitutionContext` with
 /// live Minecraft session fields from `MsaAuth` instead of offline placeholders.
 pub fn compose_msa(
-    version: &VersionJson,
+    version: &ResolvedVersion,
     auth: &MsaAuth,
     paths: &AppPaths,
     slug: &str,
@@ -173,9 +173,11 @@ mod tests {
     use super::*;
     use crate::domain::platform::{Arch, OsName};
     use crate::launcher::offline::offline_auth;
+    use crate::mojang::inherits::resolve_inherits;
     use crate::mojang::rules::RuleContext;
-    use crate::mojang::types::VersionJson;
+    use crate::mojang::types::{ResolvedVersion, VersionJson};
     use crate::persistence::paths::AppPaths;
+    use std::collections::HashMap;
     use std::path::{Path, PathBuf};
 
     fn fixture_paths() -> AppPaths {
@@ -186,9 +188,13 @@ mod tests {
         )
     }
 
-    fn load(path: &str) -> VersionJson {
+    fn load(path: &str) -> ResolvedVersion {
         let raw = std::fs::read_to_string(path).expect("fixture must be present");
-        serde_json::from_str(&raw).expect("fixture must parse")
+        let raw_v: VersionJson = serde_json::from_str(&raw).expect("fixture must parse");
+        // Vanilla fixtures declare asset_index/assets/downloads inline; an empty
+        // parents map is correct because vanilla has no inheritsFrom.
+        resolve_inherits(&raw_v, &HashMap::new())
+            .expect("vanilla fixture has all required fields and resolves to ResolvedVersion")
     }
 
     #[test]

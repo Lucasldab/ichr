@@ -6,11 +6,14 @@
 
 use std::path::{Path, PathBuf};
 
+use std::collections::HashMap;
+
 use mineltui::domain::platform::{Arch, OsName};
 use mineltui::launcher::command::compose;
 use mineltui::launcher::offline::{offline_auth, offline_uuid};
+use mineltui::mojang::inherits::resolve_inherits;
 use mineltui::mojang::rules::RuleContext;
-use mineltui::mojang::types::VersionJson;
+use mineltui::mojang::types::{ResolvedVersion, VersionJson};
 use mineltui::persistence::paths::AppPaths;
 
 fn fixture_paths() -> AppPaths {
@@ -21,9 +24,15 @@ fn fixture_paths() -> AppPaths {
     )
 }
 
-fn load(path: &str) -> VersionJson {
+/// Load a vanilla fixture and resolve to ResolvedVersion (compose takes
+/// `&ResolvedVersion` after Phase 8.3). Vanilla fixtures declare
+/// asset_index/assets/downloads inline, so resolve_inherits with an empty
+/// parents map produces a clean ResolvedVersion (root_id == id).
+fn load(path: &str) -> ResolvedVersion {
     let raw = std::fs::read_to_string(path).expect("fixture present");
-    serde_json::from_str(&raw).expect("fixture parses")
+    let v: VersionJson = serde_json::from_str(&raw).expect("fixture parses");
+    resolve_inherits(&v, &HashMap::new())
+        .expect("vanilla fixture resolves cleanly into ResolvedVersion")
 }
 
 fn assert_arg_pair(args: &[String], flag: &str, value: &str) {

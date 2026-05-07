@@ -20,7 +20,7 @@ use crate::java::detect::{scan_system_javas, SystemJava};
 use crate::java::mapping::{mojang_platform_key, validate_java_major};
 use crate::java::mojang_jre::MojangJreClient;
 use crate::java::types::JavaRuntimeId;
-use crate::mojang::types::VersionJson;
+use crate::mojang::types::ResolvedVersion;
 use crate::persistence::paths::AppPaths;
 
 // ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ impl JavaService {
         &self,
         paths: &AppPaths,
         instance: &InstanceManifest,
-        version: &VersionJson,
+        version: &ResolvedVersion,
     ) -> Result<PathBuf, AppError> {
         // Step 1 — MINELTUI_JAVA debug override (wins unconditionally; the
         // early return makes all subsequent steps unreachable when the var
@@ -267,6 +267,19 @@ impl JavaService {
         let version_json: crate::mojang::types::VersionJson =
             serde_json::from_slice(&bytes)?;
 
+        // 2b) Promote VersionJson into ResolvedVersion. This call runs only
+        //     for VANILLA installs from MC version strings (loader installers
+        //     run a different code path), so `inherits_from` is None on disk
+        //     and resolve_inherits returns Ok with the same fields wrapped
+        //     into ResolvedVersion's required-fields shape. If a vanilla JSON
+        //     on disk somehow lacks asset_index/assets/downloads (truncated
+        //     install), the typed AppError::InheritsFromMissingRequired
+        //     surfaces with a clear "install vanilla first" message.
+        let parents: std::collections::HashMap<String, crate::mojang::types::VersionJson> =
+            std::collections::HashMap::new();
+        let resolved =
+            crate::mojang::inherits::resolve_inherits(&version_json, &parents)?;
+
         // 3) Synthesize a stub instance manifest — no overrides, drives the
         //    standard precedence chain inside resolve_jre_for_launch.
         let stub = InstanceManifest::new(
@@ -274,7 +287,7 @@ impl JavaService {
             "loader-install".into(),
             mc_version.to_string(),
         );
-        self.resolve_jre_for_launch(paths, &stub, &version_json).await
+        self.resolve_jre_for_launch(paths, &stub, &resolved).await
     }
 }
 
@@ -289,9 +302,11 @@ mod tests {
     use crate::instance::store::{read_instance_manifest, write_instance_manifest};
     use crate::java::adoptium::AdoptiumClient;
     use crate::java::mojang_jre::MojangJreClient;
+    use crate::mojang::inherits::resolve_inherits;
     use crate::mojang::types::{
-        AssetIndex, VersionDownloads, VersionJson, JavaVersion,
+        AssetIndex, JavaVersion, ResolvedVersion, VersionDownloads, VersionJson,
     };
+    use std::collections::HashMap;
     use httpmock::MockServer;
     use httpmock::Method::GET;
     use std::sync::OnceLock;
@@ -318,20 +333,23 @@ mod tests {
         )
     }
 
-    fn minimal_version(component: &str, major: u32) -> VersionJson {
-        VersionJson {
+    fn minimal_version(component: &str, major: u32) -> ResolvedVersion {
+        // Construct as VersionJson then promote via resolve_inherits — this
+        // mirrors the production codepath (parse-from-disk -> resolve) and
+        // proves the demoted Option fields wrap cleanly.
+        let v = VersionJson {
             id: "1.21.4".into(),
             version_type: "release".into(),
             main_class: "net.minecraft.client.main.Main".into(),
-            asset_index: AssetIndex {
+            asset_index: Some(AssetIndex {
                 id: "17".into(),
                 sha1: "aaaa".into(),
                 size: 0,
                 total_size: 0,
                 url: "http://example.com/assets.json".into(),
-            },
-            assets: "17".into(),
-            downloads: VersionDownloads::default(),
+            }),
+            assets: Some("17".into()),
+            downloads: Some(VersionDownloads::default()),
             libraries: vec![],
             java_version: Some(JavaVersion {
                 component: component.into(),
@@ -345,23 +363,24 @@ mod tests {
             arguments: None,
             minecraft_arguments: None,
             inherits_from: None,
-        }
+        };
+        resolve_inherits(&v, &HashMap::new()).expect("minimal_version must resolve cleanly")
     }
 
-    fn version_without_java_version() -> VersionJson {
-        VersionJson {
+    fn version_without_java_version() -> ResolvedVersion {
+        let v = VersionJson {
             id: "1.16.5".into(),
             version_type: "release".into(),
             main_class: "net.minecraft.client.main.Main".into(),
-            asset_index: AssetIndex {
+            asset_index: Some(AssetIndex {
                 id: "1.16".into(),
                 sha1: "aaaa".into(),
                 size: 0,
                 total_size: 0,
                 url: "http://example.com/assets.json".into(),
-            },
-            assets: "1.16".into(),
-            downloads: VersionDownloads::default(),
+            }),
+            assets: Some("1.16".into()),
+            downloads: Some(VersionDownloads::default()),
             libraries: vec![],
             java_version: None,
             logging: None,
@@ -372,7 +391,9 @@ mod tests {
             arguments: None,
             minecraft_arguments: Some("-Xmx1G".into()),
             inherits_from: None,
-        }
+        };
+        resolve_inherits(&v, &HashMap::new())
+            .expect("version_without_java_version must resolve cleanly")
     }
 
     fn instance_no_override(slug: &str) -> InstanceManifest {

@@ -45,7 +45,9 @@ fn test_parse_modern_version_json() {
         v.java_version.as_ref().expect("javaVersion must be present").major_version,
         21
     );
-    assert_eq!(v.asset_index.id, v.assets, "assetIndex.id must equal assets field");
+    let aid = v.asset_index.as_ref().expect("vanilla 1.21.4 declares assetIndex");
+    let assets = v.assets.as_ref().expect("vanilla 1.21.4 declares assets");
+    assert_eq!(&aid.id, assets, "assetIndex.id must equal assets field");
 }
 
 #[test]
@@ -114,7 +116,11 @@ fn test_parse_snapshot_version_json() {
     assert_eq!(v.version_type, "snapshot", "pinned snapshot must have type == snapshot");
     assert!(!v.main_class.is_empty(), "mainClass must be non-empty in snapshot");
     assert!(
-        !v.asset_index.sha1.is_empty(),
+        !v.asset_index
+            .as_ref()
+            .expect("snapshot fixture declares assetIndex")
+            .sha1
+            .is_empty(),
         "assetIndex.sha1 must be populated in snapshot"
     );
     // The snapshot uses either modern or legacy arg format — accept either
@@ -392,6 +398,16 @@ fn test_inherits_from_no_parent_is_identity() {
 // ---------------------------------------------------------------------------
 
 use mineltui::mojang::args::{resolve_game_args, resolve_jvm_args};
+use mineltui::mojang::types::ResolvedVersion;
+
+/// Helper: promote a VersionJson into ResolvedVersion via resolve_inherits.
+/// All callers below have a vanilla-shape VersionJson (asset_index/assets/
+/// downloads populated) and no inheritsFrom, so resolve produces a clean
+/// ResolvedVersion with `root_id == id`.
+fn resolved(v: &VersionJson) -> ResolvedVersion {
+    resolve_inherits(v, &HashMap::new())
+        .expect("vanilla-shape VersionJson must resolve cleanly")
+}
 
 // Test 20
 #[test]
@@ -399,7 +415,7 @@ fn test_resolve_game_args_1_21_4_flattens_structured_args() {
     let raw = include_str!("./fixtures/mojang/version_1_21_4.json");
     let v: VersionJson = serde_json::from_str(raw).unwrap();
     let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-    let result = resolve_game_args(&v, &ctx);
+    let result = resolve_game_args(&resolved(&v), &ctx);
     assert!(!result.is_empty(), "1.21.4 game args must be non-empty");
     assert!(
         result.contains(&"--username".to_string()),
@@ -414,7 +430,7 @@ fn test_resolve_game_args_1_12_2_splits_minecraft_arguments_on_whitespace() {
     let raw = include_str!("./fixtures/mojang/version_1_12_2.json");
     let v: VersionJson = serde_json::from_str(raw).unwrap();
     let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-    let result = resolve_game_args(&v, &ctx);
+    let result = resolve_game_args(&resolved(&v), &ctx);
     assert!(result.len() > 10, "1.12.2 split args must have many tokens; got {}", result.len());
     assert!(
         result.iter().any(|s| s == "--username"),
@@ -432,7 +448,7 @@ fn test_resolve_jvm_args_1_21_4_os_linux_x86_64_contains_classpath_placeholder()
     let raw = include_str!("./fixtures/mojang/version_1_21_4.json");
     let v: VersionJson = serde_json::from_str(raw).unwrap();
     let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-    let result = resolve_jvm_args(&v, &ctx);
+    let result = resolve_jvm_args(&resolved(&v), &ctx);
     assert!(
         result.contains(&"${classpath}".to_string()),
         "JVM args for linux/x86_64 must contain classpath placeholder; got: {result:?}"
@@ -449,7 +465,7 @@ fn test_resolve_jvm_args_1_21_4_unique_token_count_under_80() {
     let raw = include_str!("./fixtures/mojang/version_1_21_4.json");
     let v: VersionJson = serde_json::from_str(raw).unwrap();
     let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-    let result = resolve_jvm_args(&v, &ctx);
+    let result = resolve_jvm_args(&resolved(&v), &ctx);
     assert!(
         result.len() <= 20,
         "rule filtering must produce a reasonable JVM arg count; got {}",
@@ -476,7 +492,7 @@ fn test_resolve_arguments_unknown_feature_flag_defaults_disallow() {
         arch: Arch::X86_64,
         features: HashSet::new(),
     };
-    let result = resolve_game_args(&v, &ctx);
+    let result = resolve_game_args(&resolved(&v), &ctx);
     assert!(
         !result.contains(&"--demo".to_string()),
         "unknown feature flag must NOT produce --demo; got: {result:?}"
@@ -492,7 +508,7 @@ fn test_resolve_arguments_prefers_arguments_struct_over_legacy_string() {
     v.arguments = Some(arguments);
     v.minecraft_arguments = Some("--legacy-arg".to_string());
     let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-    let result = resolve_game_args(&v, &ctx);
+    let result = resolve_game_args(&resolved(&v), &ctx);
     assert!(
         result.contains(&"--structured-arg".to_string()),
         "structured arguments must be returned when both formats present"
@@ -510,8 +526,8 @@ fn test_resolve_arguments_missing_both_returns_empty() {
     v.arguments = None;
     v.minecraft_arguments = None;
     let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-    let game = resolve_game_args(&v, &ctx);
-    let jvm = resolve_jvm_args(&v, &ctx);
+    let game = resolve_game_args(&resolved(&v), &ctx);
+    let jvm = resolve_jvm_args(&resolved(&v), &ctx);
     assert!(game.is_empty(), "game args must be empty when both None");
     assert!(jvm.is_empty(), "jvm args must be empty when both None");
 }
