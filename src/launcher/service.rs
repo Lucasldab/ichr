@@ -360,6 +360,15 @@ mod tests {
     /// the launcher can actually GET PAST the loader path when the install
     /// is real.
     ///
+    /// GAP-LAUNCH-PARSE-08 (Phase 8.3 round-3): the loader JSON literal in
+    /// this test was UNFATTENED — assetIndex, assets, and downloads were
+    /// REMOVED from the loader child literal in this round (they were added
+    /// by the 8.2-01 deviation note 3, which masked the bug). This restores
+    /// a production-shape fixture: real Fabric/Quilt/Forge/NeoForge loader
+    /// JSONs lack those three fields (inherited from vanilla via inheritsFrom).
+    /// If this test fails to parse, the fix is wrong — DO NOT fatten the
+    /// fixture; fix the type system instead.
+    ///
     /// Implementation note: we set `MINELTUI_JAVA` to a non-existent path so
     /// `JavaService::resolve_jre_for_launch` short-circuits with that path
     /// (Step 5 succeeds), `compose` succeeds (pure-sync), and Step 7 then
@@ -413,22 +422,22 @@ mod tests {
         tokio::fs::create_dir_all(loader_json_path.parent().unwrap()).await.unwrap();
         // Loader JSON inherits from vanilla and carries Fabric mainClass.
         // resolve_inherits walks `inherits_from`, fetches the parent from
-        // the parents map, and merges. Required field shape mirrors what
-        // Phase 6's install_loader actually writes.
+        // the parents map, and merges. PRODUCTION SHAPE: real Fabric/Quilt/
+        // Forge/NeoForge loader JSONs DO NOT declare assetIndex, assets,
+        // or downloads — those fields are inherited from the vanilla parent
+        // via the inheritsFrom chain. The 8.2-01 round committed a
+        // FATTENED literal (with those three fields baked in) which masked
+        // the BLOCKER bug at parse time. The literal below restores the
+        // production-matching shape; if it fails to parse, the fix is the
+        // type system (Option-demote in src/mojang/types.rs), NOT
+        // re-fattening this fixture. See GAP-LAUNCH-PARSE-08 plan
+        // 08.3-01 for the full lesson.
         let loader_json = r#"{
             "id": "fabric-loader-0.16.9-1.20.4",
             "inheritsFrom": "1.20.4",
             "type": "release",
             "mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
-            "assetIndex": {
-                "id": "12",
-                "sha1": "0000000000000000000000000000000000000000",
-                "size": 0,
-                "totalSize": 0,
-                "url": "http://example.com/12.json"
-            },
-            "assets": "12",
-            "downloads": {},
+            "arguments": { "game": [], "jvm": [] },
             "libraries": [],
             "releaseTime": "2024-12-15T00:00:00Z",
             "time": "2024-12-15T00:00:00Z"

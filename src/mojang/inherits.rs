@@ -214,3 +214,189 @@ fn merge(parent: VersionJson, child: VersionJson) -> VersionJson {
         inherits_from: None, // resolved chain — no further parent
     }
 }
+
+// ----- tests -----------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::types::AssetIndex;
+    use crate::error::AppError;
+    use std::collections::HashMap;
+
+    /// Build a VersionJson for tests via JSON parsing — mirrors the pattern
+    /// in `tests/mojang_protocol.rs::vjson_stub` but local to this file (no
+    /// cross-crate test-helper coupling). Includes the demoted fields by
+    /// default; helpers below override them to None as needed for loader
+    /// shapes.
+    fn vjson(id: &str) -> VersionJson {
+        serde_json::from_str(&format!(
+            r#"{{
+                "id": "{id}",
+                "type": "release",
+                "mainClass": "net.minecraft.client.main.Main",
+                "assetIndex": {{
+                    "id": "x",
+                    "sha1": "0000000000000000000000000000000000000000",
+                    "size": 0,
+                    "totalSize": 0,
+                    "url": "http://example.com/"
+                }},
+                "assets": "x",
+                "downloads": {{}},
+                "libraries": [],
+                "releaseTime": "2020-01-01T00:00:00Z",
+                "time": "2020-01-01T00:00:00Z"
+            }}"#
+        ))
+        .unwrap()
+    }
+
+    /// Real Fabric/Quilt loader on-disk JSON shape: NO assetIndex, NO assets,
+    /// NO downloads, NO javaVersion, NO logging. Has inheritsFrom set.
+    /// This is the production-shape fixture — DO NOT add the demoted fields
+    /// to it. If a test fails because parse rejects this shape, the fix is
+    /// the type system (Option-demote those fields), NOT fattening the
+    /// fixture. See plan 08.3-01 explicit forbid for the rationale.
+    fn loader_vjson(id: &str, parent_id: &str) -> VersionJson {
+        serde_json::from_str(&format!(
+            r#"{{
+                "id": "{id}",
+                "inheritsFrom": "{parent_id}",
+                "type": "release",
+                "mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+                "arguments": {{ "game": [], "jvm": [] }},
+                "libraries": [],
+                "releaseTime": "2025-08-01T12:00:00Z",
+                "time": "2025-08-01T12:00:00Z"
+            }}"#
+        ))
+        .unwrap()
+    }
+
+    /// GAP-LAUNCH-PARSE-08 regression (Phase 8.3 round-3 BLOCKER):
+    /// production-shaped loader JSON (NO assetIndex/assets/downloads — those
+    /// are inherited from vanilla via `inheritsFrom`) MUST resolve cleanly
+    /// when the vanilla parent is in the parents map.
+    #[test]
+    fn test_resolve_inherits_loader_shape_hydrates_from_vanilla_parent() {
+        // Loader child — production shape: no assetIndex/assets/downloads.
+        let loader = loader_vjson("fabric-loader-0.19.2-1.20.4", "1.20.4");
+        assert!(
+            loader.asset_index.is_none(),
+            "loader_vjson fixture must lack asset_index — this proves the test fixture matches \
+             production loader JSONs on disk (NOT the 8.2-01 fattened shape)"
+        );
+        assert!(loader.assets.is_none());
+        assert!(loader.downloads.is_none());
+
+        // Vanilla parent — has the demoted fields.
+        let vanilla = vjson("1.20.4");
+        assert!(
+            vanilla.asset_index.is_some(),
+            "vanilla fixture must declare asset_index"
+        );
+
+        let mut parents = HashMap::new();
+        parents.insert("1.20.4".to_string(), vanilla);
+
+        let resolved = resolve_inherits(&loader, &parents)
+            .expect("loader+vanilla merge must produce ResolvedVersion");
+
+        // ResolvedVersion fields are non-Option — they're hydrated from the parent.
+        assert_eq!(
+            resolved.asset_index.id, "x",
+            "asset_index hydrated from vanilla parent"
+        );
+        assert_eq!(resolved.assets, "x", "assets hydrated from vanilla parent");
+
+        // id remains the loader id (MultiMC convention — used in ${version_name})
+        assert_eq!(resolved.id, "fabric-loader-0.19.2-1.20.4");
+        // root_id is the vanilla MC id (where the JAR lives on disk —
+        // SECONDARY-BUG-FIX surface area)
+        assert_eq!(resolved.root_id, "1.20.4");
+        // mainClass: child wins
+        assert_eq!(
+            resolved.main_class,
+            "net.fabricmc.loader.impl.launch.knot.KnotClient"
+        );
+    }
+
+    /// Existing semantic must be preserved: when both child and parent have
+    /// asset_index, the child's value wins (not silently overridden by parent).
+    #[test]
+    fn test_resolve_inherits_child_asset_index_wins_when_both_set() {
+        let mut child = vjson("child");
+        // child gets a SPECIFIC asset_index id we'll assert on
+        child.asset_index = Some(AssetIndex {
+            id: "child-aid".into(),
+            sha1: "1111111111111111111111111111111111111111".into(),
+            size: 0,
+            total_size: 0,
+            url: "http://example.com/child".into(),
+        });
+        child.assets = Some("child-assets".into());
+        child.inherits_from = Some("parent".into());
+
+        let mut parent = vjson("parent");
+        parent.asset_index = Some(AssetIndex {
+            id: "parent-aid".into(),
+            sha1: "2222222222222222222222222222222222222222".into(),
+            size: 0,
+            total_size: 0,
+            url: "http://example.com/parent".into(),
+        });
+        parent.assets = Some("parent-assets".into());
+
+        let mut parents = HashMap::new();
+        parents.insert("parent".to_string(), parent);
+
+        let resolved = resolve_inherits(&child, &parents).expect("must resolve");
+        assert_eq!(
+            resolved.asset_index.id, "child-aid",
+            "child wins when both child and parent declare asset_index"
+        );
+        assert_eq!(
+            resolved.assets, "child-assets",
+            "child wins when both child and parent declare assets"
+        );
+    }
+
+    /// When neither child nor any ancestor declares asset_index, resolve_inherits
+    /// must surface InheritsFromMissingRequired (NOT panic on a missing field).
+    #[test]
+    fn test_resolve_inherits_errors_when_required_field_missing_from_chain() {
+        // A vanilla-id parent with `inherits_from: None` but ALSO missing
+        // asset_index/assets/downloads — the degenerate case (truncated
+        // install / hand-rolled JSON) the typed error variant exists for.
+        let mut bare_parent = vjson("bare-parent");
+        bare_parent.asset_index = None;
+        bare_parent.assets = None;
+        bare_parent.downloads = None;
+        bare_parent.inherits_from = None;
+
+        // Child references bare_parent as its inheritsFrom (loader shape:
+        // also missing the demoted fields).
+        let bare_child = loader_vjson("bare-child", "bare-parent");
+
+        let mut parents = HashMap::new();
+        parents.insert("bare-parent".to_string(), bare_parent);
+
+        let result = resolve_inherits(&bare_child, &parents);
+        match result {
+            Err(AppError::InheritsFromMissingRequired { field, version_id }) => {
+                assert_eq!(
+                    field, "asset_index",
+                    "first missing required field reported: asset_index"
+                );
+                assert_eq!(
+                    version_id, "bare-child",
+                    "version_id in error is the originating child"
+                );
+            }
+            other => panic!(
+                "expected Err(InheritsFromMissingRequired {{ field: \"asset_index\", .. }}); got {other:?}"
+            ),
+        }
+    }
+}
