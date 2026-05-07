@@ -18,7 +18,9 @@ use std::time::Duration;
 
 use crate::mods::error::ModrinthError;
 use crate::mods::filter::{is_safe_modrinth_slug, search_facets};
-use crate::mods::types::{ModrinthProjectDetail, ModrinthSearchHit, ModrinthVersion};
+use crate::mods::types::{
+    ModrinthProjectDetail, ModrinthSearchHit, ModrinthVersion, ProjectIdTitle,
+};
 
 pub const DEFAULT_MODRINTH_BASE: &str = "https://api.modrinth.com";
 pub const MODRINTH_BASE_URL_ENV: &str = "MINELTUI_MODRINTH_BASE_URL";
@@ -200,6 +202,44 @@ impl ModrinthClient {
             license_id: p.license.map(|l| l.id).unwrap_or_default(),
             categories: cats,
         })
+    }
+
+    /// `GET /v2/projects?ids=[...]` — batch-fetch (id, title) pairs.
+    ///
+    /// Used by the dep-resolver title-hydration pass (closes GAP-8-D —
+    /// without this, `ResolvedDep.project_title` is empty and the dep-confirm
+    /// modal + Installed Mods List surface opaque project_ids).
+    ///
+    /// Returns `Ok(vec![])` for an empty input slice (no HTTP call). Modrinth
+    /// allows up to 200 ids per call; callers in this codebase expect at most
+    /// ~10 deps per resolve so we do not chunk. Issues a single round-trip
+    /// regardless of the BFS diamond shape (dedupe before call).
+    ///
+    /// The response projection is intentionally minimal — only `id` + `title`
+    /// — because the BFS resolver only needs the title for display. Other
+    /// project fields (description, license, categories) flow through
+    /// `get_project` on the detail-pane code path.
+    #[tracing::instrument(skip_all, fields(n = ids.len()))]
+    pub async fn get_projects_batch(
+        &self,
+        ids: &[&str],
+    ) -> Result<Vec<ProjectIdTitle>, ModrinthError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        // Modrinth expects ids as a JSON-encoded array literal in the query
+        // string: `ids=["P7dR8mSH","AANobbMI"]`. urlencoding handles the
+        // percent-encoding of brackets and quotes.
+        let json_array = serde_json::to_string(ids)
+            .map_err(|e| ModrinthError::Parse(format!("get_projects_batch ids encode: {e}")))?;
+        let url = format!(
+            "{}/v2/projects?ids={}",
+            self.base_url,
+            urlencoding::encode(&json_array)
+        );
+        let bytes = self.send_get_bytes(&url).await?;
+        serde_json::from_slice::<Vec<ProjectIdTitle>>(&bytes)
+            .map_err(|e| ModrinthError::Parse(format!("get_projects_batch {url}: {e}")))
     }
 
     /// `GET /v2/project/{id}/version` — filtered version list.
