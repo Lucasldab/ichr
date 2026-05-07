@@ -171,4 +171,79 @@ mod tests {
             "net/fabricmc/sponge-mixin/0.17.0+mixin.0.8.7/sponge-mixin-0.17.0+mixin.0.8.7.jar"
         );
     }
+
+    // -----------------------------------------------------------------
+    // GAP-7-C fixtures (07.2-02): 4- and 5-segment Maven coordinates
+    // -----------------------------------------------------------------
+    // The Apache Maven coord layout per https://maven.apache.org/pom.html#Maven_Coordinates is:
+    //   groupId:artifactId:version[:classifier[:extension]]
+    // The original parser (07-01) hardcoded splitn(3, ':') and rejected
+    // 4- and 5-segment coords. NeoForge's installer-produced version JSON
+    // for MC 21.4.x references `net.neoforged:mergetool:2.0.0:api` (a real
+    // upstream artifact published with classifier `api`); harvest panicked
+    // at 85% with InvalidMavenCoord. These fixtures pin the new behaviour.
+
+    #[test]
+    fn test_parse_maven_coord_accepts_4_segment_classifier() {
+        // GAP-7-C trigger: real-world coord from NeoForge 21.4.x installer output.
+        let c = parse_maven_coord("net.neoforged:mergetool:2.0.0:api").unwrap();
+        assert_eq!(c.group, "net.neoforged");
+        assert_eq!(c.artifact, "mergetool");
+        assert_eq!(c.version, "2.0.0");
+        assert_eq!(c.classifier, Some("api"));
+        assert_eq!(c.extension, None);
+    }
+
+    #[test]
+    fn test_maven_coord_to_path_4_segment_classifier_neoforge_mergetool() {
+        // The exact failing coord from the 2026-05-07 UAT — pins the GAP-7-C closure.
+        let p = maven_coord_to_path("net.neoforged:mergetool:2.0.0:api").unwrap();
+        assert_eq!(p, "net/neoforged/mergetool/2.0.0/mergetool-2.0.0-api.jar");
+    }
+
+    #[test]
+    fn test_maven_coord_to_path_5_segment_classifier_extension() {
+        // LWJGL natives shape — Phase 12 launch wiring will need this; closing
+        // GAP-7-C delivers the infrastructure forward.
+        let p = maven_coord_to_path("org.lwjgl:lwjgl-glfw:3.3.3:natives-linux:zip").unwrap();
+        assert_eq!(
+            p,
+            "org/lwjgl/lwjgl-glfw/3.3.3/lwjgl-glfw-3.3.3-natives-linux.zip"
+        );
+    }
+
+    #[test]
+    fn test_parse_maven_coord_rejects_6_segments() {
+        // 6 segments must be rejected — Apache Maven defines exactly 5.
+        let r = parse_maven_coord("g:a:v:c:e:extra");
+        assert!(matches!(r, Err(LoaderError::InvalidMavenCoord { .. })));
+    }
+
+    #[test]
+    fn test_parse_maven_coord_rejects_7_segments() {
+        // Defense-in-depth: 7+ segments must be rejected.
+        let r = parse_maven_coord("g:a:v:c:e:extra:more");
+        assert!(matches!(r, Err(LoaderError::InvalidMavenCoord { .. })));
+    }
+
+    #[test]
+    fn test_maven_coord_to_path_rejects_classifier_with_traversal() {
+        // is_safe_maven_segment must apply to classifier — `..` rejected.
+        let r = maven_coord_to_path("net.neoforged:mergetool:2.0.0:..");
+        assert!(matches!(r, Err(LoaderError::InvalidMavenCoord { .. })));
+    }
+
+    #[test]
+    fn test_maven_coord_to_path_rejects_classifier_with_forward_slash() {
+        // is_safe_maven_segment must apply to classifier — `/` rejected.
+        let r = maven_coord_to_path("net.neoforged:mergetool:2.0.0:foo/bar");
+        assert!(matches!(r, Err(LoaderError::InvalidMavenCoord { .. })));
+    }
+
+    #[test]
+    fn test_maven_coord_to_path_rejects_extension_with_backslash() {
+        // is_safe_maven_segment must apply to extension — `\` rejected (Windows path sep).
+        let r = maven_coord_to_path("net.neoforged:mergetool:2.0.0:api:foo\\bar");
+        assert!(matches!(r, Err(LoaderError::InvalidMavenCoord { .. })));
+    }
 }
