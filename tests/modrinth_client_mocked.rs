@@ -677,3 +677,64 @@ async fn test_dep_resolve_titles_propagate_to_ledger_display_name() {
         .expect("Sodium row missing from ledger");
     assert_eq!(sodium_row.display_name, "Sodium");
 }
+
+// ============================================================================
+// Test 5: GAP-FACETS-EMPTY-08 — empty loader + non-empty MC produces NO empty
+// AND group in the outbound facets URL parameter
+// ============================================================================
+
+/// GAP-FACETS-EMPTY-08 (Phase 8.2 gap closure, round-2 UAT test 3a):
+///
+/// When the user toggles loader filter to 'any' (= `loaders == &[]`) but
+/// leaves the MC filter set to a specific version, the search URL must
+/// NOT contain a URL-encoded empty AND group `%5B%5D` (= `[]`). Modrinth
+/// treats an empty inner OR-array inside the outer AND as "match nothing",
+/// returning zero hits — the user-visible UAT 3a symptom.
+///
+/// This test catches the bug at the network boundary, complementing the
+/// pure-function tests in src/mods/filter.rs (which now lock the
+/// search_facets shape). httpmock 0.8.3's `req.query_params()` URL-decodes
+/// values before returning them, so we assert the literal `[]` substring
+/// is absent (rather than the URL-encoded `%5B%5D`).
+#[tokio::test]
+async fn test_search_url_omits_empty_facets_and_group() {
+    let server = MockServer::start();
+    let m = server.mock(|when, then| {
+        when.method(GET)
+            .path("/v2/search")
+            .query_param("query", "continuity")
+            // The fix MUST produce a facets parameter with the project_type
+            // group AND the versions group, but NO empty categories group.
+            // Use is_true closure to inspect the literal facets query param
+            // value (URL-decoded by httpmock 0.8 via url::Url::query_pairs).
+            .is_true(|req| {
+                let facets = req
+                    .query_params()
+                    .into_iter()
+                    .find(|(k, _)| k == "facets")
+                    .map(|(_, v)| v)
+                    .unwrap_or_default();
+                // facets is the URL-DECODED value (httpmock decodes for us).
+                // After fix:  [["versions:1.20.4"],["project_type:mod"]]
+                // Before fix: [[],["versions:1.20.4"],["project_type:mod"]]
+                !facets.contains("[]")
+                    && facets.contains("versions:1.20.4")
+                    && facets.contains("project_type:mod")
+            });
+        then.status(200)
+            .header("content-type", "application/json")
+            .body(r#"{"hits":[],"offset":0,"limit":20,"total_hits":0}"#);
+    });
+
+    let client = ModrinthClient::new_with_base_url(server.base_url())
+        .expect("ModrinthClient::new_with_base_url");
+
+    // The exact configuration from UAT round-2 test 3a: loader='any'
+    // (empty slice), mc=Some("1.20.4"), query=continuity.
+    let _ = client
+        .search("continuity", Some("1.20.4"), &[], 20)
+        .await
+        .expect("search must reach the mock; request URL is the SUT");
+
+    m.assert();
+}
