@@ -53,17 +53,31 @@ pub fn modrinth_filter_for(
 /// Example output for `(["fabric"], ["1.20.4"], "mod")`:
 /// `[["categories:fabric"],["versions:1.20.4"],["project_type:mod"]]`
 pub fn search_facets(loaders: &[&str], mc_versions: &[String], project_type: &str) -> String {
+    // GAP-FACETS-EMPTY-08 (Phase 8.2 gap closure): empty inner OR-arrays
+    // (e.g. `[]`) inside the outer AND make Modrinth match nothing — the
+    // outer AND requires every inner OR to satisfy at least one term. So
+    // when a category is "any" (empty input slice), we MUST omit that
+    // entire AND group, not emit `[]`. Caller contract (client.rs:97)
+    // still emits `&facets=` whenever `mc.is_some() || !loaders.is_empty()`;
+    // the project_type group is always present so the parameter is never
+    // empty in practice.
     let make = |k: &str, vs: &[String]| -> String {
         let parts: Vec<String> = vs.iter().map(|v| format!("\"{k}:{v}\"")).collect();
         format!("[{}]", parts.join(","))
     };
     let loader_arr: Vec<String> = loaders.iter().map(|s| (*s).to_string()).collect();
     let pt_arr = [project_type.to_string()];
-    let parts = [
-        make("categories", &loader_arr),
-        make("versions", mc_versions),
-        make("project_type", &pt_arr),
-    ];
+
+    let mut parts: Vec<String> = Vec::with_capacity(3);
+    if !loader_arr.is_empty() {
+        parts.push(make("categories", &loader_arr));
+    }
+    if !mc_versions.is_empty() {
+        parts.push(make("versions", mc_versions));
+    }
+    // project_type is always non-empty — it's a required positional arg.
+    parts.push(make("project_type", &pt_arr));
+
     format!("[{}]", parts.join(","))
 }
 
