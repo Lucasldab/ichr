@@ -668,6 +668,73 @@ mod tests {
         assert!(v.is_none());
     }
 
+    // --- get_projects_batch --------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_projects_batch_returns_id_title_pairs() {
+        // Closes GAP-8-D — this endpoint feeds the dep-resolver title-hydration
+        // pass that populates ResolvedDep.project_title.
+        let server = MockServer::start();
+        let m = server.mock(|when, then| {
+            when.method(GET)
+                .path("/v2/projects")
+                .query_param("ids", r#"["P7dR8mSH","AANobbMI"]"#);
+            then.status(200).body(
+                json!([
+                    { "id": "P7dR8mSH", "title": "Fabric API" },
+                    { "id": "AANobbMI", "title": "Sodium" }
+                ])
+                .to_string(),
+            );
+        });
+        let c = make_client(&server);
+        let pairs = c
+            .get_projects_batch(&["P7dR8mSH", "AANobbMI"])
+            .await
+            .unwrap();
+        m.assert();
+        assert_eq!(pairs.len(), 2);
+        assert!(
+            pairs
+                .iter()
+                .any(|p| p.id == "P7dR8mSH" && p.title == "Fabric API"),
+            "missing Fabric API entry: {pairs:?}"
+        );
+        assert!(
+            pairs
+                .iter()
+                .any(|p| p.id == "AANobbMI" && p.title == "Sodium"),
+            "missing Sodium entry: {pairs:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_projects_batch_empty_no_http() {
+        // Empty input must return Ok(vec![]) WITHOUT issuing an HTTP call.
+        // We point the client at an unreachable address; if the impl tried to
+        // send a request, this would error or hang.
+        let c = ModrinthClient::new_with_base_url("http://127.0.0.1:1".to_string()).unwrap();
+        let pairs = c.get_projects_batch(&[]).await.unwrap();
+        assert!(pairs.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_projects_batch_429_returns_rate_limited() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(GET).path("/v2/projects");
+            then.status(429).header("Retry-After", "30").body("{}");
+        });
+        let c = make_client(&server);
+        let r = c.get_projects_batch(&["P7dR8mSH"]).await;
+        match r {
+            Err(ModrinthError::RateLimited { retry_after_secs }) => {
+                assert_eq!(retry_after_secs, 30)
+            }
+            other => panic!("expected RateLimited, got {other:?}"),
+        }
+    }
+
     // --- env override --------------------------------------------------------
 
     #[tokio::test]
