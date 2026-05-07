@@ -80,8 +80,17 @@ pub async fn launch_instance(
     // missing client JAR will surface from the spawn layer when the JVM
     // fails to find the class on its classpath.
 
-    // Step 3 — load root version JSON from disk (no network)
+    // Step 3 — load root version JSON from disk (no network unless migration runs)
     send_progress(&tx, job_id, 10, "loading version JSON").await;
+
+    // Phase 8.4 GAP-LIBRARY-SHAPE-08: lazy migration of pre-8.4 flat-shape
+    // loader JSONs. Idempotent (no network on already-Mojang-shape files).
+    let fabric_client = crate::loader::fabric::FabricMetaClient::new()
+        .map_err(|e| AppError::Http(format!("init fabric client: {e}")))?;
+    let quilt_client = crate::loader::quilt::QuiltMetaClient::new()
+        .map_err(|e| AppError::Http(format!("init quilt client: {e}")))?;
+    migrate_loader_json_in_place_if_needed(paths, launch_version_id, &fabric_client, &quilt_client).await?;
+
     let root_version = read_version_json_from_disk(paths, launch_version_id).await?;
 
     // Step 4 — walk inheritsFrom chain from disk only; call pure-sync resolve_inherits
@@ -206,11 +215,137 @@ async fn collect_parents_from_disk(
             // Cycle detected — resolve_inherits will reject with InheritsFromCycle
             break;
         }
+        // Phase 8.4 NOTE: parent JSON migration is intentionally skipped — vanilla
+        // MC parents are Mojang shape (Mojang ships them); Fabric/Quilt loader
+        // JSONs do not inheritsFrom other loaders. If a future case introduces a
+        // multi-hop loader chain whose intermediate JSON is flat-shape, add a
+        // migrate_loader_json_in_place_if_needed call here.
         let pv = read_version_json_from_disk(paths, &parent_id).await?;
         current = pv.inherits_from.clone();
         parents.insert(parent_id, pv);
     }
     Ok(parents)
+}
+
+// -----------------------------------------------------------------------
+// Phase 8.4 GAP-LIBRARY-SHAPE-08 — lazy in-place migration of flat-shape
+// loader JSONs left on disk by pre-8.4 installs.
+// -----------------------------------------------------------------------
+
+/// Heuristic: a flat fabric-meta/quilt-meta shape has top-level `url` per
+/// library AND no `downloads` block per library. Returns true on first
+/// library entry only — sufficient because Phase 6 wrote them all from the
+/// same upstream API, so the entire libraries array is uniformly one shape
+/// or the other.
+fn is_flat_fabric_meta_shape(v: &serde_json::Value) -> bool {
+    let Some(libs) = v.get("libraries").and_then(|x| x.as_array()) else {
+        return false;
+    };
+    let Some(first) = libs.first() else {
+        return false;
+    };
+    let has_top_level_url = first.get("url").is_some();
+    let has_downloads_block = first.get("downloads").is_some();
+    has_top_level_url && !has_downloads_block
+}
+
+/// Migrate an already-installed loader version JSON from flat fabric-meta
+/// shape to Mojang shape, in place, exactly once per stale instance.
+///
+/// Idempotent: no-op when the on-disk JSON is already Mojang shape (no
+/// network call, no rewrite). Test 5 in tests/loader_install_translate.rs
+/// pins the idempotence invariant.
+///
+/// Errors map to AppError::Http for network/HTTP failures and AppError
+/// I/O variants for filesystem failures. Migration cannot run offline; if
+/// the user is offline AND has a stale JSON, the migration fails; the
+/// subsequent read_version_json_from_disk + serde parse will then fail in
+/// the same way it would have without the migration step (no regression).
+async fn migrate_loader_json_in_place_if_needed(
+    paths: &AppPaths,
+    version_id: &str,
+    fabric_client: &crate::loader::fabric::FabricMetaClient,
+    quilt_client: &crate::loader::quilt::QuiltMetaClient,
+) -> Result<(), AppError> {
+    let json_path = paths.version_json(version_id);
+    if !tokio::fs::try_exists(&json_path).await.unwrap_or(false) {
+        return Ok(());
+    }
+    let bytes = tokio::fs::read(&json_path).await?;
+    let v: serde_json::Value = serde_json::from_slice(&bytes)
+        .map_err(|e| AppError::Http(format!("parse {} for migration check: {e}", json_path.display())))?;
+
+    if !is_flat_fabric_meta_shape(&v) {
+        return Ok(());  // already Mojang shape (idempotent no-op)
+    }
+
+    let id = v.get("id").and_then(|x| x.as_str()).unwrap_or(version_id).to_string();
+    let mc_version = v.get("inheritsFrom").and_then(|x| x.as_str())
+        .ok_or_else(|| AppError::Http(format!("flat-shape JSON for {version_id} missing inheritsFrom")))?
+        .to_string();
+
+    let (loader_type, prefix) = if id.starts_with("fabric-loader-") {
+        (crate::loader::types::LoaderType::Fabric, "fabric-loader-")
+    } else if id.starts_with("quilt-loader-") {
+        (crate::loader::types::LoaderType::Quilt, "quilt-loader-")
+    } else {
+        return Err(AppError::Http(format!(
+            "cannot migrate flat-shape JSON for unknown loader id: {id} \
+             (Forge/NeoForge harvest writes Mojang shape and should not reach here)"
+        )));
+    };
+
+    let after_prefix = id.strip_prefix(prefix)
+        .ok_or_else(|| AppError::Http(format!("loader id {id} missing prefix {prefix}")))?;
+    let suffix = format!("-{mc_version}");
+    let loader_version = after_prefix.strip_suffix(&suffix)
+        .ok_or_else(|| AppError::Http(format!("loader id {id} missing suffix {suffix}")))?
+        .to_string();
+
+    let raw_bytes = match loader_type {
+        crate::loader::types::LoaderType::Fabric => fabric_client
+            .fetch_profile(&mc_version, &loader_version)
+            .await
+            .map_err(|e| AppError::Http(format!("re-fetch fabric profile during migration: {e}")))?
+            .raw_bytes,
+        crate::loader::types::LoaderType::Quilt => quilt_client
+            .fetch_profile(&mc_version, &loader_version)
+            .await
+            .map_err(|e| AppError::Http(format!("re-fetch quilt profile during migration: {e}")))?
+            .raw_bytes,
+        _ => unreachable!(),
+    };
+
+    let mojang_bytes = match loader_type {
+        crate::loader::types::LoaderType::Fabric => crate::loader::fabric::to_mojang_shape(&raw_bytes)
+            .map_err(|e| AppError::Http(format!("translate during migration: {e}")))?,
+        crate::loader::types::LoaderType::Quilt => crate::loader::quilt::to_mojang_shape(&raw_bytes)
+            .map_err(|e| AppError::Http(format!("translate during migration: {e}")))?,
+        _ => unreachable!(),
+    };
+
+    crate::mojang::cache::atomic_write(&json_path, &mojang_bytes).await?;
+    tracing::info!(
+        version_id,
+        loader_type = ?loader_type,
+        "migrated loader version JSON from flat shape to Mojang shape (Phase 8.4 GAP-LIBRARY-SHAPE-08)"
+    );
+    Ok(())
+}
+
+/// Test-only re-export of `migrate_loader_json_in_place_if_needed` so
+/// integration tests under tests/* can exercise it directly. The private
+/// function above is unchanged; this thin shim keeps production callsites
+/// pointing at the private name while the integration test surface stays
+/// a stable, named public API.
+#[doc(hidden)]
+pub async fn __test_migrate_loader_json_in_place_if_needed(
+    paths: &AppPaths,
+    version_id: &str,
+    fabric_client: &crate::loader::fabric::FabricMetaClient,
+    quilt_client: &crate::loader::quilt::QuiltMetaClient,
+) -> Result<(), AppError> {
+    migrate_loader_json_in_place_if_needed(paths, version_id, fabric_client, quilt_client).await
 }
 
 /// Send a `TaskEvent::Progress` to `tx`. Failures are silently ignored —
