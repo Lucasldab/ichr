@@ -422,6 +422,22 @@ async fn test_resolve_dependencies_through_full_service_stack() {
         );
     });
 
+    // GET /v2/projects?ids=[...] → title hydration (closes GAP-8-D).
+    // The resolver dedupes ids before this call; only `dep_project_id` is in
+    // the dep set (root is excluded from `deps`). Accept any ids order via
+    // query_param_exists — order depends on internal collection traversal.
+    server.mock(|when, then| {
+        when.method(GET)
+            .path("/v2/projects")
+            .query_param_exists("ids");
+        then.status(200).body(
+            serde_json::json!([
+                { "id": dep_project_id, "title": "Fabric API" }
+            ])
+            .to_string(),
+        );
+    });
+
     let client =
         ModrinthClient::new_with_base_url(server.base_url()).expect("client::new_with_base_url");
     let svc = ModrinthService::with_client(client);
