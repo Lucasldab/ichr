@@ -509,6 +509,11 @@ fn map_name_input_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         {
             Some(Action::TypeName(c))
         }
+        // Bracketed-paste payload (08.1-04 / GAP-8-C): the terminal delivers
+        // pasted text as a single `Event::Paste(String)` when bracketed paste
+        // is enabled at terminal init. Route the whole payload through one
+        // action dispatch instead of a stream of synthetic key events.
+        CtEvent::Paste(s) => Some(Action::PasteName(s)),
         _ => None,
     }
 }
