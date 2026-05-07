@@ -569,4 +569,18 @@ mod tests {
         assert_eq!(thousands(1000), "1,000");
         assert_eq!(thousands(312_448_221), "312,448,221");
     }
+
+    /// GAP-8-C / 08.1-04: bracketed-paste payload from the terminal must map
+    /// to a single `CfBrowserPasteSearch` action carrying the whole pasted
+    /// string — same contract as the Modrinth analog.
+    #[test]
+    fn paste_event_emits_paste_search_action() {
+        let s = state_with_search("");
+        let pasted = "create big cannons".to_string();
+        let result = map_cf_browser_event(CtEvent::Paste(pasted.clone()), &s);
+        match result {
+            Some(Action::CfBrowserPasteSearch(got)) => assert_eq!(got, pasted),
+            other => panic!("expected CfBrowserPasteSearch, got {other:?}"),
+        }
+    }
 }

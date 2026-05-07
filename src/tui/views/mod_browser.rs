@@ -525,4 +525,20 @@ mod tests {
         assert_eq!(thousands(1000), "1,000");
         assert_eq!(thousands(312_448_221), "312,448,221");
     }
+
+    /// GAP-8-C / 08.1-04: bracketed-paste payload from the terminal must map
+    /// to a single `ModBrowserPasteSearch` action carrying the whole pasted
+    /// string. Without this arm pasted text would silently fall through to
+    /// `_ => None` and the user would have to type their query character by
+    /// character.
+    #[test]
+    fn paste_event_emits_paste_search_action() {
+        let s = state_with_search("");
+        let pasted = "fabric api".to_string();
+        let result = map_mod_browser_event(CtEvent::Paste(pasted.clone()), &s);
+        match result {
+            Some(Action::ModBrowserPasteSearch(got)) => assert_eq!(got, pasted),
+            other => panic!("expected ModBrowserPasteSearch, got {other:?}"),
+        }
+    }
 }
