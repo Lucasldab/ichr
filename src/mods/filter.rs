@@ -53,17 +53,31 @@ pub fn modrinth_filter_for(
 /// Example output for `(["fabric"], ["1.20.4"], "mod")`:
 /// `[["categories:fabric"],["versions:1.20.4"],["project_type:mod"]]`
 pub fn search_facets(loaders: &[&str], mc_versions: &[String], project_type: &str) -> String {
+    // GAP-FACETS-EMPTY-08 (Phase 8.2 gap closure): empty inner OR-arrays
+    // (e.g. `[]`) inside the outer AND make Modrinth match nothing — the
+    // outer AND requires every inner OR to satisfy at least one term. So
+    // when a category is "any" (empty input slice), we MUST omit that
+    // entire AND group, not emit `[]`. Caller contract (client.rs:97)
+    // still emits `&facets=` whenever `mc.is_some() || !loaders.is_empty()`;
+    // the project_type group is always present so the parameter is never
+    // empty in practice.
     let make = |k: &str, vs: &[String]| -> String {
         let parts: Vec<String> = vs.iter().map(|v| format!("\"{k}:{v}\"")).collect();
         format!("[{}]", parts.join(","))
     };
     let loader_arr: Vec<String> = loaders.iter().map(|s| (*s).to_string()).collect();
     let pt_arr = [project_type.to_string()];
-    let parts = [
-        make("categories", &loader_arr),
-        make("versions", mc_versions),
-        make("project_type", &pt_arr),
-    ];
+
+    let mut parts: Vec<String> = Vec::with_capacity(3);
+    if !loader_arr.is_empty() {
+        parts.push(make("categories", &loader_arr));
+    }
+    if !mc_versions.is_empty() {
+        parts.push(make("versions", mc_versions));
+    }
+    // project_type is always non-empty — it's a required positional arg.
+    parts.push(make("project_type", &pt_arr));
+
     format!("[{}]", parts.join(","))
 }
 
@@ -205,6 +219,52 @@ mod tests {
         // Forward-compat: Phase 11 will pass project_type="resourcepack".
         let f = search_facets(&["minecraft"], &["1.20.4".to_string()], "resourcepack");
         assert!(f.contains("project_type:resourcepack"), "got: {f}");
+    }
+
+    /// GAP-FACETS-EMPTY-08 (Phase 8.2): empty loaders + non-empty mc must NOT
+    /// emit an empty AND group `[]`. Modrinth treats `[]` inside an outer AND
+    /// as "match nothing" → zero hits even when other groups would match.
+    /// Round-2 UAT test 3a regression: loader='any' + mc='1.20.4' returned
+    /// zero results because of this bug.
+    #[test]
+    fn test_search_facets_empty_loaders_with_mc_no_empty_and_group() {
+        let f = search_facets(&[], &["1.20.4".to_string()], "mod");
+        assert_eq!(
+            f,
+            "[[\"versions:1.20.4\"],[\"project_type:mod\"]]",
+            "empty loaders must drop the categories AND group entirely; got: {f}"
+        );
+        assert!(
+            !f.contains("[]"),
+            "facets string MUST NOT contain an empty AND group `[]`; got: {f}"
+        );
+    }
+
+    /// Inverse: non-empty loaders + empty mc must also drop the empty
+    /// versions group (today this is unreachable from client.rs because
+    /// search() short-circuits, but the function is callable from
+    /// list_versions and Phase 11 entry points; lock the contract).
+    #[test]
+    fn test_search_facets_with_loader_no_mc_no_empty_and_group() {
+        let f = search_facets(&["fabric"], &[], "mod");
+        assert_eq!(
+            f,
+            "[[\"categories:fabric\"],[\"project_type:mod\"]]",
+            "empty mc_versions must drop the versions AND group entirely; got: {f}"
+        );
+        assert!(!f.contains("[]"), "got: {f}");
+    }
+
+    /// Both empty: only the always-present project_type group remains.
+    #[test]
+    fn test_search_facets_both_empty_only_project_type() {
+        let f = search_facets(&[], &[], "mod");
+        assert_eq!(
+            f,
+            "[[\"project_type:mod\"]]",
+            "both empty: only project_type AND group remains; got: {f}"
+        );
+        assert!(!f.contains("[]"), "got: {f}");
     }
 
     // --- pick_primary_file ----------------------------------------------------
