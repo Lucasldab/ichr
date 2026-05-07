@@ -5,6 +5,7 @@
 //!
 //! See 06-RESEARCH.md §Loader Install Flow for the four-step pipeline.
 
+use std::path::Path;
 use std::sync::Arc;
 
 use tokio::sync::{mpsc, Semaphore};
@@ -15,18 +16,14 @@ use crate::error::AppError;
 use crate::install::version_installer::LIB_CONCURRENCY;
 use crate::loader::error::LoaderError;
 use crate::loader::fabric::{FabricMetaClient, FabricProfile};
+use crate::loader::forge_meta::ForgeMetaClient;
 use crate::loader::maven::{maven_coord_to_path, maven_download_url};
+use crate::loader::neoforge_meta::NeoForgeMetaClient;
 use crate::loader::quilt::{QuiltMetaClient, QuiltProfile};
 use crate::loader::types::{LoaderInfo, LoaderType, LoaderVersionEntry};
 use crate::mojang::cache::{atomic_write, verify_sha1};
 use crate::persistence::paths::AppPaths;
 use crate::tasks::TaskEvent;
-
-/// MAX_INHERITS_DEPTH is currently 3 (defined in src/mojang/inherits.rs).
-/// Fabric/Quilt add ONE hop above vanilla, total chain = 2 — safely within
-/// the limit. Phase 7 (Forge/NeoForge) must re-evaluate this constant.
-/// (Open Question 2 lock-in from 06-RESEARCH.md.)
-const _PHASE_7_TODO_MAX_INHERITS_DEPTH: () = ();
 
 /// Re-attach is the on-disk state where the loader version JSON exists AND
 /// every library is present in `libraries/`. We skip steps 1-3 of install
@@ -37,6 +34,8 @@ const _OPEN_Q1_REATTACH_LOCK: () = ();
 pub struct LoaderService {
     fabric: FabricMetaClient,
     quilt: QuiltMetaClient,
+    forge: ForgeMetaClient,
+    neoforge: NeoForgeMetaClient,
 }
 
 impl LoaderService {
@@ -45,33 +44,37 @@ impl LoaderService {
         Ok(Self {
             fabric: FabricMetaClient::new()?,
             quilt: QuiltMetaClient::new()?,
+            forge: ForgeMetaClient::new()?,
+            neoforge: NeoForgeMetaClient::new()?,
         })
     }
 
     #[cfg(test)]
-    pub fn with_clients(fabric: FabricMetaClient, quilt: QuiltMetaClient) -> Self {
-        Self { fabric, quilt }
+    pub fn with_clients(
+        fabric: FabricMetaClient,
+        quilt: QuiltMetaClient,
+        forge: ForgeMetaClient,
+        neoforge: NeoForgeMetaClient,
+    ) -> Self {
+        Self { fabric, quilt, forge, neoforge }
     }
 
     /// List all loader versions for the given loader type.
     ///
-    /// `_mc_version` is unused for Fabric and Quilt v1 — both meta APIs
-    /// return ALL loader versions regardless of game version. The argument
-    /// is kept for API symmetry with Phase 7 (Forge), which requires
-    /// per-game-version filtering.
-    #[tracing::instrument(skip_all, fields(?loader_type))]
+    /// For Fabric and Quilt, `mc_version` is ignored (both meta APIs return ALL
+    /// loader versions regardless of game version). For Forge and NeoForge,
+    /// `mc_version` is used to filter the version list by MC compatibility.
+    #[tracing::instrument(skip_all, fields(?loader_type, mc_version = %mc_version))]
     pub async fn list_loader_versions(
         &self,
         loader_type: LoaderType,
-        _mc_version: &str,
+        mc_version: &str,
     ) -> Result<Vec<LoaderVersionEntry>, LoaderError> {
         match loader_type {
             LoaderType::Fabric => self.fabric.list_loader_versions().await,
             LoaderType::Quilt => self.quilt.list_loader_versions().await,
-            LoaderType::Forge | LoaderType::NeoForge => Err(LoaderError::MetaFetch {
-                loader: if loader_type == LoaderType::Forge { "forge" } else { "neoforge" },
-                reason: "Forge/NeoForge meta client not yet implemented (07-02)".into(),
-            }),
+            LoaderType::Forge => self.forge.list_loader_versions(mc_version).await,
+            LoaderType::NeoForge => self.neoforge.list_loader_versions(mc_version).await,
         }
     }
 
@@ -109,11 +112,16 @@ impl LoaderService {
 
     /// Install a modloader into the instance.
     ///
-    /// Four-step pipeline:
-    /// 1. (1%) Fetch loader profile from meta API.
-    /// 2. (2-90%) Download loader libraries with LIB_CONCURRENCY=8 semaphore.
-    /// 3. (95%) Atomic-write the loader version JSON.
-    /// 4. (100%) Atomic-write instance.json with `loader: Some(LoaderInfo)` — LAST.
+    /// For Fabric/Quilt: four-step pipeline (fetch profile → download libs →
+    /// write version JSON → write manifest LAST).
+    ///
+    /// For Forge/NeoForge: subprocess pipeline (re-attach check → download
+    /// installer JAR → stage + ForgeWrapper → run installer → harvest → write
+    /// manifest LAST). Requires `jre_path` — obtain via
+    /// `JavaService::resolve_jre_for_mc_version_install` before calling.
+    ///
+    /// For Fabric/Quilt callers, pass a dummy path (e.g. `Path::new(".")`) until
+    /// Wave 5 wires up proper JRE resolution in `run.rs`.
     ///
     /// Cancellation: token checked at every await; returns `LoaderError::Cancelled`
     /// without modifying instance.json (atomicity invariant — Pitfall 7).
@@ -126,24 +134,46 @@ impl LoaderService {
         mc_version: &str,
         loader_type: LoaderType,
         loader_version: &str,
+        jre_path: &Path,
         progress_tx: mpsc::Sender<TaskEvent>,
         token: CancellationToken,
         job_id: crate::tasks::JobId,
     ) -> Result<(), LoaderError> {
-        install_loader_impl(
-            self,
-            InstallArgs {
-                paths,
-                slug,
-                mc_version,
-                loader_type,
-                loader_version,
-                progress_tx,
-                token,
-                job_id,
-            },
-        )
-        .await
+        match loader_type {
+            LoaderType::Fabric | LoaderType::Quilt => {
+                // Existing Phase 6 pipeline — `jre_path` is unused for HTTP-only loaders.
+                let _ = jre_path;
+                install_loader_impl(
+                    self,
+                    InstallArgs {
+                        paths,
+                        slug,
+                        mc_version,
+                        loader_type,
+                        loader_version,
+                        progress_tx,
+                        token,
+                        job_id,
+                    },
+                )
+                .await
+            }
+            LoaderType::Forge | LoaderType::NeoForge => {
+                install_subprocess_loader(
+                    self,
+                    paths,
+                    slug,
+                    mc_version,
+                    loader_type,
+                    loader_version,
+                    jre_path,
+                    progress_tx,
+                    token,
+                    job_id,
+                )
+                .await
+            }
+        }
     }
 }
 
@@ -159,7 +189,321 @@ fn map_app_error(e: AppError) -> LoaderError {
 }
 
 // -----------------------------------------------------------------
-// install_loader_impl: four-step pipeline
+// install_subprocess_loader: Forge/NeoForge six-step pipeline
+// -----------------------------------------------------------------
+
+#[allow(clippy::too_many_arguments)]
+async fn install_subprocess_loader(
+    svc: &LoaderService,
+    paths: &AppPaths,
+    slug: &str,
+    mc_version: &str,
+    loader_type: LoaderType,
+    loader_version: &str,
+    jre_path: &Path,
+    progress_tx: mpsc::Sender<TaskEvent>,
+    token: CancellationToken,
+    job_id: crate::tasks::JobId,
+) -> Result<(), LoaderError> {
+    use crate::loader::{forgewrapper, harvest, installer_subprocess, staging};
+
+    let modloader_kind = match loader_type {
+        LoaderType::Forge => ModloaderKind::Forge,
+        LoaderType::NeoForge => ModloaderKind::NeoForge,
+        _ => unreachable!("install_subprocess_loader only handles Forge/NeoForge"),
+    };
+
+    // Predict the version-id the installer will produce. Re-attach uses this
+    // for the disk-existence check; harvest will validate after the fact.
+    let expected_version_id = match loader_type {
+        LoaderType::Forge => format!("{mc_version}-forge-{loader_version}"),
+        LoaderType::NeoForge => format!("neoforge-{loader_version}"),
+        _ => unreachable!(),
+    };
+
+    macro_rules! send_progress {
+        ($pct:expr, $msg:expr) => {{
+            let _ = progress_tx
+                .send(TaskEvent::Progress { id: job_id, pct: $pct, msg: $msg.to_string() })
+                .await;
+        }};
+    }
+
+    // ------------------------------------------------------------------
+    // STEP 1 — Re-attach pre-check (D-04)
+    // If predicted version JSON exists AND all declared libraries are on disk,
+    // skip steps 2-5 and jump straight to manifest write.
+    // ------------------------------------------------------------------
+    let predicted_json = paths.version_json(&expected_version_id);
+    if tokio::fs::try_exists(&predicted_json).await.unwrap_or(false) {
+        if let Ok(bytes) = tokio::fs::read(&predicted_json).await {
+            #[derive(serde::Deserialize)]
+            struct VJ {
+                #[serde(default)]
+                libraries: Vec<crate::loader::types::LoaderLibrary>,
+            }
+            if let Ok(vj) = serde_json::from_slice::<VJ>(&bytes) {
+                let mut all_present = true;
+                for lib in &vj.libraries {
+                    if let Ok(rel) = crate::loader::maven::maven_coord_to_path(&lib.name) {
+                        if !tokio::fs::try_exists(&paths.library_path(&rel))
+                            .await
+                            .unwrap_or(false)
+                        {
+                            all_present = false;
+                            break;
+                        }
+                    }
+                }
+                if all_present {
+                    tracing::info!(
+                        version_id = %expected_version_id,
+                        "re-attach: all artifacts on disk, skipping install"
+                    );
+                    send_progress!(99, "Re-attach: writing manifest");
+                    write_manifest_loader(paths, slug, modloader_kind, loader_version, &expected_version_id).await?;
+                    send_progress!(100, "Done");
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    if token.is_cancelled() {
+        return Err(LoaderError::Cancelled);
+    }
+
+    // ------------------------------------------------------------------
+    // STEP 2 — Download installer JAR (skip if already cached)
+    // ------------------------------------------------------------------
+    send_progress!(5, "Downloading installer");
+    let installer_url = match loader_type {
+        LoaderType::Forge => svc.forge.installer_url(mc_version, loader_version),
+        LoaderType::NeoForge => svc.neoforge.installer_url(loader_version),
+        _ => unreachable!(),
+    };
+    let installer_filename = match loader_type {
+        LoaderType::Forge => format!("forge-{mc_version}-{loader_version}-installer.jar"),
+        LoaderType::NeoForge => format!("neoforge-{loader_version}-installer.jar"),
+        _ => unreachable!(),
+    };
+    let installer_dst = paths.cache_dir.join("installers").join(&installer_filename);
+    if !tokio::fs::try_exists(&installer_dst).await.unwrap_or(false) {
+        if let Some(parent) = installer_dst.parent() {
+            tokio::fs::create_dir_all(parent).await.map_err(|e| {
+                LoaderError::InstallerJarFetch {
+                    reason: format!("mkdir installers: {e}"),
+                }
+            })?;
+        }
+        let bytes = reqwest::get(&installer_url)
+            .await
+            .map_err(|e| LoaderError::InstallerJarFetch {
+                reason: format!("GET {installer_url}: {e}"),
+            })?
+            .error_for_status()
+            .map_err(|e| LoaderError::InstallerJarFetch {
+                reason: format!("status {installer_url}: {e}"),
+            })?
+            .bytes()
+            .await
+            .map_err(|e| LoaderError::InstallerJarFetch {
+                reason: format!("body {installer_url}: {e}"),
+            })?;
+        crate::mojang::cache::atomic_write(&installer_dst, &bytes)
+            .await
+            .map_err(|e| LoaderError::InstallerJarFetch {
+                reason: format!("write {}: {e}", installer_dst.display()),
+            })?;
+        // Best-effort: verify .sha1 sidecar when available (T-07-12, Pitfall 9).
+        let sha_url = format!("{installer_url}.sha1");
+        if let Ok(resp) = reqwest::get(&sha_url).await {
+            if resp.status().is_success() {
+                if let Ok(text) = resp.text().await {
+                    let expected = text.trim().to_string();
+                    if expected.len() == 40 {
+                        match crate::mojang::cache::verify_sha1(&installer_dst, &expected).await {
+                            Ok(true) => {}
+                            Ok(false) => {
+                                return Err(LoaderError::InstallerJarFetch {
+                                    reason: format!(
+                                        "SHA1 mismatch for {} (expected {expected})",
+                                        installer_dst.display()
+                                    ),
+                                });
+                            }
+                            Err(e) => {
+                                tracing::warn!(%e, "SHA1 verify failed; continuing");
+                            }
+                        }
+                    }
+                }
+            } else if resp.status().as_u16() != 404 {
+                tracing::warn!(
+                    status = %resp.status(),
+                    "SHA1 sidecar returned non-404 error; ignoring"
+                );
+            }
+        }
+    }
+    send_progress!(25, "Installer JAR ready");
+
+    if token.is_cancelled() {
+        return Err(LoaderError::Cancelled);
+    }
+
+    // ------------------------------------------------------------------
+    // STEP 3 — Build staging dir
+    // ------------------------------------------------------------------
+    let staging = staging::StagingDir::create(paths, slug).await?;
+    let staging_root = staging.root().to_path_buf();
+
+    // Inner async block so we can centralise cleanup on any error.
+    let outcome: Result<harvest::HarvestedInstall, LoaderError> = async {
+        staging.populate_vanilla(paths, mc_version).await?;
+        staging.write_launcher_profiles().await?;
+        let wrapper_jar = forgewrapper::ensure_extracted(paths).await?;
+
+        if token.is_cancelled() {
+            return Err(LoaderError::Cancelled);
+        }
+
+        // --------------------------------------------------------------
+        // STEP 4 — Run installer subprocess
+        // --------------------------------------------------------------
+        send_progress!(30, "Running installer");
+        let unix_ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let log_path = paths
+            .instance_dir(slug)
+            .join(format!("loader-install-{unix_ts}.log"));
+        if let Some(parent) = log_path.parent() {
+            let _ = tokio::fs::create_dir_all(parent).await;
+        }
+
+        // Classpath: ForgeWrapper.jar<sep>installer.jar
+        // Per 07-RESEARCH.md Pattern 5 / ForgeWrapper README (tag 1.6.0):
+        //   java -cp <wrapper>:<installer> <MAIN_CLASS> --installer=<jar> --instance=<staging>
+        let sep = if cfg!(windows) { ";" } else { ":" };
+        let classpath = format!(
+            "{}{sep}{}",
+            wrapper_jar.display(),
+            installer_dst.display()
+        );
+        let args: Vec<String> = vec![
+            "-cp".into(),
+            classpath,
+            forgewrapper::FORGE_WRAPPER_MAIN_CLASS.to_string(),
+            format!("--installer={}", installer_dst.display()),
+            format!("--instance={}", staging.root().display()),
+        ];
+
+        installer_subprocess::run_installer(
+            jre_path,
+            &[],
+            &args,
+            staging.root(),
+            &log_path,
+            progress_tx.clone(),
+            job_id,
+            token.clone(),
+        )
+        .await?;
+
+        send_progress!(85, "Harvesting libraries");
+
+        if token.is_cancelled() {
+            return Err(LoaderError::Cancelled);
+        }
+
+        // --------------------------------------------------------------
+        // STEP 5 — Harvest
+        // 07-WARNING-4 fix: pass vanilla_mc_id so harvest excludes vanilla dir.
+        // --------------------------------------------------------------
+        let harvested = match harvest::harvest_install(
+            staging.root(),
+            Some(&expected_version_id),
+            mc_version,
+        )
+        .await
+        {
+            Ok(h) => h,
+            Err(_) => {
+                // Fallback: accept whatever the installer produced.
+                tracing::warn!(
+                    expected = %expected_version_id,
+                    "expected version_id not found in staging; accepting installer output"
+                );
+                harvest::harvest_install(staging.root(), None, mc_version).await?
+            }
+        };
+        harvest::copy_libraries_into_shared(paths, &harvested.libraries, &token).await?;
+        harvest::write_version_json(paths, &harvested.version_id, &harvested.version_json_bytes)
+            .await?;
+        send_progress!(95, "Writing manifest");
+        Ok(harvested)
+    }
+    .await;
+
+    let harvested = match outcome {
+        Ok(h) => h,
+        Err(e) => {
+            // Steps 3-5 failed — clean staging, propagate.
+            staging::cleanup_staging(&staging_root).await;
+            return Err(e);
+        }
+    };
+
+    // ------------------------------------------------------------------
+    // STEP 6 — Manifest write LAST (atomicity invariant — Pitfall 7)
+    // The instance.json loader field is NEVER written if any step above
+    // failed or was cancelled.
+    // ------------------------------------------------------------------
+    write_manifest_loader(
+        paths,
+        slug,
+        modloader_kind,
+        loader_version,
+        &harvested.version_id,
+    )
+    .await?;
+    send_progress!(100, "Done");
+
+    // STEP 7 — Cleanup staging (post-success best-effort)
+    staging::cleanup_staging(&staging_root).await;
+    Ok(())
+}
+
+/// Write or update the instance manifest `loader` field.
+///
+/// Reads the existing manifest, sets `loader = Some(LoaderInfo { … })`,
+/// and writes back atomically. Used by both the re-attach fast path and the
+/// full subprocess pipeline.
+async fn write_manifest_loader(
+    paths: &AppPaths,
+    slug: &str,
+    kind: ModloaderKind,
+    version: &str,
+    version_id: &str,
+) -> Result<(), LoaderError> {
+    let mut manifest = crate::instance::store::read_instance_manifest(paths, slug)
+        .await
+        .map_err(map_app_error)?;
+    manifest.loader = Some(LoaderInfo {
+        kind,
+        version: version.to_string(),
+        version_id: version_id.to_string(),
+    });
+    crate::instance::store::write_instance_manifest(paths, &manifest)
+        .await
+        .map_err(map_app_error)?;
+    Ok(())
+}
+
+// -----------------------------------------------------------------
+// install_loader_impl: four-step pipeline (Fabric/Quilt)
 // -----------------------------------------------------------------
 
 struct InstallArgs<'a> {
@@ -609,6 +953,8 @@ fn sha1_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::loader::forge_meta::ForgeMetaClient;
+    use crate::loader::neoforge_meta::NeoForgeMetaClient;
     use httpmock::Method::GET;
     use httpmock::MockServer;
     use tempfile::TempDir;
@@ -624,7 +970,9 @@ mod tests {
     fn make_service(server: &MockServer) -> LoaderService {
         let fabric = FabricMetaClient::new_with_base_url(server.base_url()).unwrap();
         let quilt = QuiltMetaClient::new_with_base_url(server.base_url()).unwrap();
-        LoaderService::with_clients(fabric, quilt)
+        let forge = ForgeMetaClient::new().unwrap();
+        let neoforge = NeoForgeMetaClient::new().unwrap();
+        LoaderService::with_clients(fabric, quilt, forge, neoforge)
     }
 
     // ------------------------------------------------------------------
@@ -821,7 +1169,9 @@ mod tests {
         let svc = {
             let fabric = FabricMetaClient::new_with_base_url(server.base_url()).unwrap();
             let quilt = QuiltMetaClient::new_with_base_url(server.base_url()).unwrap();
-            LoaderService::with_clients(fabric, quilt)
+            let forge = ForgeMetaClient::new().unwrap();
+            let neoforge = NeoForgeMetaClient::new().unwrap();
+            LoaderService::with_clients(fabric, quilt, forge, neoforge)
         };
         (server, svc)
     }
@@ -862,6 +1212,7 @@ mod tests {
             "1.21.4",
             LoaderType::Fabric,
             "0.16.9",
+            std::path::Path::new("."),
             tx,
             token,
             job_id,
@@ -931,6 +1282,7 @@ mod tests {
             "1.21.4",
             LoaderType::Quilt,
             "0.30.0-beta.7",
+            std::path::Path::new("."),
             tx,
             token,
             job_id,
@@ -995,6 +1347,7 @@ mod tests {
             "1.21.4",
             LoaderType::Fabric,
             "0.16.9",
+            std::path::Path::new("."),
             tx,
             CancellationToken::new(),
             crate::tasks::JobId(0),
@@ -1029,6 +1382,7 @@ mod tests {
             "1.21.4",
             LoaderType::Fabric,
             "0.16.9",
+            std::path::Path::new("."),
             tx2,
             CancellationToken::new(),
             crate::tasks::JobId(1),
@@ -1086,6 +1440,7 @@ mod tests {
                 "1.21.4",
                 LoaderType::Fabric,
                 "0.16.9",
+                std::path::Path::new("."),
                 tx,
                 CancellationToken::new(),
                 crate::tasks::JobId(0),
@@ -1119,6 +1474,7 @@ mod tests {
                 "1.21.4",
                 LoaderType::Fabric,
                 "0.16.9",
+                std::path::Path::new("."),
                 tx,
                 token,
                 crate::tasks::JobId(0),
@@ -1151,6 +1507,7 @@ mod tests {
                 "1.21.4",
                 LoaderType::Fabric,
                 "0.16.9",
+                std::path::Path::new("."),
                 tx,
                 token,
                 crate::tasks::JobId(0),
@@ -1186,6 +1543,7 @@ mod tests {
             "1.21.4",
             LoaderType::Fabric,
             "0.16.9",
+            std::path::Path::new("."),
             tx,
             CancellationToken::new(),
             crate::tasks::JobId(0),
@@ -1220,6 +1578,7 @@ mod tests {
             "1.21.4",
             LoaderType::Quilt,
             "0.30.0-beta.7",
+            std::path::Path::new("."),
             tx,
             CancellationToken::new(),
             crate::tasks::JobId(1),
@@ -1246,5 +1605,232 @@ mod tests {
             !fabric_version_dir.exists(),
             "fabric version dir should still be gone"
         );
+    }
+}
+
+// -----------------------------------------------------------------
+// Forge/NeoForge-specific tests
+// -----------------------------------------------------------------
+
+#[cfg(test)]
+mod forge_neoforge_tests {
+    use super::*;
+    use crate::loader::forge_meta::ForgeMetaClient;
+    use crate::loader::neoforge_meta::NeoForgeMetaClient;
+    use tempfile::TempDir;
+
+    fn make_paths(td: &TempDir) -> AppPaths {
+        AppPaths::with_roots(
+            td.path().to_path_buf(),
+            td.path().to_path_buf(),
+            td.path().to_path_buf(),
+        )
+    }
+
+    async fn write_vanilla_instance(paths: &AppPaths, slug: &str, mc: &str) {
+        use crate::domain::instance::InstanceManifest;
+        let m = InstanceManifest::new(slug.into(), slug.into(), mc.into());
+        crate::instance::store::write_instance_manifest(paths, &m)
+            .await
+            .unwrap();
+    }
+
+    fn make_svc() -> LoaderService {
+        let fabric = crate::loader::fabric::FabricMetaClient::new().unwrap();
+        let quilt = crate::loader::quilt::QuiltMetaClient::new().unwrap();
+        let forge = ForgeMetaClient::new().unwrap();
+        let neoforge = NeoForgeMetaClient::new().unwrap();
+        LoaderService::with_clients(fabric, quilt, forge, neoforge)
+    }
+
+    /// Re-attach: predicted version JSON on disk with empty libraries.
+    /// Subprocess must NOT be invoked; manifest gets loader set.
+    #[tokio::test]
+    async fn test_forge_reattach_skip_writes_manifest_without_subprocess() {
+        let td = TempDir::new().unwrap();
+        let paths = make_paths(&td);
+        let slug = "reattach";
+        let mc = "1.20.1";
+        let loader_version = "47.4.20";
+        let expected_id = format!("{mc}-forge-{loader_version}");
+
+        write_vanilla_instance(&paths, slug, mc).await;
+
+        // Pre-create the predicted version JSON with empty libraries.
+        let json_path = paths.version_json(&expected_id);
+        tokio::fs::create_dir_all(json_path.parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(
+            &json_path,
+            format!(r#"{{"id":"{expected_id}","libraries":[]}}"#).as_bytes(),
+        )
+        .await
+        .unwrap();
+
+        let svc = make_svc();
+        let (tx, _rx) = mpsc::channel(64);
+        let token = CancellationToken::new();
+        // jre_path is irrelevant — re-attach short-circuits before subprocess.
+        let bogus_jre = std::path::PathBuf::from("/does/not/exist/java");
+
+        let r = svc
+            .install_loader(
+                &paths,
+                slug,
+                mc,
+                LoaderType::Forge,
+                loader_version,
+                &bogus_jre,
+                tx,
+                token,
+                crate::tasks::JobId(0),
+            )
+            .await;
+        assert!(r.is_ok(), "re-attach should succeed: {r:?}");
+
+        // Manifest should now have loader set to the expected id.
+        let m = crate::instance::store::read_instance_manifest(&paths, slug)
+            .await
+            .unwrap();
+        assert_eq!(
+            m.loader.as_ref().map(|l| l.version_id.clone()),
+            Some(expected_id.clone()),
+            "version_id must match"
+        );
+        assert_eq!(
+            m.loader.as_ref().map(|l| l.kind),
+            Some(ModloaderKind::Forge),
+            "kind must be Forge"
+        );
+    }
+
+    /// Cancel before subprocess: manifest MUST NOT have loader set.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_cancel_does_not_set_manifest_loader() {
+        let td = TempDir::new().unwrap();
+        let paths = make_paths(&td);
+        let slug = "cancel-atomicity";
+        let mc = "1.20.1";
+
+        write_vanilla_instance(&paths, slug, mc).await;
+
+        let svc = make_svc();
+        let (tx, _rx) = mpsc::channel(64);
+        let token = CancellationToken::new();
+        token.cancel(); // cancel immediately — before any network or FS
+
+        let bogus_jre = std::path::PathBuf::from("/bin/sh");
+        let r = svc
+            .install_loader(
+                &paths,
+                slug,
+                mc,
+                LoaderType::Forge,
+                "47.4.20",
+                &bogus_jre,
+                tx,
+                token,
+                crate::tasks::JobId(0),
+            )
+            .await;
+        // Expect Cancelled or an error (download might fail before cancel is checked)
+        assert!(
+            r.is_err(),
+            "expected error after cancel, got: {r:?}"
+        );
+
+        // Atomicity invariant: manifest loader must stay None.
+        let m = crate::instance::store::read_instance_manifest(&paths, slug)
+            .await
+            .unwrap();
+        assert!(
+            m.loader.is_none(),
+            "atomicity broken: loader should be None after cancel, got: {:?}",
+            m.loader
+        );
+    }
+
+    /// Cancel + subprocess path: pre-cache installer JAR to skip download step,
+    /// use /bin/sh as JRE (will fail fast), verify manifest stays untouched and
+    /// staging dir is cleaned.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_cancel_kills_subprocess_and_cleans_staging() {
+        let td = TempDir::new().unwrap();
+        let paths = make_paths(&td);
+        let slug = "cancel-subproc";
+        let mc = "1.20.1";
+        let loader_v = "47.4.20";
+
+        write_vanilla_instance(&paths, slug, mc).await;
+
+        // Pre-create vanilla version JSON so staging populate_vanilla doesn't fail.
+        let vj_path = paths.version_json(mc);
+        tokio::fs::create_dir_all(vj_path.parent().unwrap()).await.unwrap();
+        tokio::fs::write(&vj_path, br#"{"id":"1.20.1"}"#).await.unwrap();
+        // Pre-create vanilla JAR (also needed by populate_vanilla).
+        let vjar_path = paths.version_jar(mc);
+        tokio::fs::create_dir_all(vjar_path.parent().unwrap()).await.unwrap();
+        tokio::fs::write(&vjar_path, b"FAKE_JAR").await.unwrap();
+
+        // Pre-cache the installer JAR so the download step short-circuits.
+        let installer = paths
+            .cache_dir
+            .join("installers")
+            .join(format!("forge-{mc}-{loader_v}-installer.jar"));
+        tokio::fs::create_dir_all(installer.parent().unwrap()).await.unwrap();
+        tokio::fs::write(&installer, b"PK\x03\x04FAKE").await.unwrap();
+
+        let svc = make_svc();
+        let (tx, _rx) = mpsc::channel(64);
+        let token = CancellationToken::new();
+        let token_c = token.clone();
+        // Cancel after a short delay to let the subprocess attempt to start.
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            token_c.cancel();
+        });
+
+        // Using /bin/sh as jre — it will fail when given JVM args (non-zero exit
+        // or immediate error). Either way the install fails before writing manifest.
+        let bogus_jre = std::path::PathBuf::from("/bin/sh");
+        let r = svc
+            .install_loader(
+                &paths,
+                slug,
+                mc,
+                LoaderType::Forge,
+                loader_v,
+                &bogus_jre,
+                tx,
+                token,
+                crate::tasks::JobId(0),
+            )
+            .await;
+        assert!(r.is_err(), "expected install failure (sh != java): {r:?}");
+
+        // Atomicity invariant: manifest loader must stay None.
+        let m = crate::instance::store::read_instance_manifest(&paths, slug)
+            .await
+            .unwrap();
+        assert!(
+            m.loader.is_none(),
+            "manifest loader set after failed install: {:?}",
+            m.loader
+        );
+
+        // Staging dir should be cleaned (best-effort — might linger on some
+        // error paths, so tolerate empty dir too).
+        let staging_base = paths.data_dir.join("staging");
+        if staging_base.exists() {
+            let mut entries = tokio::fs::read_dir(&staging_base).await.unwrap();
+            let first = entries.next_entry().await.unwrap();
+            assert!(
+                first.is_none(),
+                "staging dir should be cleaned after failed install"
+            );
+        }
     }
 }

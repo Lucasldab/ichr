@@ -1040,6 +1040,12 @@ async fn execute_effects(
                             &mc_version,
                             loader_type,
                             &loader_version_for_task,
+                            // TODO(Wave 5): resolve JRE via JavaService before calling
+                            // install_loader — this placeholder works for Fabric/Quilt
+                            // (jre_path ignored for HTTP-only loaders) but will fail for
+                            // Forge/NeoForge installs until Wave 5 wires up proper JRE
+                            // resolution. See JavaService::resolve_jre_for_mc_version_install.
+                            std::path::Path::new("."),
                             lt_tx,
                             token,
                             job_id,
