@@ -1164,12 +1164,12 @@ async fn execute_effects(
                                 .await;
                         }
                         Err(e) => {
-                            // v1 surfaces empty results on error and logs a warning;
-                            // a dedicated `Action::ModBrowserSearchFailed` is a polish
-                            // item left for a follow-up plan (08-RESEARCH §Q1).
                             tracing::warn!(error = %e, slug = %slug, "Modrinth search failed");
                             let _ = tx
-                                .send(Action::ModBrowserSearchLoaded { slug, hits: Vec::new() })
+                                .send(Action::ModBrowserSearchFailed {
+                                    slug,
+                                    message: e.to_string(),
+                                })
                                 .await;
                         }
                     }
