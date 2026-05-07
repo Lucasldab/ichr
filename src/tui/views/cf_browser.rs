@@ -111,9 +111,17 @@ pub fn render_cf_browser(f: &mut Frame, area: Rect, state: &AppState) {
     } else {
         Style::default().fg(Color::Yellow)
     };
+    // GAP-FOCUS-INDICATOR-08 (Phase 8.2): symmetric mirror of mod_browser
+    // focus indicator. Both browsers must communicate focus identically
+    // for visual consistency across mod sources.
     let search_para = Paragraph::new(search_display)
         .style(search_style)
-        .block(Block::default().borders(Borders::ALL).title("Search"));
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Search")
+                .border_style(Style::default().fg(Color::Yellow)),
+        );
     f.render_widget(search_para, chunks[1]);
 
     // ---- Body: 40/60 horizontal split (results / detail) ----

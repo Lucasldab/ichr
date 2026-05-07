@@ -113,9 +113,19 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
     } else {
         Style::default().fg(Color::Yellow)
     };
+    // GAP-FOCUS-INDICATOR-08 (Phase 8.2): Yellow border signals the search
+    // input is the focused widget — distinguishes the input from passive
+    // surrounding panes (header / results / detail / footer) regardless of
+    // whether the buffer is empty. Mirrors the established Yellow=active
+    // palette already used by the chip styles and the inner Paragraph.
     let search_para = Paragraph::new(search_display)
         .style(search_style)
-        .block(Block::default().borders(Borders::ALL).title("Search"));
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Search")
+                .border_style(Style::default().fg(Color::Yellow)),
+        );
     f.render_widget(search_para, chunks[1]);
 
     // ---- Body: 40/60 horizontal split (results / detail) ----
