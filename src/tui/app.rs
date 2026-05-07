@@ -464,6 +464,11 @@ pub enum Action {
     OpenModBrowser { slug: String },
     /// Async result: search results loaded for the open ModBrowser.
     ModBrowserSearchLoaded { slug: String, hits: Vec<ModrinthSearchHit> },
+    /// Async result: Modrinth search failed -- drives `fetch_state = Error(message)`.
+    /// Mirrors `Action::CfBrowserSearchFailed`. Closes GAP-8-F (Phase 8.1 gap closure):
+    /// previously the network-error path dispatched `ModBrowserSearchLoaded { hits: [] }`
+    /// which the view rendered as "No mods found", conflating reachability with empty results.
+    ModBrowserSearchFailed { slug: String, message: String },
     /// Move the highlighted row in the ModBrowser results list (saturating).
     ModBrowserMove(isize),
     /// Enter on a ModBrowser row — opens the version picker for the selected mod.
@@ -1728,6 +1733,18 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     *results = hits;
                     *fetch_state = ModBrowserFetchState::Ready;
                     *selected = (*selected).min(new_len.saturating_sub(1));
+                }
+            }
+            vec![]
+        }
+
+        Action::ModBrowserSearchFailed { slug, message } => {
+            if let ActiveView::ModBrowser {
+                slug: cur_slug, fetch_state, ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug {
+                    *fetch_state = ModBrowserFetchState::Error(message);
                 }
             }
             vec![]
