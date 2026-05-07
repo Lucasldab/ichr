@@ -1,12 +1,15 @@
-//! Loader install progress modal — step status + LineGauge + cancel hint.
+//! Loader install progress modal — step status + LineGauge + log-tail + cancel hint.
 //!
 //! Mirrors `download_pane.rs` LineGauge pattern with the modal centering
 //! shape from `java_picker_modal.rs`.
+//!
+//! Phase 7 (D-02): renders a live log-tail Paragraph in a Min(1) chunk below the
+//! divider to surface installer subprocess output without clobbering the gauge.
 
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Span;
-use ratatui::widgets::{Block, Borders, Clear, LineGauge, Paragraph};
+use ratatui::widgets::{Block, Borders, Clear, LineGauge, Paragraph, Wrap};
 use ratatui::Frame;
 
 use crate::loader::types::LoaderType;
@@ -22,6 +25,7 @@ pub fn render_loader_install_progress_modal(f: &mut Frame, area: Rect, state: &A
         step_total,
         bytes_done,
         bytes_total,
+        log_tail,
         ..
     } = &state.active_view
     else {
@@ -36,7 +40,7 @@ pub fn render_loader_install_progress_modal(f: &mut Frame, area: Rect, state: &A
     };
 
     let modal_w = area.width.min(70);
-    let modal_h = 12u16.min(area.height.saturating_sub(4));
+    let modal_h = 22u16.min(area.height.saturating_sub(4));
     let x = area.x + area.width.saturating_sub(modal_w) / 2;
     let y = area.y + area.height.saturating_sub(modal_h) / 2;
     let modal_area = Rect { x, y, width: modal_w, height: modal_h };
@@ -49,13 +53,15 @@ pub fn render_loader_install_progress_modal(f: &mut Frame, area: Rect, state: &A
     f.render_widget(block, modal_area);
 
     let chunks = Layout::vertical([
-        Constraint::Length(1), // step status text
-        Constraint::Length(1), // blank
-        Constraint::Length(1), // LineGauge
-        Constraint::Length(1), // blank
-        Constraint::Length(1), // step counter
-        Constraint::Length(1), // divider
-        Constraint::Length(1), // footer hint
+        Constraint::Length(1), // [0] step status text
+        Constraint::Length(1), // [1] blank
+        Constraint::Length(1), // [2] LineGauge
+        Constraint::Length(1), // [3] blank
+        Constraint::Length(1), // [4] step counter
+        Constraint::Length(1), // [5] divider
+        Constraint::Length(1), // [6] log-tail header
+        Constraint::Min(1),    // [7] log-tail Paragraph (Phase 7 D-02)
+        Constraint::Length(1), // [8] footer hint
     ])
     .split(inner);
 
@@ -98,10 +104,22 @@ pub fn render_loader_install_progress_modal(f: &mut Frame, area: Rect, state: &A
     let divider = Paragraph::new(div).style(Style::default().add_modifier(Modifier::DIM));
     f.render_widget(divider, chunks[5]);
 
-    // Row 6: footer hint
+    // Row 6: log-tail header (Phase 7 D-02)
+    let header = Paragraph::new("\u{2500} Installer output \u{2500}")
+        .style(Style::default().add_modifier(Modifier::DIM));
+    f.render_widget(header, chunks[6]);
+
+    // Row 7: log_tail Paragraph — ratatui's renderer escapes control sequences,
+    // so raw subprocess bytes cannot break out of the modal Rect (T-07-16).
+    let tail_p = Paragraph::new(log_tail.as_str())
+        .style(Style::default().add_modifier(Modifier::DIM))
+        .wrap(Wrap { trim: false });
+    f.render_widget(tail_p, chunks[7]);
+
+    // Row 8: footer hint
     let hint =
         Paragraph::new("Esc cancel install").style(Style::default().add_modifier(Modifier::DIM));
-    f.render_widget(hint, chunks[6]);
+    f.render_widget(hint, chunks[8]);
 }
 
 pub fn map_loader_install_progress_event(

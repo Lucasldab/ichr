@@ -64,6 +64,33 @@ pub struct LoaderInfo {
     pub version_id: String,
 }
 
+/// MC version compatibility for Forge (07-CONTEXT.md D-05: 1.13+ only).
+///
+/// Modern Forge installer architecture is post-1.13; pre-1.13 Forge uses
+/// a fundamentally different installer flow that is out of scope for v1.
+/// Uses string-prefix matching — Mojang version IDs are not strict semver.
+pub fn forge_supported_for_mc(mc: &str) -> bool {
+    const SUPPORTED_PREFIXES: &[&str] = &[
+        "1.13", "1.14", "1.15", "1.16", "1.17", "1.18", "1.19",
+        "1.20", "1.21", "1.22", "1.23", "1.24", "1.25",
+    ];
+    SUPPORTED_PREFIXES.iter().any(|p| mc.starts_with(p))
+}
+
+/// MC version compatibility for NeoForge (07-CONTEXT.md D-05: 1.20.1+ only).
+///
+/// NeoForge forked Forge at MC 1.20.1; pre-1.20.1 is Forge-only.
+/// Uses string-prefix matching — Mojang version IDs are not strict semver.
+pub fn neoforge_supported_for_mc(mc: &str) -> bool {
+    // Explicit prefix list from 1.20.1 onward. Uses prefix matches to handle
+    // patches and pre-releases (e.g., "1.21-pre3" matches "1.21").
+    const SUPPORTED_PREFIXES: &[&str] = &[
+        "1.20.1", "1.20.2", "1.20.3", "1.20.4", "1.20.5", "1.20.6",
+        "1.21", "1.22", "1.23", "1.24", "1.25",
+    ];
+    SUPPORTED_PREFIXES.iter().any(|p| mc.starts_with(p))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,5 +235,35 @@ mod tests {
         );
         let parsed: LoaderInfo = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, li);
+    }
+
+    // ── MC version compatibility helpers (07-05) ──────────────────────────────
+
+    #[test]
+    fn test_forge_supported_rejects_pre_113() {
+        assert!(!forge_supported_for_mc("1.12.2"));
+        assert!(!forge_supported_for_mc("1.7.10"));
+        assert!(!forge_supported_for_mc("1.0"));
+    }
+
+    #[test]
+    fn test_forge_supported_accepts_113_plus() {
+        for mc in ["1.13", "1.16.5", "1.20.1", "1.21.4", "1.21.8"] {
+            assert!(forge_supported_for_mc(mc), "should accept {mc}");
+        }
+    }
+
+    #[test]
+    fn test_neoforge_supported_rejects_pre_1201() {
+        for mc in ["1.20", "1.19.4", "1.16.5", "1.12.2"] {
+            assert!(!neoforge_supported_for_mc(mc), "should reject {mc}");
+        }
+    }
+
+    #[test]
+    fn test_neoforge_supported_accepts_1201_plus() {
+        for mc in ["1.20.1", "1.20.4", "1.21", "1.21.4", "1.21.8"] {
+            assert!(neoforge_supported_for_mc(mc), "should accept {mc}");
+        }
     }
 }

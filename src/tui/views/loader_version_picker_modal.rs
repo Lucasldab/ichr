@@ -46,12 +46,11 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
         .split(modal_area);
 
     // Header
-    let filter_label = if matches!(loader, LoaderType::Quilt) {
-        "(all versions are pre-release)"
-    } else if *filter_stable_only {
-        "stable only (s for all)"
-    } else {
-        "all (s for stable only)"
+    let filter_label = match loader {
+        LoaderType::Quilt => "(all versions are pre-release)",
+        LoaderType::Fabric | LoaderType::Forge | LoaderType::NeoForge => {
+            if *filter_stable_only { "stable only (s for all)" } else { "all (s for stable only)" }
+        }
     };
     let header = Paragraph::new(vec![
         Line::from(format!("Instance: {slug}")),
@@ -83,8 +82,32 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
     let visible: Vec<usize> =
         loader_versions_visible_indices(versions, *loader, *filter_stable_only, search);
 
+    // MC-incompatibility empty-state copy (D-05): show a precise message for
+    // Forge/NeoForge when the instance's MC version is below the supported floor.
+    // Otherwise fall back to the generic "check network" message.
+    let empty_msg: String = if visible.is_empty() {
+        let mc_str: Option<&str> = state.instances.iter()
+            .find(|i| i.slug == *slug)
+            .map(|i| i.mc_version_id.as_str());
+        match (loader, mc_str) {
+            (LoaderType::Forge, Some(mc))
+                if !crate::loader::types::forge_supported_for_mc(mc) =>
+            {
+                format!("No Forge available for MC {mc} (Forge requires 1.13+)")
+            }
+            (LoaderType::NeoForge, Some(mc))
+                if !crate::loader::types::neoforge_supported_for_mc(mc) =>
+            {
+                format!("No NeoForge available for MC {mc} (NeoForge requires 1.20.1+)")
+            }
+            _ => "No versions found — check network".to_string(),
+        }
+    } else {
+        String::new()
+    };
+
     let items: Vec<ListItem> = if visible.is_empty() {
-        vec![ListItem::new("No versions found — check network").style(
+        vec![ListItem::new(empty_msg).style(
             Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
         )]
     } else {

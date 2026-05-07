@@ -2024,3 +2024,114 @@ fn test_cf_mod_install_started_inserts_running_mod_job_and_cf_mod_installed_remo
         "CfModInstalled must remove the running_mod_jobs entry"
     );
 }
+
+// ========================================================================
+// Phase 7 Plan 05 (07-05): Forge/NeoForge TUI integration smoke tests
+// ========================================================================
+
+/// Render `state` into an 80×height buffer and return the concatenated cell
+/// content as a single string (each row joined, rows concatenated).
+fn render_state_to_string(state: &AppState, width: u16, height: u16) -> String {
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+    let backend = TestBackend::new(width, height);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| mineltui::tui::view::view(state, f)).unwrap();
+    let buf = terminal.backend().buffer().clone();
+    let mut out = String::new();
+    for row in 0..height {
+        for col in 0..width {
+            out.push_str(buf.cell((col, row)).map(|c| c.symbol()).unwrap_or(" "));
+        }
+    }
+    out
+}
+
+#[test]
+fn test_loader_picker_shows_5_rows_for_supported_mc() {
+    let mut s = state_with_one_instance("ti", "1.20.1");
+    s.active_view = ActiveView::LoaderPickerModal { slug: "ti".into(), selected: 0 };
+    let rendered = render_state_to_string(&s, 80, 24);
+    assert!(rendered.contains("Fabric Loader"), "picker must show Fabric row: {rendered}");
+    assert!(rendered.contains("Quilt Loader"), "picker must show Quilt row: {rendered}");
+    assert!(rendered.contains("Forge"), "picker must show Forge row: {rendered}");
+    assert!(rendered.contains("NeoForge"), "picker must show NeoForge row: {rendered}");
+}
+
+#[test]
+fn test_loader_install_progress_renders_log_tail() {
+    let s = AppState {
+        active_view: ActiveView::LoaderInstallProgressModal {
+            slug: "ti".into(),
+            loader: LoaderType::Forge,
+            version: "47.4.20".into(),
+            step_label: "Running installer".into(),
+            step_index: 1,
+            step_total: 5,
+            bytes_done: 0,
+            bytes_total: 0,
+            cancel_token_key: "k".into(),
+            log_tail: "Running Processor 3/7".into(),
+        },
+        ..AppState::default()
+    };
+    let rendered = render_state_to_string(&s, 80, 30);
+    assert!(rendered.contains("Running Processor 3/7"), "log_tail not rendered: {rendered}");
+}
+
+#[test]
+fn test_loader_install_failed_renders_subprocess_tail() {
+    let s = AppState {
+        active_view: ActiveView::LoaderInstallFailedModal {
+            slug: "ti".into(),
+            loader: LoaderType::Forge,
+            version: "47.4.20".into(),
+            error: "Installer exited with code 1".into(),
+            log_tail: "java.lang.NullPointerException at Foo".into(),
+        },
+        ..AppState::default()
+    };
+    let rendered = render_state_to_string(&s, 80, 24);
+    assert!(
+        rendered.contains("java.lang.NullPointerException"),
+        "log_tail not rendered in failed modal: {rendered}"
+    );
+}
+
+#[test]
+fn test_version_picker_empty_state_forge_below_113() {
+    let mut s = state_with_one_instance("ti", "1.12.2");
+    s.active_view = ActiveView::LoaderVersionPickerModal {
+        slug: "ti".into(),
+        loader: LoaderType::Forge,
+        versions: vec![],
+        filter_stable_only: true,
+        search: String::new(),
+        selected: 0,
+        current_version: None,
+    };
+    let rendered = render_state_to_string(&s, 80, 24);
+    assert!(
+        rendered.contains("Forge requires 1.13+"),
+        "MC-incompatibility copy not shown for Forge/1.12.2: {rendered}"
+    );
+}
+
+#[test]
+fn test_version_picker_empty_state_neoforge_below_1201() {
+    let mut s = state_with_one_instance("ti", "1.19.4");
+    s.active_view = ActiveView::LoaderVersionPickerModal {
+        slug: "ti".into(),
+        loader: LoaderType::NeoForge,
+        versions: vec![],
+        filter_stable_only: true,
+        search: String::new(),
+        selected: 0,
+        current_version: None,
+    };
+    let rendered = render_state_to_string(&s, 80, 24);
+    assert!(
+        rendered.contains("NeoForge requires 1.20.1+"),
+        "MC-incompatibility copy not shown for NeoForge/1.19.4: {rendered}"
+    );
+}
