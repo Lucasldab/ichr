@@ -58,16 +58,26 @@ pub async fn launch_instance(
     send_progress(&tx, job_id, 1, "loading instance").await;
     let manifest = read_instance_manifest(paths, slug).await?;
 
+    // GAP-8-E (Phase 8.1 gap closure): when a loader is installed, the launch
+    // entry point is the loader's version JSON (which carries `inheritsFrom`
+    // back to the vanilla MC version). Without this, modded instances silently
+    // launch as vanilla — mods in `.minecraft/mods/` are never loaded because
+    // the JVM is invoked with the vanilla main class and classpath.
+    let launch_version_id: &str = match manifest.loader.as_ref() {
+        Some(loader) => loader.version_id.as_str(),
+        None => manifest.mc_version_id.as_str(),
+    };
+
     // Step 2 — verify client.jar present before we do anything expensive
     send_progress(&tx, job_id, 5, "checking version installed").await;
-    let client_jar = paths.version_jar(&manifest.mc_version_id);
+    let client_jar = paths.version_jar(launch_version_id);
     if !tokio::fs::try_exists(&client_jar).await.unwrap_or(false) {
         return Err(AppError::VersionNotInstalled { slug: slug.to_string() });
     }
 
     // Step 3 — load root version JSON from disk (no network)
     send_progress(&tx, job_id, 10, "loading version JSON").await;
-    let root_version = read_version_json_from_disk(paths, &manifest.mc_version_id).await?;
+    let root_version = read_version_json_from_disk(paths, launch_version_id).await?;
 
     // Step 4 — walk inheritsFrom chain from disk only; call pure-sync resolve_inherits
     send_progress(&tx, job_id, 15, "resolving inheritsFrom chain").await;
