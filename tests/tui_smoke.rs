@@ -1141,8 +1141,9 @@ fn test_cancel_loader_install_cancels_token_and_returns_to_list() {
 // ========================================================================
 
 use mineltui::mods::types::{
-    DepKind, HashAlgo, InstalledModRow, ModBrowserFetchState, ModSource, ModrinthFile,
-    ModrinthHashes, ModrinthSearchHit, ModrinthVersion, ModrinthVersionEntry, ResolvedDep,
+    DepKind, HashAlgo, InstalledItemKind, InstalledModRow, ModBrowserFetchState, ModSource,
+    ModrinthFile, ModrinthHashes, ModrinthSearchHit, ModrinthVersion, ModrinthVersionEntry,
+    ResolvedDep,
 };
 use mineltui::tui::app::ModInstallFailedReturnTo;
 
@@ -1205,6 +1206,7 @@ fn installed_row(mod_id: &str, name: &str, enabled: bool) -> InstalledModRow {
         sha512: "deadbeef".into(),
         size: 1024,
         hash_algo: HashAlgo::Sha512,
+        kind: InstalledItemKind::Mod,
         source: ModSource::Modrinth,
         enabled,
         installed_at: "2026-01-01T00:00:00Z".into(),

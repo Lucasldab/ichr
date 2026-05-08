@@ -152,10 +152,10 @@ pub enum ModBrowserFetchState {
 // ============================================================================
 
 /// Source of an installed mod — supports forward-compat with Phase 9 (CurseForge),
-/// Phase 10 (modpack), and any future "manual drop" detection.
+/// Phase 10 (modpack), Phase 11 (local file drop), and any future "manual drop" detection.
 ///
 /// Canonical wire format per 08-RESEARCH.md line 517 + 08-UI-SPEC.md line 668:
-/// `"modrinth"` | `"curseforge"` | `"manual"` | `"modpack"` (single-word, no
+/// `"modrinth"` | `"curseforge"` | `"manual"` | `"modpack"` | `"local"` (single-word, no
 /// underscore in `curseforge` — `serde(rename_all = "snake_case")` would emit
 /// `curse_forge`, so the `CurseForge` variant carries an explicit `#[serde(rename)]`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -166,6 +166,21 @@ pub enum ModSource {
     CurseForge,
     Manual,
     Modpack,
+    /// Drop-from-path install (Phase 11). Wire form: `"local"`.
+    Local,
+}
+
+/// Discriminates mods from resource/shader packs in the shared ledger.
+/// Default == Mod so pre-Phase-11 rows (no `kind` field) deserialize
+/// transparently — mirrors HashAlgo::Sha512 default at types.rs:184.
+/// Per 11-RESEARCH.md §"Adding `kind: PackKind`" + Phase 9 precedent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum InstalledItemKind {
+    #[default]
+    Mod,
+    ResourcePack,
+    Shader,
 }
 
 /// Hash algorithm discriminator for `InstalledModRow.hash_algo`.
@@ -215,6 +230,11 @@ pub struct InstalledModRow {
     /// Per 09-RESEARCH.md §"Per-Instance Ledger Reuse" lines 297-318.
     #[serde(default)]
     pub hash_algo: HashAlgo,
+    /// Item kind discriminator. NEW in Phase 11. `#[serde(default)]` lets
+    /// pre-Phase-11 ledger rows (no `kind` field) deserialize as `Mod`
+    /// (mirrors `hash_algo` Phase 9 migration precedent above).
+    #[serde(default)]
+    pub kind: InstalledItemKind,
     pub source: ModSource,
     pub enabled: bool,         // false → file is "{file_name}.disabled"
     pub installed_at: String,  // RFC3339
@@ -312,6 +332,7 @@ mod tests {
             sha512: "a3f0c91a".into(),
             size: 1567890,
             hash_algo: HashAlgo::Sha512,
+            kind: InstalledItemKind::Mod,
             source: ModSource::Modrinth,
             enabled: true,
             installed_at: "2026-05-05T12:34:56Z".into(),
@@ -338,6 +359,7 @@ mod tests {
                     sha512: "deadbeef".into(),
                     size: 1024,
                     hash_algo: HashAlgo::Sha512,
+                    kind: InstalledItemKind::Mod,
                     source: ModSource::Modrinth,
                     enabled: true,
                     installed_at: "2026-01-01T00:00:00Z".into(),
@@ -352,6 +374,7 @@ mod tests {
                     sha512: "cafebabe".into(),
                     size: 2048,
                     hash_algo: HashAlgo::Sha512,
+                    kind: InstalledItemKind::Mod,
                     source: ModSource::Modrinth,
                     enabled: false,
                     installed_at: "2026-01-02T00:00:00Z".into(),
@@ -463,5 +486,77 @@ installed_at = "2026-01-01T00:00:00Z"
             ModBrowserFetchState::Error("x".into()),
             ModBrowserFetchState::Error("x".into())
         );
+    }
+
+    // --- Phase 11 migration tests (InstalledItemKind + ModSource::Local) ------
+
+    #[test]
+    fn test_pre_phase11_ledger_loads_with_default_kind_mod() {
+        // A pre-Phase-11 ledger row (no `kind` field) must deserialize as
+        // `InstalledItemKind::Mod` thanks to `#[serde(default)]`.
+        // Mirrors test_pre_phase9_ledger_loads_with_default_hash_algo above.
+        let toml_text = r#"
+mod_id = "AANobbMI"
+project_slug = "sodium"
+display_name = "Sodium"
+version_id = "Yp8wLY1P"
+version_label = "0.5.8"
+file_name = "sodium.jar"
+sha512 = "deadbeef"
+size = 1024
+source = "modrinth"
+enabled = true
+installed_at = "2026-01-01T00:00:00Z"
+"#;
+        let row: InstalledModRow = toml::from_str(toml_text).unwrap();
+        assert_eq!(
+            row.kind,
+            InstalledItemKind::Mod,
+            "pre-Phase-11 row must default to InstalledItemKind::Mod"
+        );
+    }
+
+    #[test]
+    fn test_installed_item_kind_serde_snake_case() {
+        // Verify exact wire form so cross-version ledger compat is pinned.
+        assert_eq!(
+            serde_json::to_string(&InstalledItemKind::Mod).unwrap(),
+            "\"mod\""
+        );
+        assert_eq!(
+            serde_json::to_string(&InstalledItemKind::ResourcePack).unwrap(),
+            "\"resource_pack\""
+        );
+        assert_eq!(
+            serde_json::to_string(&InstalledItemKind::Shader).unwrap(),
+            "\"shader\""
+        );
+        // Default is Mod.
+        assert_eq!(InstalledItemKind::default(), InstalledItemKind::Mod);
+    }
+
+    #[test]
+    fn test_mod_source_local_serializes_as_local() {
+        // ModSource::Local must round-trip via toml as `source = "local"`.
+        let row = InstalledModRow {
+            mod_id: "pack:abc123".into(),
+            project_slug: "faithful-32x".into(),
+            display_name: "Faithful 32x".into(),
+            version_id: "local".into(),
+            version_label: "local".into(),
+            file_name: "Faithful 32x.zip".into(),
+            sha512: "deadbeef".into(),
+            size: 512 * 1024 * 1024,
+            hash_algo: HashAlgo::Sha1,
+            kind: InstalledItemKind::ResourcePack,
+            source: ModSource::Local,
+            enabled: true,
+            installed_at: "2026-05-08T00:00:00Z".into(),
+        };
+        let s = toml::to_string_pretty(&row).unwrap();
+        assert!(s.contains("source = \"local\""), "snake_case Local: {s}");
+        let parsed: InstalledModRow = toml::from_str(&s).unwrap();
+        assert_eq!(parsed.source, ModSource::Local);
+        assert_eq!(parsed.kind, InstalledItemKind::ResourcePack);
     }
 }

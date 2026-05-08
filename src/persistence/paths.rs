@@ -152,6 +152,27 @@ impl AppPaths {
         self.instance_minecraft_dir(slug).join("mods").join(filename)
     }
 
+    /// Per-instance pack subdirectory: `instances/{slug}/.minecraft/{resourcepacks|shaderpacks}/`.
+    /// Subdir resolved by `PackKind::subdir()`; matches the layout already
+    /// created by `write_instance_manifest` (instance/store.rs:34).
+    pub fn instance_packs_dir(
+        &self,
+        slug: &str,
+        kind: crate::packs::kind::PackKind,
+    ) -> PathBuf {
+        self.instance_minecraft_dir(slug).join(kind.subdir())
+    }
+
+    /// Pack file destination: `instances/{slug}/.minecraft/{subdir}/{filename}`.
+    pub fn instance_pack_file(
+        &self,
+        slug: &str,
+        kind: crate::packs::kind::PackKind,
+        filename: &str,
+    ) -> PathBuf {
+        self.instance_packs_dir(slug, kind).join(filename)
+    }
+
     /// Per-instance log file for Minecraft stdout/stderr drain.
     /// Path: `{data_dir}/instances/{slug}/logs/mineltui.log`.
     /// The file is APPENDED at each launch; sessions are separated by a
@@ -290,6 +311,57 @@ mod accounts_path_tests {
         );
         assert_eq!(p.accounts_file(), PathBuf::from("/c/accounts.enc"));
         assert_eq!(p.accounts_json_file(), PathBuf::from("/c/accounts.json"));
+    }
+}
+
+#[cfg(test)]
+mod instance_pack_paths_tests {
+    use super::*;
+    use crate::packs::kind::PackKind;
+
+    fn test_paths() -> AppPaths {
+        AppPaths::with_roots(
+            PathBuf::from("/data"),
+            PathBuf::from("/config"),
+            PathBuf::from("/cache"),
+        )
+    }
+
+    #[test]
+    fn test_instance_packs_dir_resource_appends_resourcepacks() {
+        let p = test_paths();
+        let dir = p.instance_packs_dir("myworld", PackKind::Resource);
+        assert_eq!(
+            dir,
+            PathBuf::from("/data/instances/myworld/.minecraft/resourcepacks")
+        );
+    }
+
+    #[test]
+    fn test_instance_packs_dir_shader_appends_shaderpacks() {
+        let p = test_paths();
+        let dir = p.instance_packs_dir("myworld", PackKind::Shader);
+        assert_eq!(
+            dir,
+            PathBuf::from("/data/instances/myworld/.minecraft/shaderpacks")
+        );
+    }
+
+    #[test]
+    fn test_instance_pack_file_joins_filename_after_subdir() {
+        let p = test_paths();
+        let file = p.instance_pack_file("myworld", PackKind::Resource, "Faithful.zip");
+        // Should end with .minecraft/resourcepacks/Faithful.zip
+        assert_eq!(
+            file,
+            PathBuf::from("/data/instances/myworld/.minecraft/resourcepacks/Faithful.zip")
+        );
+        // Verify it ends_with the expected suffix
+        assert!(
+            file.to_string_lossy().ends_with(".minecraft/resourcepacks/Faithful.zip"),
+            "got: {}",
+            file.display()
+        );
     }
 }
 

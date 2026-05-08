@@ -23,7 +23,7 @@ use crate::modpack::parse::{should_download_for_client, strip_leading_dot_slash,
 use crate::mods::error::ModrinthError;
 use crate::mods::installer::download_one_with_hash_algo;
 use crate::mods::installer::MOD_DOWNLOAD_CONCURRENCY;
-use crate::mods::types::{HashAlgo, InstalledModRow, ModSource};
+use crate::mods::types::{HashAlgo, InstalledItemKind, InstalledModRow, ModSource};
 use crate::persistence::paths::AppPaths;
 use crate::tasks::{JobId, TaskEvent};
 
@@ -143,6 +143,7 @@ fn build_mod_row(file: &MrpackFile, file_name: &str, size: u64) -> InstalledModR
         sha512: file.hashes.sha512.clone(),
         size,
         hash_algo: HashAlgo::Sha512,
+        kind: InstalledItemKind::Mod,
         source: ModSource::Modpack,
         enabled: true,
         installed_at: {

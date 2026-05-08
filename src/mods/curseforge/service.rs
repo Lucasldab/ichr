@@ -31,7 +31,7 @@ use crate::mods::curseforge::types::{
 use crate::mods::error::ModrinthError;
 use crate::mods::installer::{download_one_with_hash_algo, MOD_DOWNLOAD_CONCURRENCY};
 use crate::mods::ledger::{per_instance_lock, read_ledger, upsert_mod};
-use crate::mods::types::{HashAlgo, InstalledModRow, ModSource};
+use crate::mods::types::{HashAlgo, InstalledItemKind, InstalledModRow, ModSource};
 use crate::persistence::paths::AppPaths;
 use crate::tasks::{JobId, TaskEvent};
 
@@ -307,10 +307,11 @@ impl CurseForgeService {
             file_name: file.file_name.clone(),
             sha512: sha1.clone(), // historical field name; stores SHA-1 hex when hash_algo=Sha1
             size: file.file_length,
+            hash_algo: HashAlgo::Sha1,
+            kind: InstalledItemKind::Mod,
             source: ModSource::CurseForge,
             enabled: true,
             installed_at: crate::domain::instance::now_iso8601_utc(),
-            hash_algo: HashAlgo::Sha1,
         };
         upsert_mod(paths, slug, row).await.map_err(|e| match e {
             ModrinthError::Io(io_err) => CurseForgeError::Io(io_err),

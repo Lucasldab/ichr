@@ -14,6 +14,7 @@ pub mod modpack;
 pub mod mods;
 pub mod mojang;
 pub mod observability;
+pub mod packs;
 pub mod persistence;
 pub mod services;
 pub mod tasks;
