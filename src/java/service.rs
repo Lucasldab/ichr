@@ -377,6 +377,11 @@ mod tests {
         resolve_inherits(&v, &HashMap::new()).expect("minimal_version must resolve cleanly")
     }
 
+    // Helpers below (version_without_java_version, fixture_bytes,
+    // make_manifest_body, make_all_json_body) are used only by the two
+    // #[cfg(target_os = "linux")] tests in this module. Gate them too so
+    // Windows -D dead-code doesn't fire.
+    #[cfg(target_os = "linux")]
     fn version_without_java_version() -> ResolvedVersion {
         let v = VersionJson {
             id: "1.16.5".into(),
@@ -410,10 +415,12 @@ mod tests {
         InstanceManifest::new(slug.into(), slug.into(), "1.21.4".into())
     }
 
+    #[cfg(target_os = "linux")]
     fn fixture_bytes() -> &'static [u8] {
         b"fixture-java-bin\n"
     }
 
+    #[cfg(target_os = "linux")]
     fn make_manifest_body(server_base: &str, _component: &str) -> String {
         let sha1 = crate::mojang::cache::sha1_hex_of_bytes(fixture_bytes());
         let size = fixture_bytes().len();
@@ -434,6 +441,7 @@ mod tests {
         )
     }
 
+    #[cfg(target_os = "linux")]
     fn make_all_json_body(server_base: &str, component: &str, manifest_sha1: &str) -> String {
         format!(
             r#"{{
