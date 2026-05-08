@@ -154,7 +154,7 @@ impl JavaService {
             JavaRuntimeId::System { path, major_version } => {
                 // System path must exist and pass major-version validation.
                 if !path.is_file() {
-                    return Err(AppError::JavaNotFound);
+                    return Err(AppError::JavaOverrideNotFound { path: path.clone() });
                 }
                 validate_java_major(*major_version, required_major, path)?;
                 Ok(path.clone())
@@ -587,9 +587,13 @@ mod tests {
 
         let result = svc.resolve_jre_for_launch(&paths, &instance, &version).await;
         assert!(
-            matches!(result, Err(AppError::JavaNotFound)),
-            "missing path must return JavaNotFound; got: {result:?}"
+            matches!(result, Err(AppError::JavaOverrideNotFound { .. })),
+            "missing override path must return JavaOverrideNotFound (not the env-var/PATH-flavored JavaNotFound); got: {result:?}"
         );
+        if let Err(AppError::JavaOverrideNotFound { path }) = &result {
+            assert_eq!(path, &td.path().join("nonexistent-java"),
+                "JavaOverrideNotFound must surface the user's override path so the error message is actionable");
+        }
     }
 
     // -----------------------------------------------------------------------

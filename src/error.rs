@@ -59,6 +59,9 @@ pub enum AppError {
     #[error("Java binary not found: checked MINELTUI_JAVA env var and PATH")]
     JavaNotFound,
 
+    #[error("Java override path does not exist: {path:?} — fix or clear instance.json `java_override`")]
+    JavaOverrideNotFound { path: std::path::PathBuf },
+
     #[error("Java major version mismatch: Minecraft requires Java {required}, found Java {found} at {path:?} — {hint}")]
     JavaMismatch { required: u32, found: u32, path: std::path::PathBuf, hint: String },
 
