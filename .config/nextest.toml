@@ -1,0 +1,17 @@
+# nextest configuration. See https://nexte.st/docs/configuration/
+#
+# `default` profile is used by `cargo nextest run` with no arg.
+# `ci` profile is used by `.github/workflows/ci.yml` (`cargo nextest run --profile ci`).
+
+[profile.default]
+fail-fast = true
+
+[profile.ci]
+# CI doesn't fail-fast — we want the full picture per run, not just the first failure.
+fail-fast = false
+# Retry transient flakes (network races, filesystem timing) once before reporting failure.
+retries = 1
+# Show full output for any test that fails or is slow on the final summary.
+failure-output = "immediate-final"
+status-level = "fail"
+final-status-level = "skip"

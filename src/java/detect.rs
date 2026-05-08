@@ -276,6 +276,7 @@ mod tests {
         assert!(result.is_empty());
     }
 
+    #[cfg(unix)]
     #[test]
     fn iter_path_candidates_finds_real_file() {
         use std::io::Write;
@@ -304,6 +305,7 @@ mod tests {
     // dedupe_by_canonical
     // ------------------------------------------------------------------
 
+    #[cfg(unix)]
     #[test]
     fn dedupe_by_canonical_removes_duplicates() {
         use std::io::Write;
