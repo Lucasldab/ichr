@@ -17,5 +17,6 @@ pub mod persistence;
 pub mod services;
 pub mod tasks;
 pub mod tui;
+pub mod util;
 
 pub use error::{AppError, Result};
