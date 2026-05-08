@@ -107,16 +107,33 @@ fn test_rejects_current_dir_prefix() {
 // ---------------------------------------------------------------------------
 
 /// A Windows drive-letter prefix `C:\Windows\...` contains a Prefix component
-/// and must be rejected.
+/// on Windows and must be rejected. On Linux, backslash is a valid filename
+/// character so the entire string is treated as a single Normal component;
+/// on Linux the result is Some but the path stays inside base (no escape).
+///
+/// This test documents the platform-specific behavior.
 #[test]
 fn test_rejects_windows_prefix() {
     let base = Path::new("/tmp/base");
     let result = safe_extract_path("C:\\Windows\\System32\\foo.dll", base);
+    #[cfg(windows)]
     assert_eq!(
         result,
         None,
-        "Windows drive-prefix path must be rejected (Prefix component)"
+        "Windows drive-prefix path must be rejected on Windows (Prefix component)"
     );
+    #[cfg(not(windows))]
+    {
+        // On Linux, backslash is a filename char. "C:\Windows\..." is one Normal
+        // component — the function accepts it but places the entire backslash-laden
+        // string as a single filename component inside base. No filesystem escape.
+        if let Some(p) = result {
+            assert!(
+                p.starts_with(base),
+                "on Linux the Windows-style path must stay inside base: {p:?}"
+            );
+        }
+    }
 }
 
 /// UNC path `\\server\share\foo` — Prefix component on Windows; on Linux the
