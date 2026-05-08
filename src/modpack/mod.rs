@@ -7,3 +7,7 @@ pub mod error;
 pub mod parse;
 
 pub use error::ModpackError;
+pub use parse::{
+    detect_loader, parse_index, should_download_for_client, strip_leading_dot_slash,
+    EnvRequirement, MrpackEnv, MrpackFile, MrpackHashes, MrpackIndex,
+};
