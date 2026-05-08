@@ -4,7 +4,7 @@
 //! Phase 3 v1 is non-scrollable. A scrollable log viewer is v2 (LOG-01).
 
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Modifier, Style};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 use ratatui::Frame;
 
@@ -38,7 +38,7 @@ pub fn render_launch_failed_modal(f: &mut Frame, area: Rect, state: &AppState) {
         .split(inner);
 
     let err_p = Paragraph::new(error.as_str())
-        .style(Style::default().add_modifier(Modifier::BOLD))
+        .style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
         .wrap(Wrap { trim: false });
     f.render_widget(err_p, split[0]);
 
