@@ -568,6 +568,12 @@ mod tests {
             .replace("PLACEHOLDER", server_base)
     }
 
+    // Linux-only: select_variant("linux", ...) + asserts `bin/java` (no .exe)
+    // is extracted. install_mojang_variant returns a host-OS-conditional path
+    // (`bin/java.exe` on Windows), so on Windows host the existence assert
+    // looks for `.exe` while the Linux fixture wrote `bin/java`. A Windows
+    // counterpart would need a separate fixture with `bin/java.exe` entry.
+    #[cfg(target_os = "linux")]
     #[tokio::test]
     async fn test_install_extracts_file_with_sha1_verify() {
         let td = TempDir::new().unwrap();

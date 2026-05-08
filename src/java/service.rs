@@ -692,6 +692,12 @@ mod tests {
     // Step 3 – Auto Mojang path
     // -----------------------------------------------------------------------
 
+    // Linux-only: pins OsName::Linux on the service constructor and asserts the
+    // extracted binary lives at `bin/java` (no .exe). Service path construction
+    // is host-OS-conditional, so on Windows host the assert reads `bin/java.exe`
+    // while the fixture wrote `bin/java`. A Windows-equivalent of this test
+    // would need a separate Windows JRE fixture (with `bin/java.exe` entry).
+    #[cfg(target_os = "linux")]
     #[tokio::test]
     async fn test_resolve_auto_mojang_path() {
         let _guard = java_env_lock().lock().await;

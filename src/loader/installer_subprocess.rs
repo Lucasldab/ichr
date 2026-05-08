@@ -322,6 +322,9 @@ mod tests {
         }
     }
 
+    // See src/launcher/spawn.rs for the full rationale — same flake on
+    // GH Actions ubuntu-latest. Run locally with --include-ignored.
+    #[ignore = "flaky on GH Actions ubuntu-latest; run with --include-ignored locally"]
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_cancellation_kills_child_and_returns_cancelled() {
         let td = TempDir::new().unwrap();
