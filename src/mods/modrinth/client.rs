@@ -80,6 +80,13 @@ impl ModrinthClient {
     /// `GET /v2/search` — project search with facets.
     ///
     /// 08-RESEARCH.md §Endpoint #1.
+    ///
+    /// Wraps `search_with_project_type` with `project_type = "mod"` for
+    /// backward compatibility. The existing gate (`if mc.is_some() ||
+    /// !loaders.is_empty()`) is preserved here so callers that intentionally
+    /// want unfaceted "any-project_type" searches continue to work. Pack search
+    /// MUST use `search_with_project_type` directly to guarantee the
+    /// `project_type` facet is always emitted (HIGH-1 invariant).
     #[tracing::instrument(skip_all, fields(query, mc, loaders_count = loaders.len(), limit))]
     pub async fn search(
         &self,
@@ -129,6 +136,69 @@ impl ModrinthClient {
                 description: h.description,
                 downloads: h.downloads,
                 already_installed: false, // caller stamps from ledger
+            })
+            .collect())
+    }
+
+    /// `GET /v2/search` with an explicit `project_type` — used by `PackService`
+    /// to search for `"resourcepack"` or `"shader"` projects.
+    ///
+    /// HIGH-1 invariant: the `project_type` facet is emitted UNCONDITIONALLY,
+    /// even when `mc == None` and `loaders == []`. This prevents Modrinth from
+    /// returning mods, modpacks, and packs mixed together when neither mc nor
+    /// loader filters narrow the query. `search()` preserves the old gate for
+    /// backward compat; this method does NOT inherit it.
+    #[tracing::instrument(
+        skip_all,
+        fields(query, mc, loaders_count = loaders.len(), project_type, limit)
+    )]
+    pub async fn search_with_project_type(
+        &self,
+        query: &str,
+        mc: Option<&str>,
+        loaders: &[&str],
+        project_type: &str,
+        limit: u32,
+    ) -> Result<Vec<ModrinthSearchHit>, ModrinthError> {
+        let url = {
+            let mc_versions: Vec<String> =
+                mc.map(|v| vec![v.to_string()]).unwrap_or_default();
+            // Unconditionally build facets including project_type (HIGH-1).
+            let facets = search_facets(loaders, &mc_versions, project_type);
+            format!(
+                "{}/v2/search?query={}&limit={}&index=relevance&facets={}",
+                self.base_url,
+                urlencoding::encode(query),
+                limit,
+                urlencoding::encode(&facets),
+            )
+        };
+        let bytes = self.send_get_bytes(&url).await?;
+        #[derive(serde::Deserialize)]
+        struct SearchEnv {
+            hits: Vec<SearchHitWire>,
+        }
+        #[derive(serde::Deserialize)]
+        struct SearchHitWire {
+            project_id: String,
+            slug: String,
+            title: String,
+            description: String,
+            #[serde(default)]
+            downloads: u64,
+        }
+        let env: SearchEnv = serde_json::from_slice(&bytes)
+            .map_err(|e| ModrinthError::Parse(format!("search_with_project_type {url}: {e}")))?;
+        Ok(env
+            .hits
+            .into_iter()
+            .map(|h| ModrinthSearchHit {
+                project_id: h.project_id,
+                slug: h.slug,
+                title: h.title,
+                description: h.description,
+                downloads: h.downloads,
+                already_installed: false,
             })
             .collect())
     }
