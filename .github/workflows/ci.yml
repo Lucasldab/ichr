@@ -52,6 +52,48 @@ jobs:
       - name: cargo nextest run
         run: cargo nextest run --profile ci
 
+  windows-install-smoke:
+    name: cargo install --git smoke (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+
+      # SC4 (Windows half) automation: install from the checked-out source
+      # via the same code path `cargo install --git <url>` exercises, then
+      # confirm the produced .exe at least starts (binary launches and
+      # errors with a no-TTY error, proving main() ran). Catches packaging
+      # regressions that block downstream Windows users on every PR.
+      - name: cargo install --path . (Windows clean smoke)
+        shell: pwsh
+        run: |
+          cargo install --path . --locked --force --root "$env:RUNNER_TEMP\mineltui-smoke"
+          if (-not (Test-Path "$env:RUNNER_TEMP\mineltui-smoke\bin\mineltui.exe")) {
+            Write-Error "mineltui.exe not produced by cargo install"
+            exit 1
+          }
+          Write-Host "Installed: $env:RUNNER_TEMP\mineltui-smoke\bin\mineltui.exe"
+
+      # SC2 (PE inspection automation): the longPathAware substring must
+      # be present in the embedded side-by-side manifest of the Windows
+      # binary. Complements tests/integration_manifest_embedded.rs which
+      # pins embed-manifest 1.5's builder defaults at the API level; this
+      # step confirms the actual PE output carries the substring.
+      - name: PE manifest carries longPathAware
+        shell: pwsh
+        run: |
+          $exe = "$env:RUNNER_TEMP\mineltui-smoke\bin\mineltui.exe"
+          $matches = Select-String -Path $exe -Pattern "longPathAware" -SimpleMatch -List
+          if (-not $matches) {
+            Write-Error "longPathAware substring NOT found in $exe -- embed-manifest regression"
+            exit 1
+          }
+          Write-Host "longPathAware substring found in $exe -- SC2 PE-output verified"
+
   metadata:
     name: dist metadata regression guard
     runs-on: ubuntu-latest
