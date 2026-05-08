@@ -2,3 +2,4 @@
 //! "Module symmetry": ONE module parameterized by PackKind, not two.
 pub mod error;
 pub mod kind;
+pub mod service;

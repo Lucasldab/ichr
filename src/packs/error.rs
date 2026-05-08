@@ -40,6 +40,12 @@ pub enum PackError {
     /// Treated as a clean return at the TUI boundary — not an error.
     #[error("Pack operation cancelled")]
     Cancelled,
+
+    /// Toggle is not supported for shader packs (Iris/OptiFine manage shader
+    /// selection in their own config — no filesystem enable/disable for shaders).
+    /// D-LOCK: `PackKind::Shader` path through `toggle_pack_enabled` returns this.
+    #[error("toggle not supported for {kind:?} packs (Iris/OptiFine config required)")]
+    ShaderToggleNotSupported { kind: crate::packs::kind::PackKind },
 }
 
 #[cfg(test)]
@@ -108,5 +114,21 @@ mod tests {
     fn test_cancelled_display_static_message() {
         let e = PackError::Cancelled;
         assert_eq!(e.to_string(), "Pack operation cancelled");
+    }
+
+    #[test]
+    fn test_shader_toggle_not_supported_display_contains_kind() {
+        let e = PackError::ShaderToggleNotSupported {
+            kind: crate::packs::kind::PackKind::Shader,
+        };
+        let s = e.to_string();
+        assert!(
+            s.contains("Shader"),
+            "kind name should appear in message: {s}"
+        );
+        assert!(
+            s.contains("toggle not supported"),
+            "headline missing: {s}"
+        );
     }
 }
