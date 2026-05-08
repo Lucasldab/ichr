@@ -572,6 +572,7 @@ mod tests {
     ///     java.exe    (content "fake-java\n")
     /// ```
     #[cfg(windows)]
+    #[allow(dead_code)] // Windows zip-extract test fixture; preserved for future extract-blocking test
     fn make_zip_bytes() -> Vec<u8> {
         use std::io::Write;
 

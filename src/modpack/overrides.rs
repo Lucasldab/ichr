@@ -198,6 +198,7 @@ mod tests {
     }
 
     /// Build an mrpack with a specific unix_permissions on one entry.
+    #[cfg(unix)]
     fn build_mrpack_with_perms(
         path: &std::path::Path,
         entry_name: &str,
