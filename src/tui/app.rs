@@ -232,6 +232,34 @@ pub enum ActiveView {
         /// Some(url) iff the failure is FileNotDownloadable — render the link.
         web_url: Option<String>,
     },
+
+    // ── Phase 10 (Modpack Import) — see 10-PATTERNS.md ──
+    /// Phase 10 (PACK-01): centered text-entry modal for path to .mrpack.
+    /// Rendered by `src/tui/views/modpack_import_path_modal.rs`.
+    ModpackImportPathInput {
+        buffer: String,
+        error: Option<String>,
+    },
+    /// Phase 10 (PACK-01/02/03/06): live progress modal during import.
+    /// Mirrors `LoaderInstallProgressModal` shape; see PATTERNS.md §9.
+    /// Rendered by `src/tui/views/modpack_import_progress_modal.rs`.
+    ModpackImportProgressModal {
+        modpack_name: String,
+        step_label: String,
+        step_index: usize,
+        step_total: usize,
+        bytes_done: u64,
+        bytes_total: u64,
+        cancel_token_key: String,
+        log_tail: String,
+    },
+    /// Phase 10: error modal when import fails. Esc dismisses.
+    /// Mirrors `LoaderInstallFailedModal`; see PATTERNS.md §10.
+    ModpackImportFailedModal {
+        modpack_name: String,
+        error: String,
+        log_tail: String,
+    },
 }
 
 /// Where the `Action::DismissModInstallFailed` arm should return to.
@@ -308,6 +336,12 @@ pub struct AppState {
     /// the `OpenCfBrowser` arm to silently no-op the F keybind when no key is
     /// configured (Pitfall 1 surface — 09-RESEARCH.md §"Keybind guard").
     pub cf_api_key_present: bool,
+    /// Phase 10: tracks slug → CancellationToken for an in-progress modpack import.
+    /// Single-entry in v1 (only one modpack import runs at a time); HashMap shape
+    /// retained for future-compat with parallel imports.
+    /// Populated by Action::ModpackImportStarted; cleared by ModpackImported /
+    /// ModpackImportCancelled / ModpackImportFailed.
+    pub running_modpack_imports: HashMap<String, CancellationToken>,
 }
 
 
@@ -645,6 +679,42 @@ pub enum Action {
     },
     /// Esc on CfInstallFailedModal — returns to InstanceList.
     CfDismissInstallFailed,
+
+    // ── Phase 10 (Modpack Import) — see 10-PATTERNS.md ──
+    /// `i` (lowercase) keybind on InstanceList — opens the path-entry modal
+    /// for importing a `.mrpack` file from disk.
+    OpenModpackImport,
+    /// User typed a character in the path-input modal.
+    ImportPathTypeSearch(char),
+    /// User pasted text into the path-input modal (bracketed-paste).
+    ImportPathPasteSearch(String),
+    /// User pressed Backspace in the path-input modal.
+    ImportPathBackspaceSearch,
+    /// User pressed Enter in the path-input modal — submits the path.
+    ImportPathSubmit,
+    /// User pressed Esc in the path-input modal — cancels without importing.
+    ImportPathCancel,
+    /// Internal — emitted by the spawned task BEFORE calling import_mrpack.
+    /// Inserts the CancellationToken into running_modpack_imports and transitions
+    /// ActiveView to ModpackImportProgressModal.
+    ModpackImportStarted { slug: String, modpack_name: String, token: CancellationToken },
+    /// Progress update from the import task — updates the progress modal fields.
+    ModpackImportProgress { slug: String, pct: u8, step_label: String, bytes_done: u64, bytes_total: u64 },
+    /// Import completed successfully — clears running_modpack_imports[slug],
+    /// transitions to InstanceList, emits Effect::FetchInstances.
+    ModpackImported { slug: String },
+    /// Dispatched by the Effect-spawned task when ModpackError::Cancelled bubbles up.
+    /// Distinct from ModpackImported so the update arm can `clear()` the
+    /// running_modpack_imports map without needing to know the resolved slug (which
+    /// the spawned task may not have if cancel preceded create_instance).
+    ModpackImportCancelled,
+    /// Import failed — clears running_modpack_imports, transitions to ModpackImportFailedModal.
+    ModpackImportFailed { modpack_name: String, error: String, log_tail: String },
+    /// User-keystroke action: Esc on progress modal.
+    /// No slug arg — uses the unique current modpack import (HashMap is single-entry in v1).
+    CancelModpackImport,
+    /// Esc on ModpackImportFailedModal — returns to InstanceList.
+    DismissModpackImportFailed,
 }
 
 /// Effects requested by `update()`. NOTE: there is deliberately NO
@@ -778,6 +848,13 @@ pub enum Effect {
         mod_detail: Box<crate::mods::curseforge::types::CurseForgeProjectDetail>,
         file: Box<crate::mods::curseforge::types::CurseForgeFileEntry>,
     },
+
+    // ── Phase 10 (Modpack Import) ──
+    /// PACK-01: spawn the import_mrpack pipeline.
+    ImportModpack { mrpack_path: std::path::PathBuf },
+    /// PACK-01: cancel the running modpack import (no-op hook for symmetry with
+    /// CancelLoaderInstall — the actual token.cancel() happened in update()).
+    CancelModpackImport,
 }
 
 /// Format a loader for the status cell or switch dialog: "fabric:0.16.9".
@@ -2899,6 +2976,151 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
 
         Action::CfDismissInstallFailed => {
             state.active_view = ActiveView::default();
+            vec![]
+        }
+
+        // ── Phase 10 (Modpack Import) ──
+
+        Action::OpenModpackImport => {
+            state.active_view = ActiveView::ModpackImportPathInput {
+                buffer: String::new(),
+                error: None,
+            };
+            vec![]
+        }
+
+        Action::ImportPathTypeSearch(c) => {
+            if let ActiveView::ModpackImportPathInput { buffer, error } = &mut state.active_view {
+                buffer.push(c);
+                *error = None;
+            }
+            vec![]
+        }
+
+        Action::ImportPathPasteSearch(s) => {
+            if let ActiveView::ModpackImportPathInput { buffer, error } = &mut state.active_view {
+                buffer.push_str(&s);
+                *error = None;
+            }
+            vec![]
+        }
+
+        Action::ImportPathBackspaceSearch => {
+            if let ActiveView::ModpackImportPathInput { buffer, .. } = &mut state.active_view {
+                buffer.pop();
+            }
+            vec![]
+        }
+
+        Action::ImportPathSubmit => {
+            if let ActiveView::ModpackImportPathInput { buffer, error } = &mut state.active_view {
+                let trimmed = buffer.trim().to_string();
+                if trimmed.is_empty() {
+                    *error = Some("path required".into());
+                    return vec![];
+                }
+                // Expand leading ~/ to the user's home directory.
+                // Use directories::BaseDirs (cross-platform) rather than the
+                // deprecated std::env::home_dir().
+                let expanded = if let Some(rest) = trimmed.strip_prefix("~/") {
+                    if let Some(home) = directories::BaseDirs::new().map(|b| b.home_dir().to_path_buf()) {
+                        home.join(rest)
+                    } else {
+                        std::path::PathBuf::from(&trimmed)
+                    }
+                } else {
+                    std::path::PathBuf::from(&trimmed)
+                };
+                return vec![Effect::ImportModpack { mrpack_path: expanded }];
+            }
+            vec![]
+        }
+
+        Action::ImportPathCancel => {
+            state.active_view = ActiveView::InstanceList { selected: 0 };
+            vec![]
+        }
+
+        Action::ModpackImportStarted { slug, modpack_name, token } => {
+            state.running_modpack_imports.insert(slug.clone(), token);
+            state.active_view = ActiveView::ModpackImportProgressModal {
+                modpack_name,
+                step_label: "Starting".into(),
+                step_index: 0,
+                step_total: 7,
+                bytes_done: 0,
+                bytes_total: 0,
+                cancel_token_key: slug,
+                log_tail: String::new(),
+            };
+            vec![]
+        }
+
+        Action::ModpackImportProgress { slug: _, pct, step_label, bytes_done, bytes_total } => {
+            if let ActiveView::ModpackImportProgressModal {
+                step_label: ref mut sl,
+                bytes_done: ref mut bd,
+                bytes_total: ref mut bt,
+                step_index: ref mut si,
+                ..
+            } = &mut state.active_view
+            {
+                *sl = step_label;
+                *bd = bytes_done;
+                *bt = bytes_total;
+                *si = match pct {
+                    0..=14 => 0,
+                    15..=24 => 1,
+                    25..=39 => 2,
+                    40..=59 => 3,
+                    60..=74 => 4,
+                    75..=84 => 5,
+                    85..=94 => 6,
+                    _ => 7,
+                };
+            }
+            vec![]
+        }
+
+        Action::ModpackImported { slug } => {
+            state.running_modpack_imports.remove(&slug);
+            state.active_view = ActiveView::InstanceList { selected: 0 };
+            vec![Effect::FetchInstances]
+        }
+
+        Action::ModpackImportCancelled => {
+            // Dedicated arm: clear() the map regardless of whether a slug was
+            // assigned before cancel was observed. Covers two cases:
+            // (a) user pressed Esc on progress modal (CancelModpackImport already
+            //     drained the map → clear() is idempotent)
+            // (b) cancel was raised by the task system before a slug was assigned
+            //     (the spawned task sends ModpackImportCancelled before any slug
+            //     is stored → map still empty → clear() is idempotent).
+            // This is the HIGH-2 regression fix: dispatching ModpackImported{slug:""}
+            // would call remove("") which is a no-op against any real-slug key.
+            state.running_modpack_imports.clear();
+            state.active_view = ActiveView::InstanceList { selected: 0 };
+            vec![]
+        }
+
+        Action::ModpackImportFailed { modpack_name, error, log_tail } => {
+            // Single-entry in v1: clearing all is correct regardless of slug state.
+            state.running_modpack_imports.clear();
+            state.active_view = ActiveView::ModpackImportFailedModal { modpack_name, error, log_tail };
+            vec![]
+        }
+
+        Action::CancelModpackImport => {
+            // Drain running_modpack_imports and cancel each token.
+            for (_slug, token) in state.running_modpack_imports.drain() {
+                token.cancel();
+            }
+            state.active_view = ActiveView::InstanceList { selected: 0 };
+            vec![Effect::CancelModpackImport]
+        }
+
+        Action::DismissModpackImportFailed => {
+            state.active_view = ActiveView::InstanceList { selected: 0 };
             vec![]
         }
     }
