@@ -17,12 +17,12 @@
 //! which declared zero deps and produced a false failure on a correct
 //! resolver.
 
-use mineltui::domain::instance::{InstanceManifest, ModloaderKind};
-use mineltui::loader::types::LoaderInfo;
-use mineltui::mods::service::ModrinthService;
-use mineltui::mods::types::DepKind;
-use mineltui::persistence::paths::AppPaths;
-use mineltui::tasks::JobId;
+use ichr::domain::instance::{InstanceManifest, ModloaderKind};
+use ichr::loader::types::LoaderInfo;
+use ichr::mods::service::ModrinthService;
+use ichr::mods::types::DepKind;
+use ichr::persistence::paths::AppPaths;
+use ichr::tasks::JobId;
 use tempfile::TempDir;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -53,7 +53,7 @@ async fn live_install_continuity_with_deps_fabric_1_20_4() {
         version_id: "fabric-loader-0.16.9-1.20.4".into(),
     };
     m.loader = Some(loader_info.clone());
-    mineltui::instance::store::write_instance_manifest(&paths, &m)
+    ichr::instance::store::write_instance_manifest(&paths, &m)
         .await
         .expect("write_instance_manifest");
 

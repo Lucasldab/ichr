@@ -1,5 +1,5 @@
 //! Post-install harvest: walk staging dir after installer succeeds, extract
-//! the produced version JSON + library tree, and merge into mineltui's
+//! the produced version JSON + library tree, and merge into ichr's
 //! shared `libraries/` Maven layout + `versions/` tree.
 //!
 //! Atomicity: the merged version JSON is written via `atomic_write`

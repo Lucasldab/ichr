@@ -9,7 +9,7 @@
 //! Requires:
 //!   - Internet access (api.curseforge.com + edge.forgecdn.net)
 //!   - `CURSEFORGE_API_KEY` env var set (build-time
-//!     `MINELTUI_CURSEFORGE_API_KEY_DEFAULT` also works in principle but is
+//!     `ICHR_CURSEFORGE_API_KEY_DEFAULT` also works in principle but is
 //!     NOT assumed for CI test runs — the runtime env var is the canonical
 //!     test-time secret).
 //!
@@ -18,13 +18,13 @@
 //! This protects CI from breaking when secrets rotate or the build host has
 //! no API key configured.
 
-use mineltui::domain::instance::{InstanceManifest, ModloaderKind};
-use mineltui::loader::types::LoaderInfo;
-use mineltui::mods::curseforge::error::CurseForgeError;
-use mineltui::mods::curseforge::CurseForgeService;
-use mineltui::mods::types::{HashAlgo, ModSource};
-use mineltui::persistence::paths::AppPaths;
-use mineltui::tasks::JobId;
+use ichr::domain::instance::{InstanceManifest, ModloaderKind};
+use ichr::loader::types::LoaderInfo;
+use ichr::mods::curseforge::error::CurseForgeError;
+use ichr::mods::curseforge::CurseForgeService;
+use ichr::mods::types::{HashAlgo, ModSource};
+use ichr::persistence::paths::AppPaths;
+use ichr::tasks::JobId;
 use tempfile::TempDir;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -72,7 +72,7 @@ async fn live_install_downloadable_mod_fabric_1_20_4() {
     let mut m = InstanceManifest::new(slug.into(), slug.into(), mc.into());
     let loader_info = fabric_loader();
     m.loader = Some(loader_info.clone());
-    mineltui::instance::store::write_instance_manifest(&paths, &m)
+    ichr::instance::store::write_instance_manifest(&paths, &m)
         .await
         .expect("write_instance_manifest");
 
@@ -146,7 +146,7 @@ async fn live_install_downloadable_mod_fabric_1_20_4() {
         ledger_path.display()
     );
     let ledger_raw = tokio::fs::read_to_string(&ledger_path).await.unwrap();
-    let ledger: mineltui::mods::types::Ledger = toml::from_str(&ledger_raw).unwrap();
+    let ledger: ichr::mods::types::Ledger = toml::from_str(&ledger_raw).unwrap();
     assert_eq!(ledger.mods.len(), 1, "expected exactly 1 ledger row");
     let row = &ledger.mods[0];
     assert_eq!(
@@ -200,7 +200,7 @@ async fn live_restricted_mod_returns_file_not_downloadable() {
 
     let mut m = InstanceManifest::new(slug.into(), slug.into(), mc.into());
     m.loader = Some(loader_info.clone());
-    mineltui::instance::store::write_instance_manifest(&paths, &m)
+    ichr::instance::store::write_instance_manifest(&paths, &m)
         .await
         .expect("write_instance_manifest");
 
@@ -270,7 +270,7 @@ async fn live_restricted_mod_returns_file_not_downloadable() {
             let ledger_path = paths.instance_mod_ledger(slug);
             if ledger_path.exists() {
                 let raw = tokio::fs::read_to_string(&ledger_path).await.unwrap();
-                let ledger: mineltui::mods::types::Ledger =
+                let ledger: ichr::mods::types::Ledger =
                     toml::from_str(&raw).unwrap_or_default();
                 assert!(
                     ledger.mods.is_empty(),

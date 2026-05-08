@@ -12,15 +12,15 @@ use tempfile::TempDir;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use mineltui::domain::instance::InstanceManifest;
-use mineltui::instance::store::write_instance_manifest;
-use mineltui::mods::modrinth::ModrinthClient;
-use mineltui::packs::error::PackError;
-use mineltui::packs::install::drop_pack_from_path;
-use mineltui::packs::kind::PackKind;
-use mineltui::packs::service::PackService;
-use mineltui::persistence::paths::AppPaths;
-use mineltui::tasks::JobId;
+use ichr::domain::instance::InstanceManifest;
+use ichr::instance::store::write_instance_manifest;
+use ichr::mods::modrinth::ModrinthClient;
+use ichr::packs::error::PackError;
+use ichr::packs::install::drop_pack_from_path;
+use ichr::packs::kind::PackKind;
+use ichr::packs::service::PackService;
+use ichr::persistence::paths::AppPaths;
+use ichr::tasks::JobId;
 
 // ─── Include fixture builder ──────────────────────────────────────────────────
 
@@ -46,8 +46,8 @@ fn make_service_with_mock(server: &MockServer) -> PackService {
 }
 
 fn make_progress() -> (
-    mpsc::Sender<mineltui::tasks::TaskEvent>,
-    mpsc::Receiver<mineltui::tasks::TaskEvent>,
+    mpsc::Sender<ichr::tasks::TaskEvent>,
+    mpsc::Receiver<ichr::tasks::TaskEvent>,
 ) {
     mpsc::channel(64)
 }
@@ -94,16 +94,16 @@ async fn test_drop_resource_pack_happy_path() {
     assert_eq!(result.dest, dest);
 
     // Ledger must have exactly 1 row with correct kind and source.
-    let ledger = mineltui::mods::ledger::read_ledger(&paths, "test-instance")
+    let ledger = ichr::mods::ledger::read_ledger(&paths, "test-instance")
         .await
         .expect("read_ledger");
     assert_eq!(ledger.mods.len(), 1, "ledger must have exactly 1 row");
     let row = &ledger.mods[0];
     assert_eq!(
         row.kind,
-        mineltui::mods::types::InstalledItemKind::ResourcePack
+        ichr::mods::types::InstalledItemKind::ResourcePack
     );
-    assert_eq!(row.source, mineltui::mods::types::ModSource::Local);
+    assert_eq!(row.source, ichr::mods::types::ModSource::Local);
     assert_eq!(row.file_name, "faithful.zip");
     assert!(row.enabled, "newly dropped pack must be enabled");
 }
@@ -143,13 +143,13 @@ async fn test_drop_shader_pack_happy_path() {
     assert_eq!(result.dest, dest);
 
     // Ledger must have exactly 1 row with kind=Shader.
-    let ledger = mineltui::mods::ledger::read_ledger(&paths, "test-instance")
+    let ledger = ichr::mods::ledger::read_ledger(&paths, "test-instance")
         .await
         .expect("read_ledger");
     assert_eq!(ledger.mods.len(), 1, "ledger must have exactly 1 row");
     let row = &ledger.mods[0];
-    assert_eq!(row.kind, mineltui::mods::types::InstalledItemKind::Shader);
-    assert_eq!(row.source, mineltui::mods::types::ModSource::Local);
+    assert_eq!(row.kind, ichr::mods::types::InstalledItemKind::Shader);
+    assert_eq!(row.source, ichr::mods::types::ModSource::Local);
     assert_eq!(row.file_name, "complementary.zip");
 }
 
@@ -196,7 +196,7 @@ async fn test_drop_collision_returns_filename_collision() {
     );
 
     // Ledger must still have exactly 1 row (no duplicate insert).
-    let ledger = mineltui::mods::ledger::read_ledger(&paths, "test-instance")
+    let ledger = ichr::mods::ledger::read_ledger(&paths, "test-instance")
         .await
         .expect("read_ledger");
     assert_eq!(
@@ -246,7 +246,7 @@ async fn test_drop_cancel_mid_copy_cleans_partial() {
     );
 
     // Ledger must be empty.
-    let ledger = mineltui::mods::ledger::read_ledger(&paths, "test-instance")
+    let ledger = ichr::mods::ledger::read_ledger(&paths, "test-instance")
         .await
         .expect("read_ledger");
     assert!(ledger.mods.is_empty(), "ledger must be empty after cancel");
@@ -416,19 +416,19 @@ async fn test_modrinth_install_resource_pack_end_to_end() {
     );
 
     // Ledger row must have kind=ResourcePack + source=Modrinth + correct sha1.
-    let ledger = mineltui::mods::ledger::read_ledger(&paths, "test-instance")
+    let ledger = ichr::mods::ledger::read_ledger(&paths, "test-instance")
         .await
         .expect("read_ledger");
     assert_eq!(ledger.mods.len(), 1);
     let r = &ledger.mods[0];
     assert_eq!(
         r.kind,
-        mineltui::mods::types::InstalledItemKind::ResourcePack
+        ichr::mods::types::InstalledItemKind::ResourcePack
     );
-    assert_eq!(r.source, mineltui::mods::types::ModSource::Modrinth);
+    assert_eq!(r.source, ichr::mods::types::ModSource::Modrinth);
     assert_eq!(
         r.hash_algo,
-        mineltui::mods::types::HashAlgo::Sha1,
+        ichr::mods::types::HashAlgo::Sha1,
         "pack install uses SHA-1"
     );
     assert!(
@@ -522,17 +522,17 @@ async fn test_modrinth_install_shader_pack_end_to_end() {
         dest.display()
     );
 
-    let ledger = mineltui::mods::ledger::read_ledger(&paths, "test-instance")
+    let ledger = ichr::mods::ledger::read_ledger(&paths, "test-instance")
         .await
         .expect("read_ledger");
     assert_eq!(ledger.mods.len(), 1);
     assert_eq!(
         ledger.mods[0].kind,
-        mineltui::mods::types::InstalledItemKind::Shader
+        ichr::mods::types::InstalledItemKind::Shader
     );
     assert_eq!(
         ledger.mods[0].source,
-        mineltui::mods::types::ModSource::Modrinth
+        ichr::mods::types::ModSource::Modrinth
     );
 }
 
@@ -594,7 +594,7 @@ async fn test_toggle_resource_pack_enabled_flips_extension() {
     );
 
     // Verify ledger row has enabled=false.
-    let ledger = mineltui::mods::ledger::read_ledger(&paths, "test-instance")
+    let ledger = ichr::mods::ledger::read_ledger(&paths, "test-instance")
         .await
         .unwrap();
     assert!(!ledger.mods[0].enabled);
@@ -617,7 +617,7 @@ async fn test_toggle_resource_pack_enabled_flips_extension() {
     );
 
     // Verify ledger row has enabled=true again.
-    let ledger2 = mineltui::mods::ledger::read_ledger(&paths, "test-instance")
+    let ledger2 = ichr::mods::ledger::read_ledger(&paths, "test-instance")
         .await
         .unwrap();
     assert!(ledger2.mods[0].enabled);
@@ -663,7 +663,7 @@ async fn test_uninstall_pack_removes_file_and_ledger() {
         dest.display()
     );
 
-    let ledger = mineltui::mods::ledger::read_ledger(&paths, "test-instance")
+    let ledger = ichr::mods::ledger::read_ledger(&paths, "test-instance")
         .await
         .unwrap();
     assert!(
@@ -762,7 +762,7 @@ async fn test_list_installed_filters_by_kind_in_mixed_ledger() {
     assert_eq!(rp_rows.len(), 1, "must have exactly 1 resource pack row");
     assert_eq!(
         rp_rows[0].kind,
-        mineltui::mods::types::InstalledItemKind::ResourcePack
+        ichr::mods::types::InstalledItemKind::ResourcePack
     );
 
     // list_installed(Shader) must return exactly 1 row.
@@ -773,7 +773,7 @@ async fn test_list_installed_filters_by_kind_in_mixed_ledger() {
     assert_eq!(sp_rows.len(), 1, "must have exactly 1 shader pack row");
     assert_eq!(
         sp_rows[0].kind,
-        mineltui::mods::types::InstalledItemKind::Shader
+        ichr::mods::types::InstalledItemKind::Shader
     );
 }
 
@@ -789,7 +789,7 @@ async fn test_modrinth_install_oversized_file_rejected() {
     let paths = make_paths(&tmp);
     make_instance(&paths, "test-instance").await;
 
-    let oversized = mineltui::mods::filter::MAX_PACK_FILE_BYTES + 1;
+    let oversized = ichr::mods::filter::MAX_PACK_FILE_BYTES + 1;
 
     // Mock: GET /v2/version/oversized → version with huge file.size
     let _get_version_mock = server.mock(|when, then| {
@@ -857,7 +857,7 @@ async fn test_modrinth_install_oversized_file_rejected() {
     assert!(!dest.exists(), "no dest file after FileTooLarge rejection");
 
     // Ledger empty.
-    let ledger = mineltui::mods::ledger::read_ledger(&paths, "test-instance")
+    let ledger = ichr::mods::ledger::read_ledger(&paths, "test-instance")
         .await
         .unwrap();
     assert!(
@@ -1081,13 +1081,13 @@ async fn test_browser_enter_install_chain_picks_latest_stable() {
     );
 
     // Ledger has exactly one row, sourced from Modrinth.
-    let ledger = mineltui::mods::ledger::read_ledger(&paths, "test-instance")
+    let ledger = ichr::mods::ledger::read_ledger(&paths, "test-instance")
         .await
         .expect("read_ledger");
     assert_eq!(ledger.mods.len(), 1);
     assert_eq!(
         ledger.mods[0].source,
-        mineltui::mods::types::ModSource::Modrinth
+        ichr::mods::types::ModSource::Modrinth
     );
     assert_eq!(
         ledger.mods[0].mod_id, "PIDxxxx",

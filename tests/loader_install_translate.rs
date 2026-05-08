@@ -8,10 +8,10 @@
 
 use httpmock::Method::GET;
 use httpmock::MockServer;
-use mineltui::loader::fabric::FabricMetaClient;
-use mineltui::loader::quilt::QuiltMetaClient;
-use mineltui::mojang::types::VersionJson;
-use mineltui::persistence::paths::AppPaths;
+use ichr::loader::fabric::FabricMetaClient;
+use ichr::loader::quilt::QuiltMetaClient;
+use ichr::mojang::types::VersionJson;
+use ichr::persistence::paths::AppPaths;
 use tempfile::TempDir;
 
 // --- Fixtures: byte-equivalent samples of the user's on-disk JSONs ---
@@ -42,7 +42,7 @@ async fn test_fabric_translate_at_write_end_to_end() {
     let paths = paths_in(&td);
 
     let mojang_bytes =
-        mineltui::loader::fabric::to_mojang_shape(REAL_FABRIC_META_BYTES).expect("translate ok");
+        ichr::loader::fabric::to_mojang_shape(REAL_FABRIC_META_BYTES).expect("translate ok");
     let json_path = paths.version_json("fabric-loader-0.19.2-1.20.4");
     tokio::fs::create_dir_all(json_path.parent().unwrap())
         .await
@@ -90,7 +90,7 @@ async fn test_quilt_translate_at_write_end_to_end() {
     let paths = paths_in(&td);
 
     let mojang_bytes =
-        mineltui::loader::quilt::to_mojang_shape(REAL_QUILT_META_BYTES).expect("translate ok");
+        ichr::loader::quilt::to_mojang_shape(REAL_QUILT_META_BYTES).expect("translate ok");
     let json_path = paths.version_json("quilt-loader-0.30.0-beta.7-1.20.4");
     tokio::fs::create_dir_all(json_path.parent().unwrap())
         .await
@@ -140,7 +140,7 @@ async fn test_classpath_emits_at_least_six_fabric_libraries_after_install() {
 
     // Translate + write the loader JSON.
     let loader_bytes =
-        mineltui::loader::fabric::to_mojang_shape(REAL_FABRIC_META_BYTES).expect("translate ok");
+        ichr::loader::fabric::to_mojang_shape(REAL_FABRIC_META_BYTES).expect("translate ok");
     let loader_id = "fabric-loader-0.19.2-1.20.4";
     let loader_json_path = paths.version_json(loader_id);
     tokio::fs::create_dir_all(loader_json_path.parent().unwrap())
@@ -179,11 +179,11 @@ async fn test_classpath_emits_at_least_six_fabric_libraries_after_install() {
     let mut parents = std::collections::HashMap::new();
     parents.insert(vanilla_id.to_string(), vanilla);
     let resolved =
-        mineltui::mojang::inherits::resolve_inherits(&loader, &parents).expect("resolve ok");
+        ichr::mojang::inherits::resolve_inherits(&loader, &parents).expect("resolve ok");
 
     // Build classpath. Use a stubbed RuleContext that allows everything.
-    let ctx = mineltui::mojang::rules::RuleContext::current();
-    let cp = mineltui::launcher::classpath::build_classpath(&resolved, &ctx, &paths)
+    let ctx = ichr::mojang::rules::RuleContext::current();
+    let cp = ichr::launcher::classpath::build_classpath(&resolved, &ctx, &paths)
         .expect("build_classpath ok");
     // build_classpath returns a String of os-specific path-separated entries.
     let separator = if cfg!(target_os = "windows") {
@@ -243,20 +243,20 @@ async fn test_migration_hook_auto_heals_flat_shape_phase5_smoke() {
     });
 
     // Construct meta clients pointing at the mock server.
-    let prior = std::env::var("MINELTUI_FABRIC_META_BASE_URL").ok();
-    std::env::set_var("MINELTUI_FABRIC_META_BASE_URL", server.base_url());
+    let prior = std::env::var("ICHR_FABRIC_META_BASE_URL").ok();
+    std::env::set_var("ICHR_FABRIC_META_BASE_URL", server.base_url());
     let fabric = FabricMetaClient::new().expect("fabric client");
     let quilt = QuiltMetaClient::new_with_base_url(server.base_url()).expect("quilt client");
 
     // Run migration.
-    let result = mineltui::launcher::service::__test_migrate_loader_json_in_place_if_needed(
+    let result = ichr::launcher::service::__test_migrate_loader_json_in_place_if_needed(
         &paths, version_id, &fabric, &quilt,
     )
     .await;
 
     match prior {
-        Some(v) => std::env::set_var("MINELTUI_FABRIC_META_BASE_URL", v),
-        None => std::env::remove_var("MINELTUI_FABRIC_META_BASE_URL"),
+        Some(v) => std::env::set_var("ICHR_FABRIC_META_BASE_URL", v),
+        None => std::env::remove_var("ICHR_FABRIC_META_BASE_URL"),
     }
 
     result.expect("migration ok");
@@ -284,7 +284,7 @@ async fn test_migration_hook_idempotent_on_already_mojang_shape() {
 
     // Pre-seed with a MOJANG-shape JSON (the OUTPUT of test 4).
     let mojang_bytes =
-        mineltui::loader::fabric::to_mojang_shape(REAL_FABRIC_META_BYTES).expect("translate ok");
+        ichr::loader::fabric::to_mojang_shape(REAL_FABRIC_META_BYTES).expect("translate ok");
     let json_path = paths.version_json(version_id);
     tokio::fs::create_dir_all(json_path.parent().unwrap())
         .await
@@ -300,19 +300,19 @@ async fn test_migration_hook_idempotent_on_already_mojang_shape() {
         then.status(500).body("migration must not call this");
     });
 
-    let prior = std::env::var("MINELTUI_FABRIC_META_BASE_URL").ok();
-    std::env::set_var("MINELTUI_FABRIC_META_BASE_URL", server.base_url());
+    let prior = std::env::var("ICHR_FABRIC_META_BASE_URL").ok();
+    std::env::set_var("ICHR_FABRIC_META_BASE_URL", server.base_url());
     let fabric = FabricMetaClient::new().expect("fabric client");
     let quilt = QuiltMetaClient::new_with_base_url(server.base_url()).expect("quilt client");
 
-    let result = mineltui::launcher::service::__test_migrate_loader_json_in_place_if_needed(
+    let result = ichr::launcher::service::__test_migrate_loader_json_in_place_if_needed(
         &paths, version_id, &fabric, &quilt,
     )
     .await;
 
     match prior {
-        Some(v) => std::env::set_var("MINELTUI_FABRIC_META_BASE_URL", v),
-        None => std::env::remove_var("MINELTUI_FABRIC_META_BASE_URL"),
+        Some(v) => std::env::set_var("ICHR_FABRIC_META_BASE_URL", v),
+        None => std::env::remove_var("ICHR_FABRIC_META_BASE_URL"),
     }
 
     result.expect("idempotent migration ok");

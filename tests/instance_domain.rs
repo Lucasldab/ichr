@@ -1,10 +1,10 @@
 //! Domain tests for InstanceManifest, ModloaderKind, slug functions, and store I/O.
 
-use mineltui::domain::{InstanceManifest, ModloaderKind};
-use mineltui::instance::{
+use ichr::domain::{InstanceManifest, ModloaderKind};
+use ichr::instance::{
     list_instance_manifests, read_instance_manifest, slugify, unique_slug, write_instance_manifest,
 };
-use mineltui::persistence::AppPaths;
+use ichr::persistence::AppPaths;
 use tempfile::tempdir;
 
 fn sample_manifest() -> InstanceManifest {

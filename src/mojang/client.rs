@@ -1,6 +1,6 @@
 //! Mojang HTTP client.
 //!
-//! One `reqwest::Client` per `MojangClient`. Always uses a mineltui User-Agent.
+//! One `reqwest::Client` per `MojangClient`. Always uses a ichr User-Agent.
 //! TLS via rustls (Cargo.toml feature = "rustls"; not "rustls-tls").
 
 use std::path::Path;
@@ -16,7 +16,7 @@ pub const MANIFEST_URL: &str = "https://piston-meta.mojang.com/mc/game/version_m
 
 pub const ASSET_CDN_BASE: &str = "https://resources.download.minecraft.net";
 
-pub const USER_AGENT: &str = "mineltui/0.1 (+https://github.com/placeholder/mineltui)";
+pub const USER_AGENT: &str = "ichr/0.1 (+https://github.com/placeholder/ichr)";
 
 /// Thin HTTP facade over Mojang's CDN. All methods are async, cancel-safe,
 /// and do not hold blocking I/O across await points.

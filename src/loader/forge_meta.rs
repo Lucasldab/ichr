@@ -5,8 +5,8 @@
 //!   GET https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json
 //!   GET https://maven.minecraftforge.net/net/minecraftforge/forge/{mc}-{forge}/forge-{mc}-{forge}-installer.jar
 //!
-//! Override base URLs for tests via `MINELTUI_FORGE_MAVEN_BASE_URL` and
-//! `MINELTUI_FORGE_PROMOTIONS_URL`.
+//! Override base URLs for tests via `ICHR_FORGE_MAVEN_BASE_URL` and
+//! `ICHR_FORGE_PROMOTIONS_URL`.
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -21,8 +21,8 @@ pub const DEFAULT_FORGE_MAVEN_BASE: &str =
     "https://maven.minecraftforge.net/net/minecraftforge/forge";
 pub const DEFAULT_FORGE_PROMOTIONS_URL: &str =
     "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json";
-pub const FORGE_MAVEN_BASE_URL_ENV: &str = "MINELTUI_FORGE_MAVEN_BASE_URL";
-pub const FORGE_PROMOTIONS_URL_ENV: &str = "MINELTUI_FORGE_PROMOTIONS_URL";
+pub const FORGE_MAVEN_BASE_URL_ENV: &str = "ICHR_FORGE_MAVEN_BASE_URL";
+pub const FORGE_PROMOTIONS_URL_ENV: &str = "ICHR_FORGE_PROMOTIONS_URL";
 
 // -----------------------------------------------------------------------
 // Wire types

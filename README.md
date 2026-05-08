@@ -1,4 +1,4 @@
-# mineltui
+# ichr
 
 Terminal-UI Minecraft Java Edition launcher (Linux + Windows).
 
@@ -10,7 +10,7 @@ working modded Minecraft — entirely from the TUI.
 ### From source (recommended for v1)
 
 ```bash
-cargo install --git https://github.com/Lucasldab/mineltui
+cargo install --git https://github.com/Lucasldab/ichr
 ```
 
 Requires the Rust toolchain (>= 1.88; pinned in `rust-toolchain.toml`).
@@ -18,24 +18,24 @@ Requires the Rust toolchain (>= 1.88; pinned in `rust-toolchain.toml`).
 ### From a release binary
 
 Download the appropriate archive from
-<https://github.com/Lucasldab/mineltui/releases/latest>:
+<https://github.com/Lucasldab/ichr/releases/latest>:
 
-- Linux x86_64: `mineltui-x86_64-unknown-linux-gnu.tar.gz`
-- Windows x86_64: `mineltui-x86_64-pc-windows-msvc.zip`
+- Linux x86_64: `ichr-x86_64-unknown-linux-gnu.tar.gz`
+- Windows x86_64: `ichr-x86_64-pc-windows-msvc.zip`
 
 Or use the install scripts:
 
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Lucasldab/mineltui/releases/latest/download/mineltui-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Lucasldab/ichr/releases/latest/download/ichr-installer.sh | sh
 ```
 
 ```powershell
-powershell -c "irm https://github.com/Lucasldab/mineltui/releases/latest/download/mineltui-installer.ps1 | iex"
+powershell -c "irm https://github.com/Lucasldab/ichr/releases/latest/download/ichr-installer.ps1 | iex"
 ```
 
 ## Windows long-path support
 
-mineltui's binary declares `longPathAware` in its Windows manifest. For the
+ichr's binary declares `longPathAware` in its Windows manifest. For the
 JVM child process to also benefit, the system must have long paths enabled:
 
 ```reg
@@ -49,8 +49,8 @@ Check with:
 reg query "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled
 ```
 
-Setting this key requires admin elevation and a reboot. mineltui will warn
-in `mineltui.log` if the key is absent or 0.
+Setting this key requires admin elevation and a reboot. ichr will warn
+in `ichr.log` if the key is absent or 0.
 
 ## License
 

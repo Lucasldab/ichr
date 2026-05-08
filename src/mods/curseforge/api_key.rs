@@ -7,8 +7,8 @@
 //!
 //! Precedence (per 09-RESEARCH.md §"API Key Strategy" lines 168-218):
 //! 1. CURSEFORGE_API_KEY env var (runtime override)
-//! 2. [api_keys] curseforge in ~/.config/mineltui/config.toml
-//! 3. option_env!("MINELTUI_CURSEFORGE_API_KEY_DEFAULT") compiled-in
+//! 2. [api_keys] curseforge in ~/.config/ichr/config.toml
+//! 3. option_env!("ICHR_CURSEFORGE_API_KEY_DEFAULT") compiled-in
 //! 4. Err(ApiKeyError::NoApiKey)
 //!
 //! Empty strings at any tier are treated as absent (skipped to the next tier).
@@ -22,11 +22,11 @@
 
 use thiserror::Error;
 
-/// Compile-time injected default key. CI sets MINELTUI_CURSEFORGE_API_KEY_DEFAULT
+/// Compile-time injected default key. CI sets ICHR_CURSEFORGE_API_KEY_DEFAULT
 /// before `cargo build`; local builds without the env var get `None` and the
 /// user must supply the key via runtime sources.
 /// Per 09-RESEARCH.md §"API Key Strategy" line 186.
-pub const COMPILED_IN_DEFAULT: Option<&str> = option_env!("MINELTUI_CURSEFORGE_API_KEY_DEFAULT");
+pub const COMPILED_IN_DEFAULT: Option<&str> = option_env!("ICHR_CURSEFORGE_API_KEY_DEFAULT");
 
 /// API-key resolution failure. Single variant — the caller surfaces it as
 /// `api_key_present=false` rather than crashing the launcher.

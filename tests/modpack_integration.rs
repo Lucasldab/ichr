@@ -11,11 +11,11 @@ use tempfile::TempDir;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use mineltui::modpack::service::ModpackService;
-use mineltui::modpack::ModpackError;
-use mineltui::mojang::client::MojangClient;
-use mineltui::persistence::paths::AppPaths;
-use mineltui::tasks::JobId;
+use ichr::modpack::service::ModpackService;
+use ichr::modpack::ModpackError;
+use ichr::mojang::client::MojangClient;
+use ichr::persistence::paths::AppPaths;
+use ichr::tasks::JobId;
 
 // ─── Include fixture builder ───────────────────────────────────────────────────
 
@@ -42,12 +42,12 @@ fn make_svc() -> ModpackService {
 async fn make_services(
     paths: &AppPaths,
 ) -> (
-    mineltui::loader::service::LoaderService,
-    mineltui::java::service::JavaService,
+    ichr::loader::service::LoaderService,
+    ichr::java::service::JavaService,
     MojangClient,
 ) {
-    let loader_svc = mineltui::loader::service::LoaderService::new().expect("LoaderService::new");
-    let java_svc = mineltui::java::service::JavaService::new().expect("JavaService::new");
+    let loader_svc = ichr::loader::service::LoaderService::new().expect("LoaderService::new");
+    let java_svc = ichr::java::service::JavaService::new().expect("JavaService::new");
     let mojang_svc = MojangClient::new().expect("MojangClient::new");
     // GAP-10-A fix: pre-touch vanilla version JSON so Step 2.5's existence check
     // skips the live Mojang manifest fetch (test fixtures use mc_version "1.20.4").

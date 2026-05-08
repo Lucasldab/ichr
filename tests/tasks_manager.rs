@@ -12,7 +12,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time::{sleep, timeout};
 
-use mineltui::tasks::{JobId, TaskEvent, TaskManager};
+use ichr::tasks::{JobId, TaskEvent, TaskManager};
 
 fn new_manager(buf: usize, max_concurrent: usize) -> (TaskManager, mpsc::Receiver<TaskEvent>) {
     let (tx, rx) = mpsc::channel(buf);

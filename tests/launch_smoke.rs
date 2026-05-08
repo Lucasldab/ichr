@@ -7,10 +7,10 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 use tokio_util::sync::CancellationToken;
 
-use mineltui::launcher::spawn::{run_process, LaunchOutcome};
+use ichr::launcher::spawn::{run_process, LaunchOutcome};
 
 fn java_bin() -> PathBuf {
-    std::env::var("MINELTUI_JAVA")
+    std::env::var("ICHR_JAVA")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("java"))
 }
@@ -19,7 +19,7 @@ fn java_bin() -> PathBuf {
 #[ignore]
 async fn launch_smoke_java_version_exits_clean() {
     let td = TempDir::new().unwrap();
-    let log = td.path().join("instances/smoke/logs/mineltui.log");
+    let log = td.path().join("instances/smoke/logs/ichr.log");
     let token = CancellationToken::new();
     // `java -version` writes to stderr and exits 0.
     let result = run_process(

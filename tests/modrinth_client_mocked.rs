@@ -32,18 +32,18 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use httpmock::prelude::*;
-use mineltui::mods::error::ModrinthError;
-use mineltui::mods::installer::{
+use ichr::mods::error::ModrinthError;
+use ichr::mods::installer::{
     install_mods_into_instance, InstallStep, MOD_DOWNLOAD_CONCURRENCY,
 };
-use mineltui::mods::modrinth::ModrinthClient;
-use mineltui::mods::service::ModrinthService;
-use mineltui::mods::types::{
+use ichr::mods::modrinth::ModrinthClient;
+use ichr::mods::service::ModrinthService;
+use ichr::mods::types::{
     DepKind, HashAlgo, InstalledItemKind, InstalledModRow, Ledger, ModSource, ModrinthFile,
     ModrinthHashes,
 };
-use mineltui::persistence::paths::AppPaths;
-use mineltui::tasks::JobId;
+use ichr::persistence::paths::AppPaths;
+use ichr::tasks::JobId;
 use sha2::{Digest, Sha512};
 use tempfile::TempDir;
 use tokio::sync::mpsc;
@@ -437,8 +437,8 @@ async fn test_resolve_dependencies_through_full_service_stack() {
     let paths = paths_for(&td);
     let slug = "resolve-test";
 
-    let loader = mineltui::loader::types::LoaderInfo {
-        kind: mineltui::domain::instance::ModloaderKind::Fabric,
+    let loader = ichr::loader::types::LoaderInfo {
+        kind: ichr::domain::instance::ModloaderKind::Fabric,
         version: "0.16.9".into(),
         version_id: "fabric-loader-0.16.9-1.20.4".into(),
     };
@@ -605,8 +605,8 @@ async fn test_dep_resolve_titles_propagate_to_ledger_display_name() {
         .await
         .unwrap();
 
-    let loader = mineltui::loader::types::LoaderInfo {
-        kind: mineltui::domain::instance::ModloaderKind::Fabric,
+    let loader = ichr::loader::types::LoaderInfo {
+        kind: ichr::domain::instance::ModloaderKind::Fabric,
         version: "0.16.9".into(),
         version_id: "fabric-loader-0.16.9-1.20.4".into(),
     };

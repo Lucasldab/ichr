@@ -21,7 +21,7 @@ use crate::mods::curseforge::types::{
 };
 
 pub const DEFAULT_CF_BASE: &str = "https://api.curseforge.com";
-pub const CF_BASE_URL_ENV: &str = "MINELTUI_CURSEFORGE_BASE_URL";
+pub const CF_BASE_URL_ENV: &str = "ICHR_CURSEFORGE_BASE_URL";
 pub const MINECRAFT_GAME_ID: u32 = 432;
 pub const MOD_CLASS_ID: u32 = 6;
 pub const SEARCH_DEFAULT_PAGE_SIZE: u32 = 50;
@@ -39,7 +39,7 @@ pub struct CurseForgeClient {
 
 impl CurseForgeClient {
     /// Construct from an API key (read by the caller via the api_key resolver).
-    /// Reads `MINELTUI_CURSEFORGE_BASE_URL` env var for httpmock injection;
+    /// Reads `ICHR_CURSEFORGE_BASE_URL` env var for httpmock injection;
     /// falls back to `DEFAULT_CF_BASE`.
     pub fn new(api_key: &str) -> Result<Self, CurseForgeError> {
         let base = std::env::var(CF_BASE_URL_ENV).unwrap_or_else(|_| DEFAULT_CF_BASE.to_owned());

@@ -10,18 +10,18 @@ use tempfile::TempDir;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use mineltui::auth::AuthContext;
-use mineltui::domain::instance::InstanceManifest;
-use mineltui::error::AppError;
-use mineltui::install::install_version;
-use mineltui::java::service::JavaService;
-use mineltui::java::types::JavaRuntimeId;
-use mineltui::launcher::service::launch_instance;
-use mineltui::mojang::client::MojangClient;
-use mineltui::mojang::types::VersionEntry;
-use mineltui::persistence::paths::AppPaths;
-use mineltui::services::create_instance;
-use mineltui::tasks::job::{JobId, TaskEvent};
+use ichr::auth::AuthContext;
+use ichr::domain::instance::InstanceManifest;
+use ichr::error::AppError;
+use ichr::install::install_version;
+use ichr::java::service::JavaService;
+use ichr::java::types::JavaRuntimeId;
+use ichr::launcher::service::launch_instance;
+use ichr::mojang::client::MojangClient;
+use ichr::mojang::types::VersionEntry;
+use ichr::persistence::paths::AppPaths;
+use ichr::services::create_instance;
+use ichr::tasks::job::{JobId, TaskEvent};
 
 fn paths_in(td: &TempDir) -> AppPaths {
     AppPaths::with_roots(
@@ -133,8 +133,8 @@ async fn test_end_to_end_launch_1_20_4() {
 /// meet the version JSON's requirement.
 #[tokio::test]
 async fn test_launch_fails_early_on_java_mismatch() {
-    use mineltui::instance::store::write_instance_manifest;
-    use mineltui::mojang::types::{AssetIndex, JavaVersion, VersionDownloads, VersionJson};
+    use ichr::instance::store::write_instance_manifest;
+    use ichr::mojang::types::{AssetIndex, JavaVersion, VersionDownloads, VersionJson};
 
     let td = TempDir::new().unwrap();
     let paths = paths_in(&td);
@@ -196,9 +196,9 @@ async fn test_launch_fails_early_on_java_mismatch() {
 
     let java_service = JavaService::new().expect("JavaService::new");
 
-    // Ensure MINELTUI_JAVA is not set — we want the System override path taken.
-    let _prior = std::env::var("MINELTUI_JAVA").ok();
-    std::env::remove_var("MINELTUI_JAVA");
+    // Ensure ICHR_JAVA is not set — we want the System override path taken.
+    let _prior = std::env::var("ICHR_JAVA").ok();
+    std::env::remove_var("ICHR_JAVA");
 
     let (tx, _rx) = mpsc::channel::<TaskEvent>(16);
     let token = CancellationToken::new();
@@ -216,9 +216,9 @@ async fn test_launch_fails_early_on_java_mismatch() {
     )
     .await;
 
-    // Restore MINELTUI_JAVA if it was set.
+    // Restore ICHR_JAVA if it was set.
     if let Some(v) = _prior {
-        std::env::set_var("MINELTUI_JAVA", v);
+        std::env::set_var("ICHR_JAVA", v);
     }
 
     assert!(

@@ -36,11 +36,11 @@ use crate::auth::AuthError;
 
 /// Default MSA client ID — the legacy Mojang public launcher app ID.
 /// Conventional for third-party launchers (Prism, ATLauncher, GDLauncher).
-/// Override via `MINELTUI_MSA_CLIENT_ID` to use your own Azure AD registration.
+/// Override via `ICHR_MSA_CLIENT_ID` to use your own Azure AD registration.
 pub const DEFAULT_MSA_CLIENT_ID: &str = "00000000402b5328";
 
 /// Environment variable name for client ID override.
-pub const MSA_CLIENT_ID_ENV: &str = "MINELTUI_MSA_CLIENT_ID";
+pub const MSA_CLIENT_ID_ENV: &str = "ICHR_MSA_CLIENT_ID";
 
 /// OAuth scope: XboxLive.signin to reach Xbox Live; offline_access to receive
 /// a refresh_token (omitting offline_access means no refresh_token is issued).
@@ -62,7 +62,7 @@ pub const DEVICE_CODE_GRANT: &str = "urn:ietf:params:oauth:grant-type:device_cod
 // Public types
 // ---------------------------------------------------------------------------
 
-/// Returns the MSA client ID, honoring the `MINELTUI_MSA_CLIENT_ID` env
+/// Returns the MSA client ID, honoring the `ICHR_MSA_CLIENT_ID` env
 /// override.  Default: `"00000000402b5328"` (legacy Mojang public ID;
 /// conventional for third-party launchers).
 pub fn client_id() -> String {
@@ -165,12 +165,12 @@ pub async fn request_device_code(
         // AADSTS700016 ("unauthorized_client" / "Application with identifier ...
         // was not found in the directory 'Microsoft Accounts'") means the
         // legacy Mojang launcher client_id is no longer accepted. User must
-        // register their own Azure AD app and set MINELTUI_MSA_CLIENT_ID.
+        // register their own Azure AD app and set ICHR_MSA_CLIENT_ID.
         // See docs/msa-setup.md for the registration walkthrough.
         if body.contains("AADSTS700016") || body.contains("unauthorized_client") {
             return Err(AuthError::DeviceCodeRequest(
                 "Microsoft rejected the default client ID. You need to register \
-                 your own Azure AD app and set MINELTUI_MSA_CLIENT_ID. \
+                 your own Azure AD app and set ICHR_MSA_CLIENT_ID. \
                  See docs/msa-setup.md for a 5-step walkthrough."
                     .to_string(),
             ));

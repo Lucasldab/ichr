@@ -12,7 +12,7 @@
 //!     ?architecture={arch}&heap_size=normal&image_type=jre&os={os}&vendor=eclipse
 //! ```
 //!
-//! Override the base URL for tests via `MINELTUI_ADOPTIUM_BASE_URL`.
+//! Override the base URL for tests via `ICHR_ADOPTIUM_BASE_URL`.
 
 use std::io::Cursor;
 use std::path::{Component, Path, PathBuf};
@@ -30,7 +30,7 @@ use crate::persistence::paths::AppPaths;
 pub const DEFAULT_ADOPTIUM_BASE: &str = "https://api.adoptium.net";
 
 /// Environment variable that overrides `DEFAULT_ADOPTIUM_BASE` for testing.
-pub const ADOPTIUM_BASE_URL_ENV: &str = "MINELTUI_ADOPTIUM_BASE_URL";
+pub const ADOPTIUM_BASE_URL_ENV: &str = "ICHR_ADOPTIUM_BASE_URL";
 
 // ---------------------------------------------------------------------------
 // Serde types — Adoptium API response
@@ -77,7 +77,7 @@ pub struct AdoptiumVersion {
 ///
 /// Mirrors `MojangJreClient` — same User-Agent, gzip, 30s timeout.
 /// The base URL can be overridden at construction time via the
-/// `MINELTUI_ADOPTIUM_BASE_URL` environment variable (for httpmock in tests).
+/// `ICHR_ADOPTIUM_BASE_URL` environment variable (for httpmock in tests).
 #[derive(Debug, Clone)]
 pub struct AdoptiumClient {
     http: reqwest::Client,
@@ -88,7 +88,7 @@ impl AdoptiumClient {
     /// Construct with the launcher's User-Agent and a 30s request timeout.
     ///
     /// The base URL defaults to `DEFAULT_ADOPTIUM_BASE` but is overridden
-    /// by `MINELTUI_ADOPTIUM_BASE_URL` if set.
+    /// by `ICHR_ADOPTIUM_BASE_URL` if set.
     pub fn new() -> Result<Self, AppError> {
         let base_url = std::env::var(ADOPTIUM_BASE_URL_ENV)
             .unwrap_or_else(|_| DEFAULT_ADOPTIUM_BASE.to_owned());
@@ -712,7 +712,7 @@ mod tests {
         }
     }
 
-    /// Verify that `MINELTUI_ADOPTIUM_BASE_URL` is read by `AdoptiumClient::new()`.
+    /// Verify that `ICHR_ADOPTIUM_BASE_URL` is read by `AdoptiumClient::new()`.
     #[tokio::test]
     async fn test_env_override_base_url() {
         let server = MockServer::start();

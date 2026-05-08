@@ -8,10 +8,10 @@
 //! Phase 5 sign-off on `05-VALIDATION.md` requires a successful run of this test
 //! (see VALIDATION.md Manual-Only Verifications and nyquist gate).
 
-use mineltui::domain::platform::{Arch, OsName};
-use mineltui::java::mapping::mojang_platform_key;
-use mineltui::java::service::JavaService;
-use mineltui::persistence::paths::AppPaths;
+use ichr::domain::platform::{Arch, OsName};
+use ichr::java::mapping::mojang_platform_key;
+use ichr::java::service::JavaService;
+use ichr::persistence::paths::AppPaths;
 use tempfile::TempDir;
 
 #[tokio::test]

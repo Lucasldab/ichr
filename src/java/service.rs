@@ -3,7 +3,7 @@
 //!
 //! # Precedence order for `resolve_jre_for_launch`
 //!
-//! 1. `MINELTUI_JAVA` env var — debug escape hatch; logs WARN, skips validation.
+//! 1. `ICHR_JAVA` env var — debug escape hatch; logs WARN, skips validation.
 //! 2. `instance.java_override` — per-instance override (install-if-missing).
 //! 3. Auto-resolve Mojang via `version.java_version.component`.
 //! 4. Adoptium fallback (Mojang absent for this platform/variant).
@@ -73,7 +73,7 @@ impl JavaService {
     ///
     /// Precedence (first match wins):
     ///
-    /// 1. `MINELTUI_JAVA` env var — bypass all managed JRE logic (logs WARN).
+    /// 1. `ICHR_JAVA` env var — bypass all managed JRE logic (logs WARN).
     /// 2. `instance.java_override` — per-instance override (install-if-missing).
     /// 3. Auto Mojang — uses `version.java_version.component` from the MC manifest.
     /// 4. Adoptium fallback — when Mojang has no entry for the current platform.
@@ -84,13 +84,13 @@ impl JavaService {
         instance: &InstanceManifest,
         version: &ResolvedVersion,
     ) -> Result<PathBuf, AppError> {
-        // Step 1 — MINELTUI_JAVA debug override (wins unconditionally; the
+        // Step 1 — ICHR_JAVA debug override (wins unconditionally; the
         // early return makes all subsequent steps unreachable when the var
         // is set — semantically equivalent to "checked last as bypass-all").
-        if let Ok(p) = std::env::var("MINELTUI_JAVA") {
+        if let Ok(p) = std::env::var("ICHR_JAVA") {
             tracing::warn!(
                 path = %p,
-                "MINELTUI_JAVA overrides JRE resolution — validation skipped"
+                "ICHR_JAVA overrides JRE resolution — validation skipped"
             );
             return Ok(PathBuf::from(p));
         }
@@ -331,7 +331,7 @@ mod tests {
     use tokio::sync::Mutex;
 
     // Global async-aware mutex serialising all tests that read or write
-    // MINELTUI_JAVA. tokio::sync::Mutex is held across await points safely
+    // ICHR_JAVA. tokio::sync::Mutex is held across await points safely
     // and passes clippy::await_holding_lock because it is the async variant.
     fn java_env_lock() -> &'static Mutex<()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -506,11 +506,11 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // Step 1: MINELTUI_JAVA env var wins
+    // Step 1: ICHR_JAVA env var wins
     // -----------------------------------------------------------------------
 
     #[tokio::test]
-    async fn test_resolve_mineltui_java_env_wins() {
+    async fn test_resolve_ichr_java_env_wins() {
         let _guard = java_env_lock().lock().await;
         let td = TempDir::new().unwrap();
         let paths = make_paths(&td);
@@ -519,8 +519,8 @@ mod tests {
         let fake_java = td.path().join("myjava");
         std::fs::write(&fake_java, b"#!/bin/sh\n").unwrap();
 
-        let prior = std::env::var("MINELTUI_JAVA").ok();
-        std::env::set_var("MINELTUI_JAVA", fake_java.to_str().unwrap());
+        let prior = std::env::var("ICHR_JAVA").ok();
+        std::env::set_var("ICHR_JAVA", fake_java.to_str().unwrap());
 
         // Service with real (production) clients — they must NOT be called.
         let svc = JavaService::new().expect("service build");
@@ -532,14 +532,14 @@ mod tests {
             .await;
 
         match prior {
-            Some(v) => std::env::set_var("MINELTUI_JAVA", v),
-            None => std::env::remove_var("MINELTUI_JAVA"),
+            Some(v) => std::env::set_var("ICHR_JAVA", v),
+            None => std::env::remove_var("ICHR_JAVA"),
         }
 
         let path = result.expect("should return Ok");
         assert_eq!(
             path, fake_java,
-            "must return the MINELTUI_JAVA path verbatim"
+            "must return the ICHR_JAVA path verbatim"
         );
     }
 
@@ -550,7 +550,7 @@ mod tests {
     #[tokio::test]
     async fn test_resolve_system_override_accepts_sufficient_major() {
         let _guard = java_env_lock().lock().await;
-        std::env::remove_var("MINELTUI_JAVA");
+        std::env::remove_var("ICHR_JAVA");
 
         let td = TempDir::new().unwrap();
         let paths = make_paths(&td);
@@ -578,7 +578,7 @@ mod tests {
     #[tokio::test]
     async fn test_resolve_system_override_validates_major_mismatch() {
         let _guard = java_env_lock().lock().await;
-        std::env::remove_var("MINELTUI_JAVA");
+        std::env::remove_var("ICHR_JAVA");
 
         let td = TempDir::new().unwrap();
         let paths = make_paths(&td);
@@ -613,7 +613,7 @@ mod tests {
     #[tokio::test]
     async fn test_resolve_system_override_missing_path() {
         let _guard = java_env_lock().lock().await;
-        std::env::remove_var("MINELTUI_JAVA");
+        std::env::remove_var("ICHR_JAVA");
 
         let td = TempDir::new().unwrap();
         let paths = make_paths(&td);
@@ -647,7 +647,7 @@ mod tests {
     #[tokio::test]
     async fn test_resolve_adoptium_override() {
         let _guard = java_env_lock().lock().await;
-        std::env::remove_var("MINELTUI_JAVA");
+        std::env::remove_var("ICHR_JAVA");
 
         let td = TempDir::new().unwrap();
         let paths = make_paths(&td);
@@ -716,7 +716,7 @@ mod tests {
     #[tokio::test]
     async fn test_resolve_auto_mojang_path() {
         let _guard = java_env_lock().lock().await;
-        std::env::remove_var("MINELTUI_JAVA");
+        std::env::remove_var("ICHR_JAVA");
 
         let td = TempDir::new().unwrap();
         let paths = make_paths(&td);
@@ -775,7 +775,7 @@ mod tests {
     #[tokio::test]
     async fn test_resolve_auto_falls_through_to_adoptium_for_aarch64_linux() {
         let _guard = java_env_lock().lock().await;
-        std::env::remove_var("MINELTUI_JAVA");
+        std::env::remove_var("ICHR_JAVA");
 
         let td = TempDir::new().unwrap();
         let paths = make_paths(&td);
@@ -846,7 +846,7 @@ mod tests {
     #[tokio::test]
     async fn test_resolve_version_without_java_version_defaults_to_legacy() {
         let _guard = java_env_lock().lock().await;
-        std::env::remove_var("MINELTUI_JAVA");
+        std::env::remove_var("ICHR_JAVA");
 
         let td = TempDir::new().unwrap();
         let paths = make_paths(&td);

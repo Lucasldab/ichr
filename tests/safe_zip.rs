@@ -8,7 +8,7 @@
 use std::path::Path;
 use tempfile::tempdir;
 
-use mineltui::util::safe_zip::safe_extract_path;
+use ichr::util::safe_zip::safe_extract_path;
 
 // ---------------------------------------------------------------------------
 // Happy-path tests

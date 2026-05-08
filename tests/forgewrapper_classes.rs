@@ -18,13 +18,13 @@
 //!     caught by this bytecode pin.
 //!
 //! Runs offline; no network, no JVM, no fs. Loads the embedded jar bytes
-//! via `mineltui::loader::forgewrapper::FORGE_WRAPPER_JAR` and uses the
+//! via `ichr::loader::forgewrapper::FORGE_WRAPPER_JAR` and uses the
 //! `zip` crate to extract `Main.class` bytes for byte-substring scanning.
 
 use std::io::{Cursor, Read};
 use zip::ZipArchive;
 
-use mineltui::loader::forgewrapper::{FORGE_WRAPPER_JAR, FORGE_WRAPPER_MAIN_CLASS};
+use ichr::loader::forgewrapper::{FORGE_WRAPPER_JAR, FORGE_WRAPPER_MAIN_CLASS};
 
 /// JVM method descriptor for `void main(String[])`.
 /// Constant-pool entries this exact byte sequence in any .class file

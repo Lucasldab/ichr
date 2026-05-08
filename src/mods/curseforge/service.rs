@@ -69,7 +69,7 @@ struct ApiKeysSection {
     curseforge: Option<String>,
 }
 
-/// Read `~/.config/mineltui/config.toml` `[api_keys] curseforge` field.
+/// Read `~/.config/ichr/config.toml` `[api_keys] curseforge` field.
 ///
 /// Best-effort: returns None on any of (a) `AppPaths::resolve` returning None
 /// (directories crate failed); (b) the file not existing; (c) a parse error;
@@ -88,7 +88,7 @@ fn read_config_curseforge_key() -> Option<String> {
 impl CurseForgeService {
     /// Construct the service, running the precedence chain:
     ///   env (`CURSEFORGE_API_KEY`) > config.toml (`[api_keys] curseforge`)
-    ///   > compiled-in default (`option_env!("MINELTUI_CURSEFORGE_API_KEY_DEFAULT")`)
+    ///   > compiled-in default (`option_env!("ICHR_CURSEFORGE_API_KEY_DEFAULT")`)
     ///   > NoApiKey (Pitfall 1: returns `Ok` with `api_key_present: false`).
     ///
     /// MOD-08 invariant: config.toml IS read here. Pass-None is FORBIDDEN.

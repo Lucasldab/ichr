@@ -1,9 +1,9 @@
 //! End-to-end instance lifecycle tests. No network, no Mojang downloads.
 //! All state lives under a fresh tempdir per test.
 
-use mineltui::error::AppError;
-use mineltui::persistence::AppPaths;
-use mineltui::services::{
+use ichr::error::AppError;
+use ichr::persistence::AppPaths;
+use ichr::services::{
     clone_instance, create_instance, delete_instance, list_instances, rename_instance, set_group,
 };
 use tempfile::tempdir;

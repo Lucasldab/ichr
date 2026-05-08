@@ -4,7 +4,7 @@
 //!
 //! Two storage tiers:
 //!
-//!   - **Secrets** (refresh tokens): `keyring::Entry::new("mineltui", id)`
+//!   - **Secrets** (refresh tokens): `keyring::Entry::new("ichr", id)`
 //!     → on any keyring error (libsecret daemon absent, etc. — pitfall 21)
 //!     → encrypted entry in `{config_dir}/accounts.enc` (AES-256-GCM with
 //!     a 32-byte key derived from /etc/machine-id + a domain separator).
@@ -27,7 +27,7 @@ use sha2::{Digest, Sha256};
 
 use crate::auth::{Account, AuthError, StorageBackend};
 
-pub const KEYRING_SERVICE: &str = "mineltui";
+pub const KEYRING_SERVICE: &str = "ichr";
 
 /// Configuration injected into the storage layer. In production, built
 /// from `AppPaths`. In tests, points to a tempdir + optionally forces
@@ -257,7 +257,7 @@ async fn write_encrypted_map(
 pub fn derive_machine_key() -> Result<[u8; 32], AuthError> {
     let raw = read_machine_id();
     let mut hasher = Sha256::new();
-    hasher.update(b"mineltui-auth-v1:");
+    hasher.update(b"ichr-auth-v1:");
     hasher.update(&raw);
     let digest = hasher.finalize();
     let mut out = [0u8; 32];
@@ -291,7 +291,7 @@ fn read_machine_id() -> Vec<u8> {
     }
     // Deterministic-but-low-entropy fallback — at least the same value
     // across runs on the same host.
-    b"mineltui-no-machine-id".to_vec()
+    b"ichr-no-machine-id".to_vec()
 }
 
 // ============================================================================

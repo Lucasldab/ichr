@@ -8,7 +8,7 @@
 //!
 //! `DEFAULT_MOJANG_JRE_ALL_URL` is content-addressed by Mojang. If Mojang
 //! rotates the hash (rare — stable since at least 2023), update the constant
-//! below and ship a patch. Set `MINELTUI_JRE_ALL_URL` env var at runtime
+//! below and ship a patch. Set `ICHR_JRE_ALL_URL` env var at runtime
 //! to override without recompiling.
 
 use std::collections::HashMap;
@@ -28,13 +28,13 @@ use crate::persistence::paths::AppPaths;
 ///
 /// To update: replace the 40-char SHA1 hex segment with the new hash
 /// from the Mojang launcher manifest. Override at runtime via
-/// `MINELTUI_JRE_ALL_URL` env var (no recompile needed).
+/// `ICHR_JRE_ALL_URL` env var (no recompile needed).
 pub const DEFAULT_MOJANG_JRE_ALL_URL: &str =
     "https://piston-meta.mojang.com/v1/products/java-runtime/\
      2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json";
 
 /// Environment variable that overrides `DEFAULT_MOJANG_JRE_ALL_URL`.
-pub const MOJANG_JRE_URL_ENV: &str = "MINELTUI_JRE_ALL_URL";
+pub const MOJANG_JRE_URL_ENV: &str = "ICHR_JRE_ALL_URL";
 
 // ---------------------------------------------------------------------------
 // Serde types — Mojang JRE all.json
@@ -138,7 +138,7 @@ impl MojangJreClient {
     ///
     /// URL priority:
     /// 1. `url_override` argument (for tests)
-    /// 2. `MINELTUI_JRE_ALL_URL` environment variable
+    /// 2. `ICHR_JRE_ALL_URL` environment variable
     /// 3. `DEFAULT_MOJANG_JRE_ALL_URL` constant
     #[tracing::instrument(skip_all)]
     pub async fn fetch_all_json(

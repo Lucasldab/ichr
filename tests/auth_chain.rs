@@ -8,10 +8,10 @@
 use std::time::Duration;
 
 use httpmock::prelude::*;
-use mineltui::auth::chain::AuthChainConfig;
-use mineltui::auth::service::{AccountAuthEvent, AccountService};
-use mineltui::auth::store::StoreConfig;
-use mineltui::auth::AuthContext;
+use ichr::auth::chain::AuthChainConfig;
+use ichr::auth::service::{AccountAuthEvent, AccountService};
+use ichr::auth::store::StoreConfig;
+use ichr::auth::AuthContext;
 use tempfile::TempDir;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;

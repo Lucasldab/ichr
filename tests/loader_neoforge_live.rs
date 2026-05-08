@@ -13,14 +13,14 @@
 
 use std::sync::Arc;
 
-use mineltui::domain::instance::{InstanceManifest, ModloaderKind};
-use mineltui::install::version_installer::install_version;
-use mineltui::java::service::JavaService;
-use mineltui::loader::service::LoaderService;
-use mineltui::loader::types::LoaderType;
-use mineltui::mojang::client::MojangClient;
-use mineltui::persistence::paths::AppPaths;
-use mineltui::tasks::{JobId, TaskEvent};
+use ichr::domain::instance::{InstanceManifest, ModloaderKind};
+use ichr::install::version_installer::install_version;
+use ichr::java::service::JavaService;
+use ichr::loader::service::LoaderService;
+use ichr::loader::types::LoaderType;
+use ichr::mojang::client::MojangClient;
+use ichr::persistence::paths::AppPaths;
+use ichr::tasks::{JobId, TaskEvent};
 use tempfile::TempDir;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -55,7 +55,7 @@ async fn live_neoforge_install_1_21_4() {
 
     // 1) Write vanilla InstanceManifest
     let m = InstanceManifest::new(slug.into(), slug.into(), mc.into());
-    mineltui::instance::store::write_instance_manifest(&paths, &m)
+    ichr::instance::store::write_instance_manifest(&paths, &m)
         .await
         .expect("write_instance_manifest");
 
@@ -146,7 +146,7 @@ async fn live_neoforge_install_1_21_4() {
     .expect("install_loader NeoForge");
 
     // 7) Assertions
-    let m = mineltui::instance::store::read_instance_manifest(&paths, slug)
+    let m = ichr::instance::store::read_instance_manifest(&paths, slug)
         .await
         .expect("read manifest");
     let loader = m.loader.expect("manifest.loader must be Some");
@@ -224,7 +224,7 @@ async fn live_neoforge_install_1_21_4() {
 #[tokio::test]
 #[ignore = "requires internet access — see module docs"]
 async fn live_neoforge_meta_lists_versions() {
-    use mineltui::loader::neoforge_meta::NeoForgeMetaClient;
+    use ichr::loader::neoforge_meta::NeoForgeMetaClient;
 
     let client = NeoForgeMetaClient::new()
         .expect("NeoForgeMetaClient::new (no env override; production endpoints)");
@@ -285,7 +285,7 @@ async fn live_neoforge_install_1_21_4_reaches_100_percent() {
 
     // 1) Vanilla manifest
     let m = InstanceManifest::new(slug.into(), slug.into(), mc.into());
-    mineltui::instance::store::write_instance_manifest(&paths, &m)
+    ichr::instance::store::write_instance_manifest(&paths, &m)
         .await
         .expect("write manifest");
 
@@ -412,7 +412,7 @@ async fn live_neoforge_install_1_21_4_reaches_100_percent() {
     );
 
     // 8) Assert manifest write
-    let m = mineltui::instance::store::read_instance_manifest(&paths, slug)
+    let m = ichr::instance::store::read_instance_manifest(&paths, slug)
         .await
         .expect("read manifest");
     let loader = m

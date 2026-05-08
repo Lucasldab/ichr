@@ -22,5 +22,5 @@ Thumbs.db
 .env.local
 *.key
 
-# Logs (mineltui writes to data_dir, but allow local stray logs)
+# Logs (ichr writes to data_dir, but allow local stray logs)
 *.log

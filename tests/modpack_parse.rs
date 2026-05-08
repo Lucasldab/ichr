@@ -1,12 +1,12 @@
 //! File-level integration tests for `.mrpack` manifest parsing.
 //!
-//! These tests call `mineltui::modpack::parse::parse_index` directly on JSON
+//! These tests call `ichr::modpack::parse::parse_index` directly on JSON
 //! strings and on bytes extracted from zip fixtures.  No network access required.
 //!
 //! Run with: `cargo nextest run --test modpack_parse`
 
-use mineltui::modpack::parse::{parse_index, EnvRequirement, MrpackIndex};
-use mineltui::modpack::ModpackError;
+use ichr::modpack::parse::{parse_index, EnvRequirement, MrpackIndex};
+use ichr::modpack::ModpackError;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

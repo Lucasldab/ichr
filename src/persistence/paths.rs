@@ -7,8 +7,8 @@
 //!
 //! ## Windows `\data` suffix
 //!
-//! On Windows, `ProjectDirs::from("", "", "mineltui").data_dir()` returns
-//! `%APPDATA%\mineltui\data` (a `\data` subfolder is appended by the
+//! On Windows, `ProjectDirs::from("", "", "ichr").data_dir()` returns
+//! `%APPDATA%\ichr\data` (a `\data` subfolder is appended by the
 //! `directories` crate). We accept this suffix rather than stripping it —
 //! stripping risks diverging from the crate's own `config_dir`/`cache_dir`
 //! layout and ratatui apps never expose these paths to end users.
@@ -18,20 +18,20 @@ use std::path::{Path, PathBuf};
 
 use directories::ProjectDirs;
 
-/// Snapshot of all platform-relevant base directories for `mineltui`.
+/// Snapshot of all platform-relevant base directories for `ichr`.
 ///
 /// Construct once at startup via `AppPaths::resolve()` and clone / pass
 /// references to everything downstream.
 #[derive(Debug, Clone)]
 pub struct AppPaths {
-    /// OS-specific data root. Linux: `~/.local/share/mineltui`.
-    /// Windows: `%APPDATA%\mineltui\data`.
+    /// OS-specific data root. Linux: `~/.local/share/ichr`.
+    /// Windows: `%APPDATA%\ichr\data`.
     pub data_dir: PathBuf,
-    /// OS-specific config root. Linux: `~/.config/mineltui`.
-    /// Windows: `%APPDATA%\mineltui\config`.
+    /// OS-specific config root. Linux: `~/.config/ichr`.
+    /// Windows: `%APPDATA%\ichr\config`.
     pub config_dir: PathBuf,
-    /// OS-specific cache root. Linux: `~/.cache/mineltui`.
-    /// Windows: `%LOCALAPPDATA%\mineltui\cache`.
+    /// OS-specific cache root. Linux: `~/.cache/ichr`.
+    /// Windows: `%LOCALAPPDATA%\ichr\cache`.
     pub cache_dir: PathBuf,
 }
 
@@ -39,7 +39,7 @@ impl AppPaths {
     /// Resolve platform paths. Returns `None` only if the platform cannot
     /// determine a valid home directory (extremely rare; treat as fatal).
     pub fn resolve() -> Option<Self> {
-        let proj = ProjectDirs::from("", "", "mineltui")?;
+        let proj = ProjectDirs::from("", "", "ichr")?;
         Some(Self {
             data_dir: proj.data_dir().to_path_buf(),
             config_dir: proj.config_dir().to_path_buf(),
@@ -57,9 +57,9 @@ impl AppPaths {
         }
     }
 
-    /// Absolute path to the mineltui log file (single-file; rotation deferred).
+    /// Absolute path to the ichr log file (single-file; rotation deferred).
     pub fn log_file(&self) -> PathBuf {
-        self.data_dir.join("mineltui.log")
+        self.data_dir.join("ichr.log")
     }
 
     /// Absolute path to the global app config file.
@@ -186,13 +186,13 @@ impl AppPaths {
     }
 
     /// Per-instance log file for Minecraft stdout/stderr drain.
-    /// Path: `{data_dir}/instances/{slug}/logs/mineltui.log`.
+    /// Path: `{data_dir}/instances/{slug}/logs/ichr.log`.
     /// The file is APPENDED at each launch; sessions are separated by a
     /// timestamped header written by `launcher::spawn` (plan 03-03).
     /// Minecraft's own `logs/latest.log` is a separate file managed by
     /// Minecraft's own log4j config — do not conflate.
     pub fn instance_log_file(&self, slug: &str) -> PathBuf {
-        self.instance_dir(slug).join("logs").join("mineltui.log")
+        self.instance_dir(slug).join("logs").join("ichr.log")
     }
 
     /// Encrypted fallback refresh-token file.

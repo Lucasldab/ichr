@@ -107,7 +107,7 @@ pub fn validate_java_major(found: u32, required: u32, java_path: &Path) -> Resul
             found,
             path: java_path.to_path_buf(),
             hint: format!(
-                "Install Java {required} or set MINELTUI_JAVA to a Java {required}+ executable"
+                "Install Java {required} or set ICHR_JAVA to a Java {required}+ executable"
             ),
         });
     }

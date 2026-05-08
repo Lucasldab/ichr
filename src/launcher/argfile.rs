@@ -23,7 +23,7 @@ use crate::persistence::paths::AppPaths;
 /// Placed inside `instance_dir(slug)` so concurrent launches of different
 /// instances never stomp each other. The file is overwritten on each launch.
 pub fn argfile_path(paths: &AppPaths, slug: &str) -> PathBuf {
-    paths.instance_dir(slug).join(".mineltui-argfile.txt")
+    paths.instance_dir(slug).join(".ichr-argfile.txt")
 }
 
 /// Write `args` to `path` in Java @argfile format.

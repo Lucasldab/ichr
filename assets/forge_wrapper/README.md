@@ -1,7 +1,7 @@
 # ForgeWrapper (vendored)
 
 This directory contains a vendored copy of ForgeWrapper, an MS-PL licensed
-Java helper used by mineltui to drive the Forge / NeoForge installer JAR
+Java helper used by ichr to drive the Forge / NeoForge installer JAR
 in headless mode (the official Forge installer has no `--installClient`
 flag — see `.planning/phases/07-forge-and-neoforge-modloaders/07-RESEARCH.md`
 §Critical Finding for the full rationale).

@@ -6,16 +6,16 @@
 //!
 //! Requires: an internet-connected machine, a real Microsoft account,
 //! and a browser to paste the device code into. Uses a tempdir so the
-//! real `~/.config/mineltui/accounts.*` files are NOT touched.
+//! real `~/.config/ichr/accounts.*` files are NOT touched.
 //!
 //! Phase 4 sign-off on `04-VALIDATION.md` requires a successful run of
 //! this test (see VALIDATION.md Manual-Only Verifications).
 
 use std::time::Duration;
 
-use mineltui::auth::chain::AuthChainConfig;
-use mineltui::auth::service::{AccountAuthEvent, AccountService};
-use mineltui::auth::store::StoreConfig;
+use ichr::auth::chain::AuthChainConfig;
+use ichr::auth::service::{AccountAuthEvent, AccountService};
+use ichr::auth::store::StoreConfig;
 use tempfile::TempDir;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -24,7 +24,7 @@ use tokio_util::sync::CancellationToken;
 #[ignore = "requires real MS account + browser + internet — see module docs"]
 async fn live_msa_round_trip_prints_code_and_expects_sign_in() {
     let http = reqwest::Client::builder()
-        .user_agent("mineltui-live-test/0.1")
+        .user_agent("ichr-live-test/0.1")
         .timeout(Duration::from_secs(30))
         .build()
         .unwrap();

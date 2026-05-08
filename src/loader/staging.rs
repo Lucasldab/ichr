@@ -3,7 +3,7 @@
 //!
 //! The installer expects an MMC-style instance directory: `launcher_profiles.json`
 //! at the root, plus `versions/<mc>/<mc>.{json,jar}` pre-populated from the
-//! mineltui Phase 2 cache. After the subprocess completes, `harvest.rs` walks
+//! ichr Phase 2 cache. After the subprocess completes, `harvest.rs` walks
 //! the produced layout. On cancel, `cleanup_staging` is best-effort.
 //!
 //! See PITFALL 2 (launcher_profiles.json missing) and PITFALL 6 (cleanup on
@@ -220,7 +220,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cleanup_staging_is_idempotent_on_missing_path() {
-        let p = std::path::PathBuf::from("/tmp/mineltui-staging-does-not-exist-xyz123");
+        let p = std::path::PathBuf::from("/tmp/ichr-staging-does-not-exist-xyz123");
         cleanup_staging(&p).await; // must not panic
     }
 

@@ -37,7 +37,7 @@ pub fn map_xerr(code: u64) -> String {
         2148916262 => "This account has been banned from Xbox Live services.".into(),
         other => format!(
             "Xbox authentication failed (XErr: {other}). \
-             If this persists, please report this error code to the mineltui issue tracker."
+             If this persists, please report this error code to the ichr issue tracker."
         ),
     }
 }

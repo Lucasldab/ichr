@@ -561,7 +561,7 @@ mod tests {
     /// If this test fails to parse, the fix is wrong — DO NOT fatten the
     /// fixture; fix the type system instead.
     ///
-    /// Implementation note: we set `MINELTUI_JAVA` to a non-existent path so
+    /// Implementation note: we set `ICHR_JAVA` to a non-existent path so
     /// `JavaService::resolve_jre_for_launch` short-circuits with that path
     /// (Step 5 succeeds), `compose` succeeds (pure-sync), and Step 7 then
     /// fails with `JavaNotFound` because the path doesn't exist on disk.
@@ -659,9 +659,9 @@ mod tests {
 
         // --- Hermetic Java path: short-circuit Step 5 to a non-existent
         //     binary so Step 7 fails cleanly with JavaNotFound (no network). ---
-        let prior_java = std::env::var("MINELTUI_JAVA").ok();
+        let prior_java = std::env::var("ICHR_JAVA").ok();
         let fake_java = td.path().join("nonexistent-java-binary");
-        std::env::set_var("MINELTUI_JAVA", fake_java.to_str().unwrap());
+        std::env::set_var("ICHR_JAVA", fake_java.to_str().unwrap());
 
         let (tx, _rx) = mpsc::channel::<TaskEvent>(16);
         let token = CancellationToken::new();
@@ -684,8 +684,8 @@ mod tests {
 
         // Restore env BEFORE assertions so a panic doesn't leak state.
         match prior_java {
-            Some(v) => std::env::set_var("MINELTUI_JAVA", v),
-            None => std::env::remove_var("MINELTUI_JAVA"),
+            Some(v) => std::env::set_var("ICHR_JAVA", v),
+            None => std::env::remove_var("ICHR_JAVA"),
         }
 
         // Pin the negative assertion: any AppError variant is fine EXCEPT
@@ -707,7 +707,7 @@ mod tests {
             ),
             Err(other) => {
                 // Acceptable: any other error variant proves we got past
-                // the early jar/json existence checks. With MINELTUI_JAVA
+                // the early jar/json existence checks. With ICHR_JAVA
                 // set to a non-existent path, the expected variant is
                 // JavaNotFound (Step 7). Log for diagnosis:
                 eprintln!("[gap-08-launch-jar] post-guard failure (expected): {other:?}");

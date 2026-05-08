@@ -1,12 +1,12 @@
 [package]
-name = "mineltui"
+name = "ichr"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.88"
 description = "Terminal-UI Minecraft Java Edition launcher"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/Lucasldab/mineltui"
-homepage = "https://github.com/Lucasldab/mineltui"
+repository = "https://github.com/Lucasldab/ichr"
+homepage = "https://github.com/Lucasldab/ichr"
 readme = "README.md"
 authors = ["Lucas L. de Barros <lucasldabarros@gmail.com>"]
 keywords = ["minecraft", "launcher", "tui", "ratatui"]
@@ -72,20 +72,23 @@ filetime = "0.2"
 httpmock = "0.8.3"
 embed-manifest = "1.5"
 
-# Cargo-dist managed config (Plan 12-03).
-# Restricted to v1 targets: Linux x86_64 + Windows x86_64 only (per project policy).
-# `dist generate --mode=ci` regenerates .github/workflows/release.yml from this block.
+# Config for 'dist'
 [workspace.metadata.dist]
+# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
 cargo-dist-version = "0.31.0"
-ci = ["github"]
+# CI backends to support
+ci = "github"
+# The installers to generate for each app
 installers = ["shell", "powershell"]
-targets = [
-    "x86_64-unknown-linux-gnu",
-    "x86_64-pc-windows-msvc",
-]
+# Target platforms to build apps for (Rust target-triple syntax)
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+# Path that installers should place binaries in
 install-path = "CARGO_HOME"
+# Whether to install an updater program
 install-updater = false
+# Whether builds should try to be cached in CI
 cache-builds = true
+# Whether to enable GitHub Attestations
 github-attestations = true
 
 # The profile that 'dist' will build with

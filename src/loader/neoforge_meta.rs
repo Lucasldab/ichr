@@ -7,8 +7,8 @@
 //!     → Installer JAR (different base — the maven-files repo, not the JSON-API)
 //!
 //! Override base URLs for tests via:
-//!   - `MINELTUI_NEOFORGE_MAVEN_BASE_URL`        (JSON-API base — list_loader_versions)
-//!   - `MINELTUI_NEOFORGE_MAVEN_FILES_BASE_URL`  (maven-files base — installer_url)
+//!   - `ICHR_NEOFORGE_MAVEN_BASE_URL`        (JSON-API base — list_loader_versions)
+//!   - `ICHR_NEOFORGE_MAVEN_FILES_BASE_URL`  (maven-files base — installer_url)
 //!
 //! Why dual bases: the version listing endpoint and the installer JAR live at
 //! different roots on `maven.neoforged.net`. Phase 7 originally assumed they
@@ -32,14 +32,14 @@ use crate::loader::types::LoaderVersionEntry;
 /// JSON-API base URL — used by `list_loader_versions`.
 pub const DEFAULT_NEOFORGE_MAVEN_BASE: &str =
     "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge";
-pub const NEOFORGE_MAVEN_BASE_URL_ENV: &str = "MINELTUI_NEOFORGE_MAVEN_BASE_URL";
+pub const NEOFORGE_MAVEN_BASE_URL_ENV: &str = "ICHR_NEOFORGE_MAVEN_BASE_URL";
 
 /// Maven-FILES base URL — used by `installer_url` only. Distinct from the
 /// JSON-API base above because the version listing endpoint and the installer
 /// JAR live in different parts of the `maven.neoforged.net` layout.
 pub const DEFAULT_NEOFORGE_MAVEN_FILES_BASE: &str =
     "https://maven.neoforged.net/releases/net/neoforged/neoforge";
-pub const NEOFORGE_MAVEN_FILES_BASE_URL_ENV: &str = "MINELTUI_NEOFORGE_MAVEN_FILES_BASE_URL";
+pub const NEOFORGE_MAVEN_FILES_BASE_URL_ENV: &str = "ICHR_NEOFORGE_MAVEN_FILES_BASE_URL";
 
 // -----------------------------------------------------------------------
 // Pure helpers

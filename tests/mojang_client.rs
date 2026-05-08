@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 
-use mineltui::mojang::cache::{
+use ichr::mojang::cache::{
     atomic_write, cache_is_fresh, sha1_hex_of_bytes, verify_sha1, MANIFEST_CACHE_TTL,
 };
 
@@ -134,14 +134,14 @@ async fn test_cache_fresh_within_ttl() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_client_builds_with_user_agent() {
-    use mineltui::mojang::client::{MojangClient, USER_AGENT};
+    use ichr::mojang::client::{MojangClient, USER_AGENT};
     let client = MojangClient::new().expect("MojangClient::new should not fail");
     assert_eq!(client.user_agent(), USER_AGENT);
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_download_verified_skips_when_already_correct() {
-    use mineltui::mojang::client::MojangClient;
+    use ichr::mojang::client::MojangClient;
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("file.bin");
     let data = b"correct data";
@@ -165,7 +165,7 @@ async fn test_download_verified_skips_when_already_correct() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_download_verified_retries_once_on_mismatch() {
-    use mineltui::mojang::client::MojangClient;
+    use ichr::mojang::client::MojangClient;
 
     let dir = tempfile::tempdir().unwrap();
     let dest = dir.path().join("downloaded.bin");
@@ -219,7 +219,7 @@ async fn serve_canned(listener: tokio::net::TcpListener, mut responses: Vec<Vec<
 #[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_fetch_manifest_live() {
-    use mineltui::mojang::client::MojangClient;
+    use ichr::mojang::client::MojangClient;
     let dir = tempfile::tempdir().unwrap();
     let cache_path = dir.path().join("version_manifest_v2.json");
     let client = MojangClient::new().unwrap();

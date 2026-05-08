@@ -1,8 +1,8 @@
-//! Tests for `mineltui::domain::platform`.
+//! Tests for `ichr::domain::platform`.
 //! Covers PLAT-03 (arch / OS detection for Mojang library rules).
 
-use mineltui::domain::platform::{Arch, OsName};
-use mineltui::AppError;
+use ichr::domain::platform::{Arch, OsName};
+use ichr::AppError;
 
 #[test]
 fn arch_current_is_known_variant() {

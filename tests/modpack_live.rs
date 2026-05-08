@@ -25,9 +25,9 @@ use tempfile::TempDir;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use mineltui::modpack::service::ModpackService;
-use mineltui::persistence::paths::AppPaths;
-use mineltui::tasks::JobId;
+use ichr::modpack::service::ModpackService;
+use ichr::persistence::paths::AppPaths;
+use ichr::tasks::JobId;
 
 // ─── Pin constants ─────────────────────────────────────────────────────────────
 
@@ -65,7 +65,7 @@ async fn live_import_pinned_modpack() {
     );
 
     let http = reqwest::Client::builder()
-        .user_agent(mineltui::mojang::client::USER_AGENT)
+        .user_agent(ichr::mojang::client::USER_AGENT)
         .timeout(std::time::Duration::from_secs(120))
         .build()
         .expect("build http client");
@@ -122,23 +122,23 @@ async fn live_import_pinned_modpack() {
     // ── Step 3: import via ModpackService ────────────────────────────────────
     let svc = ModpackService::with_client(
         reqwest::Client::builder()
-            .user_agent(mineltui::mojang::client::USER_AGENT)
+            .user_agent(ichr::mojang::client::USER_AGENT)
             .timeout(std::time::Duration::from_secs(60))
             .build()
             .expect("build svc client"),
     );
 
-    let loader_svc = mineltui::loader::service::LoaderService::new().expect("LoaderService::new");
-    let java_svc = mineltui::java::service::JavaService::new().expect("JavaService::new");
-    let mojang_svc = mineltui::mojang::client::MojangClient::new().expect("MojangClient::new");
+    let loader_svc = ichr::loader::service::LoaderService::new().expect("LoaderService::new");
+    let java_svc = ichr::java::service::JavaService::new().expect("JavaService::new");
+    let mojang_svc = ichr::mojang::client::MojangClient::new().expect("MojangClient::new");
 
-    let (tx, mut rx) = mpsc::channel::<mineltui::tasks::TaskEvent>(256);
+    let (tx, mut rx) = mpsc::channel::<ichr::tasks::TaskEvent>(256);
 
     // Drain progress events in a background task so the channel never fills.
     let drain = tokio::spawn(async move {
         let mut labels: Vec<String> = Vec::new();
         while let Some(evt) = rx.recv().await {
-            if let mineltui::tasks::TaskEvent::Progress { msg, pct, .. } = evt {
+            if let ichr::tasks::TaskEvent::Progress { msg, pct, .. } = evt {
                 eprintln!("[live-test] {pct:3}% — {msg}");
                 labels.push(msg);
             }

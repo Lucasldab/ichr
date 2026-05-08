@@ -2,12 +2,12 @@
 
 use std::io::Write;
 
-use mineltui::domain::platform::{Arch, OsName};
-use mineltui::install::natives_extract::extract_native_jar;
-use mineltui::install::version_installer::{ASSET_CONCURRENCY, LIB_CONCURRENCY};
-use mineltui::mojang::natives::needs_native_extraction;
-use mineltui::mojang::rules::{evaluate_rules, RuleContext};
-use mineltui::mojang::types::VersionJson;
+use ichr::domain::platform::{Arch, OsName};
+use ichr::install::natives_extract::extract_native_jar;
+use ichr::install::version_installer::{ASSET_CONCURRENCY, LIB_CONCURRENCY};
+use ichr::mojang::natives::needs_native_extraction;
+use ichr::mojang::rules::{evaluate_rules, RuleContext};
+use ichr::mojang::types::VersionJson;
 use tempfile::tempdir;
 
 fn build_test_jar(dest: &std::path::Path, entries: &[(&str, &[u8])]) {
@@ -81,7 +81,7 @@ async fn test_extract_native_jar_rejects_path_traversal() {
     );
 
     // The passwd file should NOT exist outside dest
-    let victim = std::path::PathBuf::from("/etc/passwd_mineltui_test");
+    let victim = std::path::PathBuf::from("/etc/passwd_ichr_test");
     assert!(!victim.exists());
 }
 
@@ -220,8 +220,8 @@ fn test_concurrency_bounds_are_distinct_constants() {
 
 #[test]
 fn test_resolve_inherits_with_no_parent_is_noop() {
-    use mineltui::mojang::inherits::resolve_inherits;
-    use mineltui::mojang::types::{AssetIndex, VersionDownloads};
+    use ichr::mojang::inherits::resolve_inherits;
+    use ichr::mojang::types::{AssetIndex, VersionDownloads};
     use std::collections::HashMap;
 
     // Synthesize a VersionJson with no inheritsFrom.
@@ -271,10 +271,10 @@ fn test_resolve_inherits_with_no_parent_is_noop() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore]
 async fn test_install_version_live_1_20_4() {
-    use mineltui::install::install_version;
-    use mineltui::mojang::client::MojangClient;
-    use mineltui::persistence::paths::AppPaths;
-    use mineltui::tasks::job::{JobId, TaskEvent};
+    use ichr::install::install_version;
+    use ichr::mojang::client::MojangClient;
+    use ichr::persistence::paths::AppPaths;
+    use ichr::tasks::job::{JobId, TaskEvent};
     use tokio_util::sync::CancellationToken;
 
     let td = tempdir().unwrap();

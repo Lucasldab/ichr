@@ -4,12 +4,12 @@
 //! Hits the real meta APIs and downloads real loader libraries. Requires
 //! internet access. Each test takes ~10-30 seconds depending on bandwidth.
 
-use mineltui::domain::InstanceManifest;
-use mineltui::loader::maven::maven_coord_to_path;
-use mineltui::loader::service::LoaderService;
-use mineltui::loader::types::LoaderType;
-use mineltui::persistence::paths::AppPaths;
-use mineltui::tasks::JobId;
+use ichr::domain::InstanceManifest;
+use ichr::loader::maven::maven_coord_to_path;
+use ichr::loader::service::LoaderService;
+use ichr::loader::types::LoaderType;
+use ichr::persistence::paths::AppPaths;
+use ichr::tasks::JobId;
 use tempfile::TempDir;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -24,16 +24,16 @@ fn make_paths(td: &TempDir) -> AppPaths {
 
 async fn write_vanilla_manifest(paths: &AppPaths, slug: &str, mc: &str) {
     let m = InstanceManifest::new(slug.into(), slug.into(), mc.into());
-    mineltui::instance::store::write_instance_manifest(paths, &m)
+    ichr::instance::store::write_instance_manifest(paths, &m)
         .await
         .unwrap();
 }
 
-fn make_progress_drain() -> mpsc::Sender<mineltui::tasks::TaskEvent> {
-    let (tx, mut rx) = mpsc::channel::<mineltui::tasks::TaskEvent>(64);
+fn make_progress_drain() -> mpsc::Sender<ichr::tasks::TaskEvent> {
+    let (tx, mut rx) = mpsc::channel::<ichr::tasks::TaskEvent>(64);
     tokio::spawn(async move {
         while let Some(evt) = rx.recv().await {
-            if let mineltui::tasks::TaskEvent::Progress { pct, msg, .. } = evt {
+            if let ichr::tasks::TaskEvent::Progress { pct, msg, .. } = evt {
                 println!("[loader_live] progress: {pct:>3}%  {msg}");
             }
         }
@@ -81,7 +81,7 @@ async fn live_fabric_install_1_21_4() {
     );
 
     // Manifest now has loader set with the profile.id verbatim (Pitfall 7)
-    let m = mineltui::instance::store::read_instance_manifest(&paths, slug)
+    let m = ichr::instance::store::read_instance_manifest(&paths, slug)
         .await
         .unwrap();
     let loader = m.loader.expect("manifest.loader should be set");
@@ -147,7 +147,7 @@ async fn live_quilt_install_1_21_4() {
     .await
     .expect("install_loader Quilt should succeed");
 
-    let m = mineltui::instance::store::read_instance_manifest(&paths, slug)
+    let m = ichr::instance::store::read_instance_manifest(&paths, slug)
         .await
         .unwrap();
     let loader = m.loader.expect("manifest.loader should be set");

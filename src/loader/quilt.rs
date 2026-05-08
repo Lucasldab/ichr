@@ -10,7 +10,7 @@
 //!   (presence of `"beta"`, `"rc"`, or `"pre"` => pre-release).
 //! - Profile JSON libraries are `{name, url}` only — no hash fields.
 //!
-//! Override the base URL for tests via `MINELTUI_QUILT_META_BASE_URL`.
+//! Override the base URL for tests via `ICHR_QUILT_META_BASE_URL`.
 
 use std::time::Duration;
 
@@ -20,7 +20,7 @@ use crate::loader::error::LoaderError;
 use crate::loader::types::{LoaderLibrary, LoaderVersionEntry};
 
 pub const DEFAULT_QUILT_META_BASE: &str = "https://meta.quiltmc.org";
-pub const QUILT_META_BASE_URL_ENV: &str = "MINELTUI_QUILT_META_BASE_URL";
+pub const QUILT_META_BASE_URL_ENV: &str = "ICHR_QUILT_META_BASE_URL";
 
 // -----------------------------------------------------------------------
 // Wire types
@@ -494,7 +494,7 @@ mod tests {
     // ---- to_mojang_shape ----
 
     /// Real quilt-meta JSON sample BYTE-EQUIVALENT to a fragment of
-    /// ~/.local/share/mineltui/versions/quilt-loader-0.30.0-beta.7-1.20.4/
+    /// ~/.local/share/ichr/versions/quilt-loader-0.30.0-beta.7-1.20.4/
     ///   quilt-loader-0.30.0-beta.7-1.20.4.json (round-4 FORBID #4).
     const REAL_QUILT_META_BYTES: &[u8] = br#"{"id":"quilt-loader-0.30.0-beta.7-1.20.4","inheritsFrom":"1.20.4","type":"release","mainClass":"org.quiltmc.loader.impl.launch.knot.KnotClient","arguments":{"game":[]},"libraries":[{"name":"net.fabricmc:sponge-mixin:0.17.0+mixin.0.8.7","url":"https://maven.fabricmc.net/"},{"name":"org.quiltmc:quilt-json5:1.0.4+final","url":"https://maven.quiltmc.org/repository/release/"},{"name":"org.ow2.asm:asm:9.9","url":"https://maven.fabricmc.net/"},{"name":"org.quiltmc:quilt-loader:0.30.0-beta.7","url":"https://maven.quiltmc.org/repository/release/"}],"releaseTime":"2023-12-07T12:56:20+00:00","time":"2026-04-21T06:25:58+00:00"}"#;
 

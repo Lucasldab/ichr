@@ -1,4 +1,4 @@
-//! Top-level error type for the library layer of `mineltui`.
+//! Top-level error type for the library layer of `ichr`.
 //!
 //! Library/domain code returns `Result<T, AppError>`.
 //! The `main.rs` / TUI boundary uses `anyhow::Result` (added by Plan 05).
@@ -60,7 +60,7 @@ pub enum AppError {
     #[error("Version not installed for instance {slug} — run install first")]
     VersionNotInstalled { slug: String },
 
-    #[error("Java binary not found: checked MINELTUI_JAVA env var and PATH")]
+    #[error("Java binary not found: checked ICHR_JAVA env var and PATH")]
     JavaNotFound,
 
     #[error(

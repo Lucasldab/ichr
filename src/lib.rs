@@ -1,4 +1,4 @@
-//! mineltui — terminal-UI Minecraft Java Edition launcher.
+//! ichr — terminal-UI Minecraft Java Edition launcher.
 //!
 //! Library crate; `src/main.rs` is the binary entry point.
 

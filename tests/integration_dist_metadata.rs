@@ -3,7 +3,7 @@
 
 use std::process::Command;
 
-fn mineltui_package() -> serde_json::Value {
+fn ichr_package() -> serde_json::Value {
     let out = Command::new(env!("CARGO"))
         .args(["metadata", "--format-version", "1", "--no-deps"])
         .output()
@@ -18,14 +18,14 @@ fn mineltui_package() -> serde_json::Value {
         serde_json::from_slice(&out.stdout).expect("cargo metadata returns valid json");
     let pkgs = v["packages"].as_array().expect("packages array");
     pkgs.iter()
-        .find(|p| p["name"] == "mineltui")
+        .find(|p| p["name"] == "ichr")
         .cloned()
-        .expect("mineltui package present in metadata")
+        .expect("ichr package present in metadata")
 }
 
 #[test]
 fn cargo_metadata_declares_required_publish_fields() {
-    let pkg = mineltui_package();
+    let pkg = ichr_package();
     for field in ["repository", "homepage", "readme", "description", "license"] {
         assert!(
             !pkg[field].is_null(),
@@ -50,17 +50,17 @@ fn cargo_metadata_declares_required_publish_fields() {
 
 #[test]
 fn cargo_metadata_repository_points_at_lucasldab_owner() {
-    let pkg = mineltui_package();
+    let pkg = ichr_package();
     let repo = pkg["repository"].as_str().expect("repository set");
     assert_eq!(
-        repo, "https://github.com/Lucasldab/mineltui",
-        "repository URL must match the GitHub remote (Lucasldab/mineltui); cargo install --git users follow this URL"
+        repo, "https://github.com/Lucasldab/ichr",
+        "repository URL must match the GitHub remote (Lucasldab/ichr); cargo install --git users follow this URL"
     );
 }
 
 #[test]
 fn cargo_metadata_license_is_dual_licensed() {
-    let pkg = mineltui_package();
+    let pkg = ichr_package();
     let license = pkg["license"].as_str().expect("license set");
     assert_eq!(
         license, "MIT OR Apache-2.0",

@@ -32,15 +32,15 @@
 //! All tests use a per-test `MockServer` (parallel-safe).
 
 use httpmock::prelude::*;
-use mineltui::mods::curseforge::client::CurseForgeClient;
-use mineltui::mods::curseforge::error::CurseForgeError;
-use mineltui::mods::curseforge::service::CurseForgeService;
-use mineltui::mods::curseforge::types::{
+use ichr::mods::curseforge::client::CurseForgeClient;
+use ichr::mods::curseforge::error::CurseForgeError;
+use ichr::mods::curseforge::service::CurseForgeService;
+use ichr::mods::curseforge::types::{
     CurseForgeAuthor, CurseForgeFileEntry, CurseForgeHash, CurseForgeLinks, CurseForgeProjectDetail,
 };
-use mineltui::mods::types::{HashAlgo, Ledger, ModSource};
-use mineltui::persistence::paths::AppPaths;
-use mineltui::tasks::JobId;
+use ichr::mods::types::{HashAlgo, Ledger, ModSource};
+use ichr::persistence::paths::AppPaths;
+use ichr::tasks::JobId;
 use sha1::{Digest, Sha1};
 use tempfile::TempDir;
 use tokio::sync::mpsc;

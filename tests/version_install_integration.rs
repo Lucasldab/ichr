@@ -4,10 +4,10 @@
 //!
 //! Downloads ~50-100 MB from piston-meta.mojang.com + resources.download.minecraft.net.
 
-use mineltui::install::install_version;
-use mineltui::mojang::client::MojangClient;
-use mineltui::persistence::AppPaths;
-use mineltui::tasks::{JobId, TaskEvent};
+use ichr::install::install_version;
+use ichr::mojang::client::MojangClient;
+use ichr::persistence::AppPaths;
+use ichr::tasks::{JobId, TaskEvent};
 use tempfile::tempdir;
 use tokio_util::sync::CancellationToken;
 

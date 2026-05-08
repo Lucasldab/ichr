@@ -14,14 +14,14 @@
 
 use std::sync::Arc;
 
-use mineltui::domain::instance::{InstanceManifest, ModloaderKind};
-use mineltui::install::version_installer::install_version;
-use mineltui::java::service::JavaService;
-use mineltui::loader::service::LoaderService;
-use mineltui::loader::types::LoaderType;
-use mineltui::mojang::client::MojangClient;
-use mineltui::persistence::paths::AppPaths;
-use mineltui::tasks::{JobId, TaskEvent};
+use ichr::domain::instance::{InstanceManifest, ModloaderKind};
+use ichr::install::version_installer::install_version;
+use ichr::java::service::JavaService;
+use ichr::loader::service::LoaderService;
+use ichr::loader::types::LoaderType;
+use ichr::mojang::client::MojangClient;
+use ichr::persistence::paths::AppPaths;
+use ichr::tasks::{JobId, TaskEvent};
 use tempfile::TempDir;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -56,7 +56,7 @@ async fn live_forge_install_1_20_1() {
 
     // 1) Write vanilla InstanceManifest
     let m = InstanceManifest::new(slug.into(), slug.into(), mc.into());
-    mineltui::instance::store::write_instance_manifest(&paths, &m)
+    ichr::instance::store::write_instance_manifest(&paths, &m)
         .await
         .expect("write_instance_manifest");
 
@@ -147,7 +147,7 @@ async fn live_forge_install_1_20_1() {
     .expect("install_loader Forge");
 
     // 7) Assertions
-    let m = mineltui::instance::store::read_instance_manifest(&paths, slug)
+    let m = ichr::instance::store::read_instance_manifest(&paths, slug)
         .await
         .expect("read manifest");
     let loader = m.loader.expect("manifest.loader must be Some");
@@ -241,7 +241,7 @@ async fn live_forge_install_does_not_throw_install_blocker() {
 
     // 1) Write vanilla InstanceManifest
     let m = InstanceManifest::new(slug.into(), slug.into(), mc.into());
-    mineltui::instance::store::write_instance_manifest(&paths, &m)
+    ichr::instance::store::write_instance_manifest(&paths, &m)
         .await
         .expect("write manifest");
 
@@ -353,7 +353,7 @@ async fn live_forge_install_does_not_throw_install_blocker() {
         }
     }
 
-    let m = mineltui::instance::store::read_instance_manifest(&paths, slug)
+    let m = ichr::instance::store::read_instance_manifest(&paths, slug)
         .await
         .expect("read manifest");
     let loader = m

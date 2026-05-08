@@ -42,7 +42,7 @@ use crate::util::safe_zip::safe_extract_path;
 ///  2. All entries whose name starts with `client-overrides/` are extracted
 ///     second, overwriting any file written in step 1 at the same relative path.
 ///
-/// `server-overrides/` entries are silently ignored (mineltui is a client
+/// `server-overrides/` entries are silently ignored (ichr is a client
 /// launcher; server-side overrides are out of scope for v1).
 ///
 /// # Returns
@@ -342,7 +342,7 @@ mod tests {
         // Nothing should have been extracted (dest may not even exist yet).
         assert_eq!(count, 0);
         // The traversal target must not have been written.
-        assert!(!std::path::Path::new("/etc/passwd_mineltui_test").exists());
+        assert!(!std::path::Path::new("/etc/passwd_ichr_test").exists());
     }
 
     // ── test 6: path traversal in client-overrides/ silently skipped ──────────

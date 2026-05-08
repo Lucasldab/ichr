@@ -7,7 +7,7 @@
 //! ASSUMPTION A1 from 08-RESEARCH.md — `MOD_DOWNLOAD_CONCURRENCY = 6` is safe
 //! below the 300 req/min cap. Verify in human checkpoint.
 //!
-//! ASSUMPTION A2 from 08-RESEARCH.md — `mineltui/0.1 (+https://github.com/.../mineltui)`
+//! ASSUMPTION A2 from 08-RESEARCH.md — `ichr/0.1 (+https://github.com/.../ichr)`
 //! UA satisfies Modrinth's "uniquely identifying" requirement. Verify in human checkpoint.
 //!
 //! PITFALL 1: Modrinth returns 403 against the default reqwest UA — every request
@@ -23,7 +23,7 @@ use crate::mods::types::{
 };
 
 pub const DEFAULT_MODRINTH_BASE: &str = "https://api.modrinth.com";
-pub const MODRINTH_BASE_URL_ENV: &str = "MINELTUI_MODRINTH_BASE_URL";
+pub const MODRINTH_BASE_URL_ENV: &str = "ICHR_MODRINTH_BASE_URL";
 pub const SEARCH_DEFAULT_LIMIT: u32 = 20;
 
 /// Maximum allowed file size for a single mod download — defense in depth
@@ -504,7 +504,7 @@ mod tests {
                         .find(|(k, _)| k.eq_ignore_ascii_case("user-agent"))
                         .map(|(_, v)| v.as_str())
                         .unwrap_or("");
-                    ua.starts_with("mineltui/")
+                    ua.starts_with("ichr/")
                 });
             then.status(200).body(r#"{"hits":[]}"#);
         });

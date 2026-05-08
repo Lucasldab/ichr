@@ -57,7 +57,7 @@ pub struct AccountService {
 impl AccountService {
     /// Build from an `AppPaths` + a prebuilt `reqwest::Client`. The
     /// client should use rustls-tls (per project constraint) and carry
-    /// the mineltui User-Agent.
+    /// the ichr User-Agent.
     pub fn new(paths: &AppPaths, http: reqwest::Client) -> Self {
         Self {
             chain_config: AuthChainConfig::production(http),

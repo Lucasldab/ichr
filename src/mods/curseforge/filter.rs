@@ -1,12 +1,12 @@
 //! Pure CurseForge filter mapping — no I/O.
 //!
-//! Maps mineltui's `LoaderInfo` to CurseForge's `ModLoaderType` integer enum.
+//! Maps ichr's `LoaderInfo` to CurseForge's `ModLoaderType` integer enum.
 //!
 //! **Pitfall 4 (09-RESEARCH.md line 954) — DO NOT confuse with Modrinth's
 //! string enum.** CurseForge's enum is:
 //!   1 = Forge
-//!   2 = Cauldron (legacy — not in mineltui's ModloaderKind)
-//!   3 = LiteLoader (legacy — not in mineltui's ModloaderKind)
+//!   2 = Cauldron (legacy — not in ichr's ModloaderKind)
+//!   3 = LiteLoader (legacy — not in ichr's ModloaderKind)
 //!   4 = Fabric
 //!   5 = Quilt
 //!   6 = NeoForge
@@ -24,7 +24,7 @@
 use crate::domain::instance::ModloaderKind;
 use crate::loader::types::LoaderInfo;
 
-/// Map mineltui loader to CurseForge's ModLoaderType integer enum.
+/// Map ichr loader to CurseForge's ModLoaderType integer enum.
 /// Returns `None` for `Vanilla` — caller omits the `modLoaderType` query param.
 pub fn curseforge_loader_type(loader: Option<&LoaderInfo>) -> Option<i32> {
     match loader.map(|l| l.kind) {

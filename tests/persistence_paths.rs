@@ -1,10 +1,10 @@
-//! Integration tests for `mineltui::persistence::paths`.
+//! Integration tests for `ichr::persistence::paths`.
 //!
 //! Covers PLAT-01 (XDG paths on Linux) and PLAT-02 (AppData on Windows).
 
 use std::path::PathBuf;
 
-use mineltui::persistence::AppPaths;
+use ichr::persistence::AppPaths;
 
 fn assert_path_contains_segment(p: &std::path::Path, segment: &str) {
     let found = p
@@ -24,19 +24,19 @@ fn resolve_returns_some() {
 #[test]
 fn data_config_cache_all_contain_app_name() {
     let paths = AppPaths::resolve().expect("paths resolve");
-    assert_path_contains_segment(&paths.data_dir, "mineltui");
-    assert_path_contains_segment(&paths.config_dir, "mineltui");
-    assert_path_contains_segment(&paths.cache_dir, "mineltui");
+    assert_path_contains_segment(&paths.data_dir, "ichr");
+    assert_path_contains_segment(&paths.config_dir, "ichr");
+    assert_path_contains_segment(&paths.cache_dir, "ichr");
 }
 
 #[test]
 fn derived_paths_descend_from_roots() {
-    let tmp_data = PathBuf::from("/tmp/mineltui-test-data");
-    let tmp_config = PathBuf::from("/tmp/mineltui-test-config");
-    let tmp_cache = PathBuf::from("/tmp/mineltui-test-cache");
+    let tmp_data = PathBuf::from("/tmp/ichr-test-data");
+    let tmp_config = PathBuf::from("/tmp/ichr-test-config");
+    let tmp_cache = PathBuf::from("/tmp/ichr-test-cache");
     let paths = AppPaths::with_roots(tmp_data.clone(), tmp_config.clone(), tmp_cache.clone());
 
-    assert_eq!(paths.log_file(), tmp_data.join("mineltui.log"));
+    assert_eq!(paths.log_file(), tmp_data.join("ichr.log"));
     assert_eq!(paths.app_config_file(), tmp_config.join("config.toml"));
     assert_eq!(paths.instances_dir(), tmp_data.join("instances"));
     assert_eq!(paths.assets_dir(), tmp_data.join("assets"));
@@ -57,7 +57,7 @@ fn log_file_lives_under_data_dir() {
     );
     assert_eq!(
         log.file_name().and_then(|f| f.to_str()),
-        Some("mineltui.log")
+        Some("ichr.log")
     );
 }
 
@@ -96,7 +96,7 @@ fn linux_xdg_paths() {
         "Linux config_dir {:?} should be under ~/.config or $XDG_CONFIG_HOME",
         paths.config_dir
     );
-    assert_path_contains_segment(&paths.data_dir, "mineltui");
+    assert_path_contains_segment(&paths.data_dir, "ichr");
 }
 
 #[cfg(target_os = "windows")]
@@ -110,7 +110,7 @@ fn windows_appdata_paths() {
         "Windows data_dir {:?} should descend from %APPDATA%",
         paths.data_dir
     );
-    assert_path_contains_segment(&paths.data_dir, "mineltui");
+    assert_path_contains_segment(&paths.data_dir, "ichr");
 }
 
 // ── Phase 2 accessor tests ────────────────────────────────────────────────────

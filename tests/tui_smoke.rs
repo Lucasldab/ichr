@@ -2,9 +2,9 @@
 //! a real terminal); instead exercises `update()` directly, which is the only
 //! place state mutation happens.
 
-use mineltui::mojang::types::VersionEntry;
-use mineltui::tasks::{JobId, TaskEvent};
-use mineltui::tui::{update, Action, ActiveView, AppState, CreateStep, Effect, VersionFilter};
+use ichr::mojang::types::VersionEntry;
+use ichr::tasks::{JobId, TaskEvent};
+use ichr::tui::{update, Action, ActiveView, AppState, CreateStep, Effect, VersionFilter};
 
 // ---- Phase 1 tests (preserved) ---------------------------------------------
 
@@ -251,7 +251,7 @@ fn test_type_search_appends_to_version_picker_search_field() {
 
 #[test]
 fn test_version_filter_includes_releases_and_excludes_old_beta() {
-    use mineltui::tui::run::filter_version_list;
+    use ichr::tui::run::filter_version_list;
 
     let versions = vec![
         VersionEntry {
@@ -321,7 +321,7 @@ fn test_view_renders_empty_state_without_crash() {
     let mut terminal = Terminal::new(backend).unwrap();
     let state = AppState::default();
     terminal
-        .draw(|f| mineltui::tui::view::view(&state, f))
+        .draw(|f| ichr::tui::view::view(&state, f))
         .unwrap();
 }
 
@@ -336,7 +336,7 @@ fn test_view_dispatches_without_panic() {
     // InstanceList (default)
     let state = AppState::default();
     terminal
-        .draw(|f| mineltui::tui::view::view(&state, f))
+        .draw(|f| ichr::tui::view::view(&state, f))
         .unwrap();
 
     // CreateModal / NameInput
@@ -348,7 +348,7 @@ fn test_view_dispatches_without_panic() {
         ..AppState::default()
     };
     terminal
-        .draw(|f| mineltui::tui::view::view(&state, f))
+        .draw(|f| ichr::tui::view::view(&state, f))
         .unwrap();
 
     // CreateModal / VersionPicker
@@ -362,7 +362,7 @@ fn test_view_dispatches_without_panic() {
         ..AppState::default()
     };
     terminal
-        .draw(|f| mineltui::tui::view::view(&state, f))
+        .draw(|f| ichr::tui::view::view(&state, f))
         .unwrap();
 
     // DeleteConfirm
@@ -374,7 +374,7 @@ fn test_view_dispatches_without_panic() {
         ..AppState::default()
     };
     terminal
-        .draw(|f| mineltui::tui::view::view(&state, f))
+        .draw(|f| ichr::tui::view::view(&state, f))
         .unwrap();
 
     // RenameInline
@@ -387,7 +387,7 @@ fn test_view_dispatches_without_panic() {
         ..AppState::default()
     };
     terminal
-        .draw(|f| mineltui::tui::view::view(&state, f))
+        .draw(|f| ichr::tui::view::view(&state, f))
         .unwrap();
 
     // GroupInline
@@ -401,13 +401,13 @@ fn test_view_dispatches_without_panic() {
         ..AppState::default()
     };
     terminal
-        .draw(|f| mineltui::tui::view::view(&state, f))
+        .draw(|f| ichr::tui::view::view(&state, f))
         .unwrap();
 }
 
 // ---- INST-06 group-assign smoke tests (Task 2-09-01) ------------------------
 
-use mineltui::domain::InstanceManifest;
+use ichr::domain::InstanceManifest;
 
 fn make_instance(slug: &str, name: &str, group: Option<&str>) -> InstanceManifest {
     let mut m = InstanceManifest::new(name.to_string(), slug.to_string(), "1.20.4".to_string());
@@ -655,7 +655,7 @@ fn test_launch_job_started_inserts_token() {
 
 #[test]
 fn test_d_on_running_is_noop() {
-    use mineltui::tui::run::map_event_pub;
+    use ichr::tui::run::map_event_pub;
     use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
 
     let mut state = AppState {
@@ -677,8 +677,8 @@ fn test_d_on_running_is_noop() {
 
 // ---- Phase 4 account management smoke tests (Task 04-09-03) -----------------
 
-use mineltui::auth::{Account, AuthContext, StorageBackend};
-use mineltui::tui::run::map_event_pub;
+use ichr::auth::{Account, AuthContext, StorageBackend};
+use ichr::tui::run::map_event_pub;
 use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
 
 fn sample_account(id: &str, active: bool) -> Account {
@@ -794,7 +794,7 @@ fn test_esc_in_auth_failed_modal_closes() {
 fn test_launch_effect_with_active_account_is_msa() {
     let mut state = AppState {
         // new(display_name, slug, mc_version_id)
-        instances: vec![mineltui::domain::InstanceManifest::new(
+        instances: vec![ichr::domain::InstanceManifest::new(
             "s".into(),
             "s".into(),
             "1.21.4".into(),
@@ -825,9 +825,9 @@ fn test_accounts_loaded_sets_active_id() {
 
 // ---- Phase 5 Java picker smoke tests (Task 05-08-01) ------------------------
 
-use mineltui::java::detect::SystemJava;
-use mineltui::java::types::JavaRuntimeId;
-use mineltui::tui::app::JavaPickerRow;
+use ichr::java::detect::SystemJava;
+use ichr::java::types::JavaRuntimeId;
+use ichr::tui::app::JavaPickerRow;
 use std::path::PathBuf;
 
 fn make_system_java(path: &str, major: u32) -> SystemJava {
@@ -840,7 +840,7 @@ fn make_system_java(path: &str, major: u32) -> SystemJava {
 // (1) j on a running instance is a no-op
 #[test]
 fn test_j_on_running_instance_is_noop() {
-    use mineltui::tui::run::map_event_pub;
+    use ichr::tui::run::map_event_pub;
 
     let mut state = AppState {
         active_view: ActiveView::InstanceList { selected: 0 },
@@ -862,7 +862,7 @@ fn test_j_on_running_instance_is_noop() {
 // (2) j on a non-running instance dispatches OpenJavaPicker + FetchSystemJavas effect
 #[test]
 fn test_j_on_non_running_opens_java_picker() {
-    use mineltui::tui::run::map_event_pub;
+    use ichr::tui::run::map_event_pub;
 
     let state = AppState {
         active_view: ActiveView::InstanceList { selected: 0 },
@@ -1059,7 +1059,7 @@ fn test_move_selection_in_accounts_list() {
 // Phase 6: Loader picker / install / switch
 // ========================================================================
 
-use mineltui::loader::types::LoaderType;
+use ichr::loader::types::LoaderType;
 
 fn key_l() -> CtEvent {
     CtEvent::Key(KeyEvent::new(KeyCode::Char('L'), KeyModifiers::NONE))
@@ -1278,12 +1278,12 @@ fn test_cancel_loader_install_cancels_token_and_returns_to_list() {
 // Phase 8 (08-07): Modrinth state machine — 15 transition tests
 // ========================================================================
 
-use mineltui::mods::types::{
+use ichr::mods::types::{
     DepKind, HashAlgo, InstalledItemKind, InstalledModRow, ModBrowserFetchState, ModSource,
     ModrinthFile, ModrinthHashes, ModrinthSearchHit, ModrinthVersion, ModrinthVersionEntry,
     ResolvedDep,
 };
-use mineltui::tui::app::ModInstallFailedReturnTo;
+use ichr::tui::app::ModInstallFailedReturnTo;
 
 /// Like `state_with_one_instance`, but returns an instance with no loader
 /// (None). Same shape as Phase 6's helper; named distinctly so future
@@ -1826,7 +1826,7 @@ fn test_lowercase_m_on_instance_list_emits_open_installed_mods() {
 
 #[test]
 fn test_mod_browser_jk_navigates_when_search_empty() {
-    use mineltui::mods::types::ModBrowserFetchState;
+    use ichr::mods::types::ModBrowserFetchState;
     let state = AppState {
         active_view: ActiveView::ModBrowser {
             slug: "alpha".into(),
@@ -1854,7 +1854,7 @@ fn test_mod_browser_jk_navigates_when_search_empty() {
 
 #[test]
 fn test_mod_browser_jk_types_when_search_nonempty() {
-    use mineltui::mods::types::ModBrowserFetchState;
+    use ichr::mods::types::ModBrowserFetchState;
     let state = AppState {
         active_view: ActiveView::ModBrowser {
             slug: "alpha".into(),
@@ -1882,7 +1882,7 @@ fn test_mod_browser_jk_types_when_search_nonempty() {
 
 #[test]
 fn test_mod_browser_arrows_always_navigate_even_with_search() {
-    use mineltui::mods::types::ModBrowserFetchState;
+    use ichr::mods::types::ModBrowserFetchState;
     let state = AppState {
         active_view: ActiveView::ModBrowser {
             slug: "alpha".into(),
@@ -1912,7 +1912,7 @@ fn test_mod_browser_arrows_always_navigate_even_with_search() {
 // Phase 9 (09-06): CurseForge state machine — 12 tui_smoke tests
 // ========================================================================
 
-use mineltui::mods::curseforge::types::{
+use ichr::mods::curseforge::types::{
     CurseForgeFileEntry, CurseForgeProjectDetail, CurseForgeSearchHit,
 };
 
@@ -2037,7 +2037,7 @@ fn test_cf_browser_search_loaded_resets_state() {
         assert_eq!(*selected, 0);
         assert!(matches!(
             fetch_state,
-            mineltui::mods::types::ModBrowserFetchState::Ready
+            ichr::mods::types::ModBrowserFetchState::Ready
         ));
         assert_eq!(results.len(), hits.len());
     } else {
@@ -2238,7 +2238,7 @@ fn render_state_to_string(state: &AppState, width: u16, height: u16) -> String {
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal
-        .draw(|f| mineltui::tui::view::view(state, f))
+        .draw(|f| ichr::tui::view::view(state, f))
         .unwrap();
     let buf = terminal.backend().buffer().clone();
     let mut out = String::new();
@@ -2745,12 +2745,12 @@ fn test_modpack_import_cancelled_clears_running_imports_and_returns_to_instance_
 
 // ── Phase 11 (11-04): Pack browser + installed list + D-LOCK keybind tests ──
 
-use mineltui::packs::kind::PackKind;
+use ichr::packs::kind::PackKind;
 
 // Helper: state with one instance + InstanceList active view.
 fn pack_instance_state(slug: &str) -> AppState {
     let mut s = AppState::default();
-    s.instances.push(mineltui::domain::InstanceManifest::new(
+    s.instances.push(ichr::domain::InstanceManifest::new(
         slug.into(),
         slug.into(),
         "1.20.4".into(),
@@ -2760,7 +2760,7 @@ fn pack_instance_state(slug: &str) -> AppState {
 
 // Helper: minimal installed pack row.
 fn pack_row(mod_id: &str, name: &str) -> InstalledModRow {
-    use mineltui::mods::types::{HashAlgo, InstalledItemKind, ModSource};
+    use ichr::mods::types::{HashAlgo, InstalledItemKind, ModSource};
     InstalledModRow {
         mod_id: mod_id.into(),
         project_slug: name.into(),
@@ -2781,7 +2781,7 @@ fn pack_row(mod_id: &str, name: &str) -> InstalledModRow {
 #[test]
 #[allow(non_snake_case)]
 fn test_uppercase_R_opens_resource_pack_browser() {
-    use mineltui::tui::run::map_event_pub;
+    use ichr::tui::run::map_event_pub;
     use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
 
     let s = pack_instance_state("foo");
@@ -2831,7 +2831,7 @@ fn test_uppercase_R_opens_resource_pack_browser() {
 #[test]
 #[allow(non_snake_case)]
 fn test_uppercase_S_opens_shader_pack_browser() {
-    use mineltui::tui::run::map_event_pub;
+    use ichr::tui::run::map_event_pub;
     use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
 
     let s = pack_instance_state("foo");
@@ -2880,7 +2880,7 @@ fn test_uppercase_S_opens_shader_pack_browser() {
 #[test]
 fn test_lowercase_r_still_opens_rename_inline() {
     // D-LOCK keybind-conflict-resolution: lowercase 'r' must remain OpenRenameInline.
-    use mineltui::tui::run::map_event_pub;
+    use ichr::tui::run::map_event_pub;
     use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
 
     let s = pack_instance_state("foo");
@@ -2899,7 +2899,7 @@ fn test_lowercase_r_still_opens_rename_inline() {
 #[test]
 fn test_lowercase_s_running_still_stops_instance() {
     // D-LOCK keybind-conflict-resolution: lowercase 's' must remain StopInstance when running.
-    use mineltui::tui::run::map_event_pub;
+    use ichr::tui::run::map_event_pub;
     use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
 
     let mut s = pack_instance_state("foo");
@@ -2920,7 +2920,7 @@ fn test_lowercase_s_running_still_stops_instance() {
 #[test]
 fn test_lowercase_s_not_running_is_no_op() {
     // lowercase 's' on non-running instance = no-op (pre-existing Phase 3 behavior).
-    use mineltui::tui::run::map_event_pub;
+    use ichr::tui::run::map_event_pub;
     use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
 
     let s = pack_instance_state("foo");
@@ -2941,7 +2941,7 @@ fn test_uppercase_D_inside_resource_browser_opens_drop_modal_with_resource_kind(
             slug: "foo".into(),
             kind: PackKind::Resource,
             search: String::new(),
-            fetch_state: mineltui::mods::types::ModBrowserFetchState::Ready,
+            fetch_state: ichr::mods::types::ModBrowserFetchState::Ready,
             results: Vec::new(),
             selected: 0,
         },
@@ -2975,7 +2975,7 @@ fn test_uppercase_D_inside_shader_browser_opens_drop_modal_with_shader_kind() {
             slug: "bar".into(),
             kind: PackKind::Shader,
             search: String::new(),
-            fetch_state: mineltui::mods::types::ModBrowserFetchState::Ready,
+            fetch_state: ichr::mods::types::ModBrowserFetchState::Ready,
             results: Vec::new(),
             selected: 0,
         },
@@ -3033,7 +3033,7 @@ fn test_pack_drop_path_cancel_returns_to_browser() {
 #[test]
 fn test_lowercase_m_enters_installed_mods() {
     // `m` on InstanceList → InstalledModsList (existing Phase 8 behavior, NOT InstalledPacksList).
-    use mineltui::tui::run::map_event_pub;
+    use ichr::tui::run::map_event_pub;
     use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
 
     let s = pack_instance_state("foo");
@@ -3239,7 +3239,7 @@ fn test_pack_browser_search_loaded_with_matching_slug_kind_populates_results() {
             slug: "foo".into(),
             kind: PackKind::Resource,
             search: String::new(),
-            fetch_state: mineltui::mods::types::ModBrowserFetchState::Loading,
+            fetch_state: ichr::mods::types::ModBrowserFetchState::Loading,
             results: Vec::new(),
             selected: 0,
         },
@@ -3262,7 +3262,7 @@ fn test_pack_browser_search_loaded_with_matching_slug_kind_populates_results() {
         assert_eq!(results.len(), 1, "results should be populated");
         assert_eq!(
             *fetch_state,
-            mineltui::mods::types::ModBrowserFetchState::Ready
+            ichr::mods::types::ModBrowserFetchState::Ready
         );
     } else {
         panic!("active_view changed unexpectedly");
@@ -3277,7 +3277,7 @@ fn test_pack_browser_search_loaded_with_mismatched_slug_does_not_overwrite() {
             slug: "foo".into(),
             kind: PackKind::Resource,
             search: String::new(),
-            fetch_state: mineltui::mods::types::ModBrowserFetchState::Loading,
+            fetch_state: ichr::mods::types::ModBrowserFetchState::Loading,
             results: Vec::new(),
             selected: 0,
         },
@@ -3316,7 +3316,7 @@ fn test_pack_browser_search_loaded_with_mismatched_kind_does_not_overwrite() {
             slug: "foo".into(),
             kind: PackKind::Resource,
             search: String::new(),
-            fetch_state: mineltui::mods::types::ModBrowserFetchState::Loading,
+            fetch_state: ichr::mods::types::ModBrowserFetchState::Loading,
             results: Vec::new(),
             selected: 0,
         },

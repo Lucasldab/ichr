@@ -1,9 +1,9 @@
 //! Integration tests for services::instance_service.
 //! Each test builds its own AppPaths with_roots pointing at a tempdir.
 
-use mineltui::error::AppError;
-use mineltui::persistence::AppPaths;
-use mineltui::services::{
+use ichr::error::AppError;
+use ichr::persistence::AppPaths;
+use ichr::services::{
     clone_instance, create_instance, delete_instance, list_instances, rename_instance, set_group,
 };
 use tempfile::tempdir;
@@ -111,7 +111,7 @@ async fn test_rename_instance_updates_display_name_only() {
     // Directory slug unchanged
     assert!(paths.instance_dir("old").exists());
     // Display name updated
-    let m = mineltui::instance::read_instance_manifest(&paths, "old")
+    let m = ichr::instance::read_instance_manifest(&paths, "old")
         .await
         .unwrap();
     assert_eq!(m.display_name, "New");
@@ -139,7 +139,7 @@ async fn test_set_group_updates_group_field() {
     set_group(&paths, &m.slug, Some("favorites".to_string()))
         .await
         .unwrap();
-    let updated = mineltui::instance::read_instance_manifest(&paths, &m.slug)
+    let updated = ichr::instance::read_instance_manifest(&paths, &m.slug)
         .await
         .unwrap();
     assert_eq!(updated.group, Some("favorites".to_string()));
@@ -155,7 +155,7 @@ async fn test_set_group_none_clears_group() {
         .await
         .unwrap();
     set_group(&paths, &m.slug, None).await.unwrap();
-    let updated = mineltui::instance::read_instance_manifest(&paths, &m.slug)
+    let updated = ichr::instance::read_instance_manifest(&paths, &m.slug)
         .await
         .unwrap();
     assert_eq!(updated.group, None);
@@ -258,12 +258,12 @@ async fn test_clone_resets_timestamps_and_play_time() {
     create_instance(&paths, "Src", "1.21.4").await.unwrap();
 
     // Manually update the source manifest to have play state
-    let mut m = mineltui::instance::read_instance_manifest(&paths, "src")
+    let mut m = ichr::instance::read_instance_manifest(&paths, "src")
         .await
         .unwrap();
     m.last_played_at = Some("2026-01-01T00:00:00Z".to_string());
     m.total_play_time_ms = 99999;
-    mineltui::instance::write_instance_manifest(&paths, &m)
+    ichr::instance::write_instance_manifest(&paths, &m)
         .await
         .unwrap();
 

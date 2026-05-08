@@ -1,4 +1,4 @@
-//! Integration tests for `mineltui::observability::logging`.
+//! Integration tests for `ichr::observability::logging`.
 //!
 //! NOTE: `tracing_subscriber::try_init()` installs a process-global subscriber.
 //! Multiple `#[test]` functions in this binary share that state, so we keep
@@ -9,8 +9,8 @@
 use std::io::Read;
 use std::time::Duration;
 
-use mineltui::observability::logging;
-use mineltui::persistence::AppPaths;
+use ichr::observability::logging;
+use ichr::persistence::AppPaths;
 
 #[test]
 fn init_writes_info_to_data_dir_log_file_without_ansi() {
@@ -81,11 +81,11 @@ fn init_writes_info_to_data_dir_log_file_without_ansi() {
 #[test]
 fn log_path_matches_app_paths_log_file() {
     // This test does NOT call logging::init (to avoid global-subscriber conflict).
-    // It just asserts the contract we rely on: log_file == data_dir/mineltui.log.
+    // It just asserts the contract we rely on: log_file == data_dir/ichr.log.
     let tmp = tempfile::tempdir().expect("tempdir");
     let root = tmp.path().to_path_buf();
     let paths = AppPaths::with_roots(root.clone(), root.clone(), root.clone());
 
-    let expected = root.join("mineltui.log");
+    let expected = root.join("ichr.log");
     assert_eq!(paths.log_file(), expected);
 }

@@ -1,4 +1,4 @@
-//! mineltui binary entry point.
+//! ichr binary entry point.
 //!
 //! Startup order (critical — see PITFALLS.md):
 //!   1. Resolve AppPaths (pre-TUI; plain errors print to stderr normally)
@@ -10,13 +10,13 @@
 
 use anyhow::Context;
 
-use mineltui::observability::logging;
-use mineltui::persistence::AppPaths;
-use mineltui::tui;
+use ichr::observability::logging;
+use ichr::persistence::AppPaths;
+use ichr::tui;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
-    // 0. Load .env (if present) so MINELTUI_MSA_CLIENT_ID and any other
+    // 0. Load .env (if present) so ICHR_MSA_CLIENT_ID and any other
     //    user-provided overrides are visible to std::env::var lookups below.
     //    Silent on absence — .env is optional.
     let _ = dotenvy::dotenv();
@@ -32,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
         data_dir = %paths.data_dir.display(),
         config_dir = %paths.config_dir.display(),
         cache_dir = %paths.cache_dir.display(),
-        "mineltui starting"
+        "ichr starting"
     );
 
     // 3. Terminal — panic hook is installed inside tui::init_terminal so that
@@ -50,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
         // Logging is still live here (guard not yet dropped).
         tracing::error!(error = ?e, "TUI event loop terminated with error");
     } else {
-        tracing::info!("mineltui exiting cleanly");
+        tracing::info!("ichr exiting cleanly");
     }
 
     run_result

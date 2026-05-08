@@ -3,13 +3,13 @@
 
 use std::collections::HashMap;
 
-use mineltui::domain::platform::{Arch, OsName};
-use mineltui::error::AppError;
-use mineltui::mojang::inherits::resolve_inherits;
-use mineltui::mojang::natives::needs_native_extraction;
-use mineltui::mojang::rules::evaluate_rules;
-use mineltui::mojang::rules::RuleContext;
-use mineltui::mojang::{AssetIndexFile, Library, Rule, VersionJson, VersionManifest};
+use ichr::domain::platform::{Arch, OsName};
+use ichr::error::AppError;
+use ichr::mojang::inherits::resolve_inherits;
+use ichr::mojang::natives::needs_native_extraction;
+use ichr::mojang::rules::evaluate_rules;
+use ichr::mojang::rules::RuleContext;
+use ichr::mojang::{AssetIndexFile, Library, Rule, VersionJson, VersionManifest};
 
 // ---------------------------------------------------------------------------
 // Task 2-02-01: Parse tests (tests 1–7)
@@ -354,7 +354,7 @@ fn test_inherits_from_two_level_merge() {
         .game
         .iter()
         .filter_map(|e| {
-            if let mineltui::mojang::ArgumentEntry::Plain(s) = e {
+            if let ichr::mojang::ArgumentEntry::Plain(s) = e {
                 Some(s.clone())
             } else {
                 None
@@ -470,8 +470,8 @@ fn test_inherits_from_no_parent_is_identity() {
 // Task 2-02-03: Argument resolver tests (tests 20–26)
 // ---------------------------------------------------------------------------
 
-use mineltui::mojang::args::{resolve_game_args, resolve_jvm_args};
-use mineltui::mojang::types::ResolvedVersion;
+use ichr::mojang::args::{resolve_game_args, resolve_jvm_args};
+use ichr::mojang::types::ResolvedVersion;
 
 /// Helper: promote a VersionJson into ResolvedVersion via resolve_inherits.
 /// All callers below have a vanilla-shape VersionJson (asset_index/assets/
@@ -563,7 +563,7 @@ fn test_resolve_arguments_unknown_feature_flag_defaults_disallow() {
         }],
         "jvm": []
     }"#;
-    let arguments: mineltui::mojang::Arguments = serde_json::from_str(args_json).unwrap();
+    let arguments: ichr::mojang::Arguments = serde_json::from_str(args_json).unwrap();
     let mut v = vjson_stub("synthetic");
     v.arguments = Some(arguments);
     let ctx = RuleContext {
@@ -582,7 +582,7 @@ fn test_resolve_arguments_unknown_feature_flag_defaults_disallow() {
 #[test]
 fn test_resolve_arguments_prefers_arguments_struct_over_legacy_string() {
     let args_json = r#"{"game":["--structured-arg"],"jvm":[]}"#;
-    let arguments: mineltui::mojang::Arguments = serde_json::from_str(args_json).unwrap();
+    let arguments: ichr::mojang::Arguments = serde_json::from_str(args_json).unwrap();
     let mut v = vjson_stub("synthetic");
     v.arguments = Some(arguments);
     v.minecraft_arguments = Some("--legacy-arg".to_string());

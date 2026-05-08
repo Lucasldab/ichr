@@ -1,6 +1,6 @@
 //! File-based tracing setup.
 //!
-//! Writes structured logs to `{data_dir}/mineltui.log` using
+//! Writes structured logs to `{data_dir}/ichr.log` using
 //! `tracing-appender`'s non-blocking writer so the render loop is
 //! never blocked by log I/O.
 //!
@@ -19,7 +19,7 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Env
 use crate::persistence::AppPaths;
 
 /// Initialize the global tracing subscriber to write to
-/// `{paths.data_dir}/mineltui.log` with ANSI colors disabled.
+/// `{paths.data_dir}/ichr.log` with ANSI colors disabled.
 ///
 /// The returned `WorkerGuard` must be held for the process lifetime.
 ///
@@ -44,7 +44,7 @@ pub fn init(paths: &AppPaths) -> anyhow::Result<WorkerGuard> {
     let (non_blocking, guard) = tracing_appender::non_blocking(file);
 
     let filter = EnvFilter::try_from_env("RUST_LOG")
-        .unwrap_or_else(|_| EnvFilter::new("mineltui=debug,info"));
+        .unwrap_or_else(|_| EnvFilter::new("ichr=debug,info"));
 
     let fmt_layer = fmt::layer()
         .with_writer(non_blocking)

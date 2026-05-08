@@ -4,7 +4,7 @@
 //!   GET /v2/versions/loader
 //!   GET /v2/versions/loader/{game_version}/{loader_version}/profile/json
 //!
-//! Override the base URL for tests via `MINELTUI_FABRIC_META_BASE_URL`.
+//! Override the base URL for tests via `ICHR_FABRIC_META_BASE_URL`.
 
 use std::time::Duration;
 
@@ -14,7 +14,7 @@ use crate::loader::error::LoaderError;
 use crate::loader::types::{LoaderLibrary, LoaderVersionEntry};
 
 pub const DEFAULT_FABRIC_META_BASE: &str = "https://meta.fabricmc.net";
-pub const FABRIC_META_BASE_URL_ENV: &str = "MINELTUI_FABRIC_META_BASE_URL";
+pub const FABRIC_META_BASE_URL_ENV: &str = "ICHR_FABRIC_META_BASE_URL";
 
 // -----------------------------------------------------------------------
 // Wire types — Fabric meta response shapes (private; map to LoaderVersionEntry)
@@ -471,7 +471,7 @@ mod tests {
     // ---- to_mojang_shape ----
 
     /// Real fabric-meta JSON sample BYTE-EQUIVALENT to a fragment of
-    /// ~/.local/share/mineltui/versions/fabric-loader-0.19.2-1.20.4/
+    /// ~/.local/share/ichr/versions/fabric-loader-0.19.2-1.20.4/
     ///   fabric-loader-0.19.2-1.20.4.json (round-4 plan FORBID #4: production
     /// shape only; do not synthesise; do not fatten).
     const REAL_FABRIC_META_BYTES: &[u8] = br#"{"id":"fabric-loader-0.19.2-1.20.4","inheritsFrom":"1.20.4","releaseTime":"2026-05-07T02:57:33+0000","time":"2026-05-07T02:57:33+0000","type":"release","mainClass":"net.fabricmc.loader.impl.launch.knot.KnotClient","arguments":{"game":[],"jvm":["-DFabricMcEmu= net.minecraft.client.main.Main "]},"libraries":[{"name":"org.ow2.asm:asm:9.9","url":"https://maven.fabricmc.net/","md5":"6d1dd0482c03a6dc1807d9d004456021","sha1":"c29635c8a7afa03d74b33c1884df8abb2b3f3dcc","sha256":"03d99a74ad1ee5c71334ef67437f4ef4fe3488caa7c96d8645abc73c8e2017d4","sha512":"197a4fb3ecb34d05ac555c6a510e69affcb1e476f24c5e935ad513ecdabf74b45aa1b0e0b25dbe91224fc6db7959b2677ea5876ee49e7487265e2a29c560c21c","size":126122},{"name":"net.fabricmc:sponge-mixin:0.17.2+mixin.0.8.7","url":"https://maven.fabricmc.net/","md5":"4b6b96074976cc7aa096b9e569ca623e","sha1":"edf98d1d98229e46e36c61774ae2b54dcd852981","sha256":"95cef6aebd9da1559cf9c4624eafae2ce1242d0167e3587d5d62c488e45b6999","sha512":"89044dca9a63bd5f2ceec09bfcb5807f1b294026665294bae7a9a980da89bd86c6d441eb38c92c89ca0efe86884c0730dab348d27633ef1e3970ed9eb5c30a4e","size":1540039},{"name":"net.fabricmc:intermediary:1.20.4","url":"https://maven.fabricmc.net/"},{"name":"net.fabricmc:fabric-loader:0.19.2","url":"https://maven.fabricmc.net/"}]}"#;

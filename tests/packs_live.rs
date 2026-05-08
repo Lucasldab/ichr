@@ -13,7 +13,7 @@
 //! or:
 //!   cargo test --test packs_live -- --ignored --nocapture
 //!
-//! Skip with: `MINELTUI_SKIP_LIVE=1 cargo nextest run --test packs_live -- --include-ignored`
+//! Skip with: `ICHR_SKIP_LIVE=1 cargo nextest run --test packs_live -- --include-ignored`
 //!
 //! Refresh policy: re-pin if either test fails with 404 or Modrinth ranking shifts.
 //! Reference:
@@ -22,13 +22,13 @@
 
 use tempfile::TempDir;
 
-use mineltui::domain::instance::InstanceManifest;
-use mineltui::instance::store::write_instance_manifest;
-use mineltui::mods::types::InstalledItemKind;
-use mineltui::packs::kind::PackKind;
-use mineltui::packs::service::PackService;
-use mineltui::persistence::paths::AppPaths;
-use mineltui::tasks::JobId;
+use ichr::domain::instance::InstanceManifest;
+use ichr::instance::store::write_instance_manifest;
+use ichr::mods::types::InstalledItemKind;
+use ichr::packs::kind::PackKind;
+use ichr::packs::service::PackService;
+use ichr::persistence::paths::AppPaths;
+use ichr::tasks::JobId;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -80,8 +80,8 @@ async fn make_instance(paths: &AppPaths, slug: &str) {
 #[tokio::test]
 #[ignore = "requires internet — downloads Faithful 32x from cdn.modrinth.com"]
 async fn live_install_faithful_32x() -> Result<(), Box<dyn std::error::Error>> {
-    if std::env::var("MINELTUI_SKIP_LIVE").is_ok() {
-        eprintln!("[packs_live] skipped (MINELTUI_SKIP_LIVE set)");
+    if std::env::var("ICHR_SKIP_LIVE").is_ok() {
+        eprintln!("[packs_live] skipped (ICHR_SKIP_LIVE set)");
         return Ok(());
     }
 
@@ -168,7 +168,7 @@ async fn live_install_faithful_32x() -> Result<(), Box<dyn std::error::Error>> {
     let (progress_tx, mut rx) = mpsc::channel(256);
 
     let drain = tokio::spawn(async move {
-        while let Some(mineltui::tasks::TaskEvent::Progress { pct, msg, .. }) = rx.recv().await {
+        while let Some(ichr::tasks::TaskEvent::Progress { pct, msg, .. }) = rx.recv().await {
             eprintln!("[packs_live:faithful] {pct:3}% — {msg}");
         }
     });
@@ -201,7 +201,7 @@ async fn live_install_faithful_32x() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Assert ledger has 1 row with kind=ResourcePack + source=Modrinth.
-    let ledger = mineltui::mods::ledger::read_ledger(&paths, slug)
+    let ledger = ichr::mods::ledger::read_ledger(&paths, slug)
         .await
         .map_err(|e| format!("read_ledger failed: {e:?}"))?;
     assert_eq!(
@@ -218,7 +218,7 @@ async fn live_install_faithful_32x() -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         r.source,
-        mineltui::mods::types::ModSource::Modrinth,
+        ichr::mods::types::ModSource::Modrinth,
         "row source must be Modrinth"
     );
     assert!(
@@ -244,8 +244,8 @@ async fn live_install_faithful_32x() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 #[ignore = "requires internet — downloads Complementary Reimagined from cdn.modrinth.com"]
 async fn live_install_complementary_reimagined() -> Result<(), Box<dyn std::error::Error>> {
-    if std::env::var("MINELTUI_SKIP_LIVE").is_ok() {
-        eprintln!("[packs_live] skipped (MINELTUI_SKIP_LIVE set)");
+    if std::env::var("ICHR_SKIP_LIVE").is_ok() {
+        eprintln!("[packs_live] skipped (ICHR_SKIP_LIVE set)");
         return Ok(());
     }
 
@@ -332,7 +332,7 @@ async fn live_install_complementary_reimagined() -> Result<(), Box<dyn std::erro
     let (progress_tx, mut rx) = mpsc::channel(256);
 
     let drain = tokio::spawn(async move {
-        while let Some(mineltui::tasks::TaskEvent::Progress { pct, msg, .. }) = rx.recv().await {
+        while let Some(ichr::tasks::TaskEvent::Progress { pct, msg, .. }) = rx.recv().await {
             eprintln!("[packs_live:complementary] {pct:3}% — {msg}");
         }
     });
@@ -365,7 +365,7 @@ async fn live_install_complementary_reimagined() -> Result<(), Box<dyn std::erro
     );
 
     // Assert ledger has 1 row with kind=Shader + source=Modrinth.
-    let ledger = mineltui::mods::ledger::read_ledger(&paths, slug)
+    let ledger = ichr::mods::ledger::read_ledger(&paths, slug)
         .await
         .map_err(|e| format!("read_ledger failed: {e:?}"))?;
     assert_eq!(
@@ -378,7 +378,7 @@ async fn live_install_complementary_reimagined() -> Result<(), Box<dyn std::erro
     assert_eq!(r.kind, InstalledItemKind::Shader, "row kind must be Shader");
     assert_eq!(
         r.source,
-        mineltui::mods::types::ModSource::Modrinth,
+        ichr::mods::types::ModSource::Modrinth,
         "row source must be Modrinth"
     );
     assert!(

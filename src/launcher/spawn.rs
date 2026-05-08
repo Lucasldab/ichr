@@ -207,7 +207,7 @@ mod tests {
     use tokio_util::sync::CancellationToken;
 
     fn log_path(td: &TempDir) -> PathBuf {
-        td.path().join("instances/slug/logs/mineltui.log")
+        td.path().join("instances/slug/logs/ichr.log")
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

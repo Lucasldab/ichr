@@ -1216,6 +1216,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "ichr"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "base64",
+ "crossterm",
+ "directories",
+ "dotenvy",
+ "embed-manifest",
+ "filetime",
+ "flate2",
+ "futures",
+ "httpmock",
+ "keyring",
+ "md-5",
+ "oauth2",
+ "ratatui",
+ "ratatui-textarea",
+ "reqwest 0.13.2",
+ "serde",
+ "serde_json",
+ "sha1",
+ "sha2 0.11.0",
+ "tar",
+ "tempfile",
+ "thiserror 2.0.18",
+ "time",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "toml",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "urlencoding",
+ "zip",
+]
+
+[[package]]
 name = "icu_collections"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1639,46 +1679,6 @@ name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
-
-[[package]]
-name = "mineltui"
-version = "0.1.0"
-dependencies = [
- "aes-gcm",
- "anyhow",
- "base64",
- "crossterm",
- "directories",
- "dotenvy",
- "embed-manifest",
- "filetime",
- "flate2",
- "futures",
- "httpmock",
- "keyring",
- "md-5",
- "oauth2",
- "ratatui",
- "ratatui-textarea",
- "reqwest 0.13.2",
- "serde",
- "serde_json",
- "sha1",
- "sha2 0.11.0",
- "tar",
- "tempfile",
- "thiserror 2.0.18",
- "time",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "toml",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
- "urlencoding",
- "zip",
-]
 
 [[package]]
 name = "minimal-lexical"

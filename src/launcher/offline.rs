@@ -222,7 +222,7 @@ mod tests {
         assert_eq!(a.xuid, "uhs-1");
         assert_eq!(a.xbox_user_hash, "uhs-1");
         assert_eq!(a.user_type, "msa");
-        // Default when MINELTUI_MSA_CLIENT_ID env var is unset.
+        // Default when ICHR_MSA_CLIENT_ID env var is unset.
         assert_eq!(a.clientid, "00000000402b5328");
     }
 }

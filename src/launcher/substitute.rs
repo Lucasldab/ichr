@@ -64,7 +64,7 @@ pub struct SubstitutionContext {
     pub arch: String,
 
     // --- Launcher identity --------------------------------------------------
-    /// Always `"mineltui"`.
+    /// Always `"ichr"`.
     pub launcher_name: String,
     /// `env!("CARGO_PKG_VERSION")` baked in at compile time.
     pub launcher_version: String,
@@ -150,7 +150,7 @@ mod tests {
             classpath: "/data/libraries/a.jar:/data/versions/1.21.4/1.21.4.jar".to_string(),
             classpath_separator: ':',
             arch: "x86_64".to_string(),
-            launcher_name: "mineltui".to_string(),
+            launcher_name: "ichr".to_string(),
             launcher_version: "0.1.0".to_string(),
             resolution_width: String::new(),
             resolution_height: String::new(),
@@ -231,6 +231,6 @@ mod tests {
     fn test_substitute_launcher_identity() {
         let ctx = minimal_ctx();
         let result = substitute("${launcher_name}/${launcher_version}", &ctx);
-        assert_eq!(result, "mineltui/0.1.0");
+        assert_eq!(result, "ichr/0.1.0");
     }
 }

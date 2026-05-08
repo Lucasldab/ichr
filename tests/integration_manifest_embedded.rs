@@ -18,7 +18,7 @@ use embed_manifest::new_manifest;
 /// to `false`, this test fails loudly.
 #[test]
 fn embed_manifest_defaults_enable_long_path_aware() {
-    let m = new_manifest("Mineltui.Launcher");
+    let m = new_manifest("Ichr.Launcher");
     let debug_repr = format!("{m:?}");
     assert!(
         debug_repr.contains("long_path_aware"),
@@ -65,12 +65,12 @@ fn built_exe_path_exists_after_release_build() {
     // prove the .exe exists, not which profile produced it.
     let target_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target");
     let candidates = [
-        target_dir.join("release").join("mineltui.exe"),
-        target_dir.join("debug").join("mineltui.exe"),
+        target_dir.join("release").join("ichr.exe"),
+        target_dir.join("debug").join("ichr.exe"),
     ];
     let exists = candidates.iter().any(|p| p.exists());
     assert!(
         exists,
-        "expected mineltui.exe to exist at one of: {candidates:?} (run `cargo build` first)"
+        "expected ichr.exe to exist at one of: {candidates:?} (run `cargo build` first)"
     );
 }

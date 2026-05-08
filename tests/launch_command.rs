@@ -8,13 +8,13 @@ use std::path::{Path, PathBuf};
 
 use std::collections::HashMap;
 
-use mineltui::domain::platform::{Arch, OsName};
-use mineltui::launcher::command::compose;
-use mineltui::launcher::offline::{offline_auth, offline_uuid};
-use mineltui::mojang::inherits::resolve_inherits;
-use mineltui::mojang::rules::RuleContext;
-use mineltui::mojang::types::{ResolvedVersion, VersionJson};
-use mineltui::persistence::paths::AppPaths;
+use ichr::domain::platform::{Arch, OsName};
+use ichr::launcher::command::compose;
+use ichr::launcher::offline::{offline_auth, offline_uuid};
+use ichr::mojang::inherits::resolve_inherits;
+use ichr::mojang::rules::RuleContext;
+use ichr::mojang::types::{ResolvedVersion, VersionJson};
+use ichr::persistence::paths::AppPaths;
 
 fn fixture_paths() -> AppPaths {
     AppPaths::with_roots(
