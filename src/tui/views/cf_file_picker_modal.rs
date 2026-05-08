@@ -34,7 +34,12 @@ pub fn render_cf_file_picker_modal(f: &mut Frame, area: Rect, state: &AppState) 
     let modal_h = (area.height.saturating_sub(4)).min(20);
     let x = area.x + area.width.saturating_sub(modal_w) / 2;
     let y = area.y + area.height.saturating_sub(modal_h) / 2;
-    let modal_area = Rect { x, y, width: modal_w, height: modal_h };
+    let modal_area = Rect {
+        x,
+        y,
+        width: modal_w,
+        height: modal_h,
+    };
 
     f.render_widget(Clear, modal_area);
 
@@ -48,10 +53,13 @@ pub fn render_cf_file_picker_modal(f: &mut Frame, area: Rect, state: &AppState) 
 
     // ---- File list ----
     let items: Vec<ListItem> = if files.is_empty() {
-        vec![ListItem::new(
-            "No files match MC + loader — press Esc and adjust filters",
-        )
-        .style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM))]
+        vec![
+            ListItem::new("No files match MC + loader — press Esc and adjust filters").style(
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
+            ),
+        ]
     } else {
         files
             .iter()
@@ -62,7 +70,9 @@ pub fn render_cf_file_picker_modal(f: &mut Frame, area: Rect, state: &AppState) 
                 if Some(i) == first_release_idx {
                     spans.push(Span::styled(
                         "   ← latest".to_string(),
-                        Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::DIM),
                     ));
                 }
                 let style = if i == *selected {
@@ -101,16 +111,28 @@ fn release_type_str(rt: i32) -> &'static str {
 
 pub fn map_cf_file_picker_event(ev: CtEvent) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Up, .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
-            Some(Action::CfFilePickerMove(-1))
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Down, .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
-            Some(Action::CfFilePickerMove(1))
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => Some(Action::CfFilePickerConfirm),
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CloseModal),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Up, ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('k'),
+            ..
+        }) => Some(Action::CfFilePickerMove(-1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Down,
+            ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('j'),
+            ..
+        }) => Some(Action::CfFilePickerMove(1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        }) => Some(Action::CfFilePickerConfirm),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::CloseModal),
         _ => None,
     }
 }
@@ -245,11 +267,11 @@ mod tests {
         })
         .unwrap();
         let text = buffer_to_string(term.backend().buffer());
-        assert!(text.contains("Sodium 0.5.8"), "file 1 label missing:\n{text}");
         assert!(
-            text.contains("(release)"),
-            "release label missing:\n{text}"
+            text.contains("Sodium 0.5.8"),
+            "file 1 label missing:\n{text}"
         );
+        assert!(text.contains("(release)"), "release label missing:\n{text}");
         assert!(text.contains("(beta)"), "beta label missing:\n{text}");
         assert!(text.contains("← latest"), "latest marker missing:\n{text}");
         assert!(

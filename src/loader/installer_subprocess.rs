@@ -65,12 +65,12 @@ pub async fn run_installer(
 
     // Pre-create the log file directory.
     if let Some(parent) = log_path.parent() {
-        tokio::fs::create_dir_all(parent).await.map_err(|e| {
-            LoaderError::ProfileWrite {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| LoaderError::ProfileWrite {
                 path: log_path.display().to_string(),
                 reason: format!("create log dir: {e}"),
-            }
-        })?;
+            })?;
     }
 
     // Open the log file (append). Wrap in Arc<TokioMutex<File>> for shared writes.
@@ -199,10 +199,12 @@ async fn write_session_header(
         args.join(" ")
     );
     let mut f = log.lock().await;
-    f.write_all(header.as_bytes()).await.map_err(|e| LoaderError::ProfileWrite {
-        path: "log file".into(),
-        reason: format!("write header: {e}"),
-    })?;
+    f.write_all(header.as_bytes())
+        .await
+        .map_err(|e| LoaderError::ProfileWrite {
+            path: "log file".into(),
+            reason: format!("write header: {e}"),
+        })?;
     f.flush().await.ok();
     Ok(())
 }
@@ -219,10 +221,12 @@ async fn write_session_footer(
         }
     );
     let mut f = log.lock().await;
-    f.write_all(footer.as_bytes()).await.map_err(|e| LoaderError::ProfileWrite {
-        path: "log file".into(),
-        reason: format!("write footer: {e}"),
-    })?;
+    f.write_all(footer.as_bytes())
+        .await
+        .map_err(|e| LoaderError::ProfileWrite {
+            path: "log file".into(),
+            reason: format!("write footer: {e}"),
+        })?;
     f.flush().await.ok();
     Ok(())
 }
@@ -286,7 +290,10 @@ mod tests {
         .await;
         assert!(matches!(result, Ok(())));
         let body = tokio::fs::read_to_string(&log).await.unwrap();
-        assert!(body.contains("[stdout] hi"), "log missing stdout line: {body}");
+        assert!(
+            body.contains("[stdout] hi"),
+            "log missing stdout line: {body}"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -341,7 +348,10 @@ mod tests {
         .await;
         let elapsed = start.elapsed();
         assert!(matches!(result, Err(LoaderError::Cancelled)));
-        assert!(elapsed < Duration::from_secs(7), "cancel took too long: {elapsed:?}");
+        assert!(
+            elapsed < Duration::from_secs(7),
+            "cancel took too long: {elapsed:?}"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -362,7 +372,13 @@ mod tests {
         )
         .await;
         let body = tokio::fs::read_to_string(&log).await.unwrap();
-        assert!(body.contains("=== Loader install:"), "header missing: {body}");
-        assert!(body.contains("=== Exit code: 0 ==="), "footer missing: {body}");
+        assert!(
+            body.contains("=== Loader install:"),
+            "header missing: {body}"
+        );
+        assert!(
+            body.contains("=== Exit code: 0 ==="),
+            "footer missing: {body}"
+        );
     }
 }

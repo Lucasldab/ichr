@@ -14,8 +14,8 @@
 
 use serde::Deserialize;
 
-use crate::auth::AuthError;
 use crate::auth::xsts_errors::map_xerr;
+use crate::auth::AuthError;
 
 pub const XBL_AUTH_URL: &str = "https://user.auth.xboxlive.com/user/authenticate";
 pub const XSTS_AUTHORIZE_URL: &str = "https://xsts.auth.xboxlive.com/xsts/authorize";
@@ -233,9 +233,7 @@ mod tests {
                     .header("x-xbl-contract-version", "1");
                 then.status(200)
                     .header("content-type", "application/json")
-                    .body(
-                        r#"{"Token":"xbl-tok","DisplayClaims":{"xui":[{"uhs":"user-hash-1"}]}}"#,
-                    );
+                    .body(r#"{"Token":"xbl-tok","DisplayClaims":{"xui":[{"uhs":"user-hash-1"}]}}"#);
             })
             .await;
 
@@ -256,9 +254,8 @@ mod tests {
                 when.method(POST)
                     .path("/user/authenticate")
                     .body_includes("\"RpsTicket\":\"d=msa-token-42\"");
-                then.status(200).body(
-                    r#"{"Token":"t","DisplayClaims":{"xui":[{"uhs":"h"}]}}"#,
-                );
+                then.status(200)
+                    .body(r#"{"Token":"t","DisplayClaims":{"xui":[{"uhs":"h"}]}}"#);
             })
             .await;
         let _ = authenticate_xbox_live(&http_client(), &server.base_url(), "msa-token-42")
@@ -322,9 +319,8 @@ mod tests {
         let _m = server
             .mock_async(|when, then| {
                 when.method(POST).path("/xsts/authorize");
-                then.status(401).body(
-                    r#"{"Identity":"0","XErr":9999999999,"Message":"x","Redirect":"r"}"#,
-                );
+                then.status(401)
+                    .body(r#"{"Identity":"0","XErr":9999999999,"Message":"x","Redirect":"r"}"#);
             })
             .await;
         let err = authenticate_xsts(&http_client(), &server.base_url(), "xbl-token")

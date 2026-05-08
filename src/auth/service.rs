@@ -67,7 +67,10 @@ impl AccountService {
 
     /// Test constructor — inject configs directly.
     pub fn new_with_config(chain_config: AuthChainConfig, store_config: StoreConfig) -> Self {
-        Self { chain_config, store_config }
+        Self {
+            chain_config,
+            store_config,
+        }
     }
 
     // ================================================================
@@ -342,7 +345,10 @@ mod tests {
         let td = TempDir::new().unwrap();
         let chain_cfg = AuthChainConfig::single_host(http_client(), "http://x");
         let svc = AccountService::new_with_config(chain_cfg, store_cfg(&td));
-        let got = svc.resolve_auth_context_for_launch("fallback-name").await.unwrap();
+        let got = svc
+            .resolve_auth_context_for_launch("fallback-name")
+            .await
+            .unwrap();
         match got {
             AuthContext::Offline { username } => assert_eq!(username, "fallback-name"),
             other => panic!("expected Offline, got {other:?}"),
@@ -381,7 +387,10 @@ mod tests {
         };
         store::save_accounts(&cfg, &[a1, a2]).await.unwrap();
 
-        let got = svc.resolve_auth_context_for_launch("fallback").await.unwrap();
+        let got = svc
+            .resolve_auth_context_for_launch("fallback")
+            .await
+            .unwrap();
         match got {
             AuthContext::Msa { account_id } => assert_eq!(account_id, "id-B"),
             other => panic!("expected Msa, got {other:?}"),
@@ -451,18 +460,16 @@ mod tests {
         server
             .mock_async(|when, then| {
                 when.method(POST).path("/user/authenticate");
-                then.status(200).body(
-                    r#"{"Token":"xbl","DisplayClaims":{"xui":[{"uhs":"uhs-1"}]}}"#,
-                );
+                then.status(200)
+                    .body(r#"{"Token":"xbl","DisplayClaims":{"xui":[{"uhs":"uhs-1"}]}}"#);
             })
             .await;
         // 4. XSTS
         server
             .mock_async(|when, then| {
                 when.method(POST).path("/xsts/authorize");
-                then.status(200).body(
-                    r#"{"Token":"xsts","DisplayClaims":{"xui":[{"uhs":"uhs-1"}]}}"#,
-                );
+                then.status(200)
+                    .body(r#"{"Token":"xsts","DisplayClaims":{"xui":[{"uhs":"uhs-1"}]}}"#);
             })
             .await;
         // 5. MC login
@@ -487,9 +494,8 @@ mod tests {
         server
             .mock_async(|when, then| {
                 when.method(GET).path("/minecraft/profile");
-                then.status(200).body(
-                    r#"{"id":"c6bf819300004000800000000000abcd","name":"PlayerOne"}"#,
-                );
+                then.status(200)
+                    .body(r#"{"id":"c6bf819300004000800000000000abcd","name":"PlayerOne"}"#);
             })
             .await;
 
@@ -503,14 +509,21 @@ mod tests {
 
         assert_eq!(out.account.mc_username, "PlayerOne");
         assert_eq!(out.account.mc_uuid, "c6bf8193-0000-4000-8000-00000000abcd");
-        assert!(out.account.is_active, "first added account should auto-activate");
+        assert!(
+            out.account.is_active,
+            "first added account should auto-activate"
+        );
 
         // Drain events — at least one Started + >= 1 Progress.
         let mut saw_started = false;
         let mut saw_progress = false;
         while let Ok(ev) = rx.try_recv() {
             match ev {
-                AccountAuthEvent::Started { user_code, verification_uri, .. } => {
+                AccountAuthEvent::Started {
+                    user_code,
+                    verification_uri,
+                    ..
+                } => {
                     assert_eq!(user_code, "ABCD");
                     assert_eq!(verification_uri, "https://ms/link");
                     saw_started = true;
@@ -519,7 +532,10 @@ mod tests {
             }
         }
         assert!(saw_started, "expected AccountAuthEvent::Started");
-        assert!(saw_progress, "expected at least one AccountAuthEvent::Progress");
+        assert!(
+            saw_progress,
+            "expected at least one AccountAuthEvent::Progress"
+        );
 
         // Verify persistence.
         let listed = svc.list_accounts().await.unwrap();

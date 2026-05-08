@@ -21,8 +21,13 @@ use crate::packs::kind::PackKind;
 use crate::tui::app::{Action, ActiveView, AppState};
 
 pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) {
-    let ActiveView::InstalledPacksList { slug, kind, packs, selected, transient_status } =
-        &state.active_view
+    let ActiveView::InstalledPacksList {
+        slug,
+        kind,
+        packs,
+        selected,
+        transient_status,
+    } = &state.active_view
     else {
         return;
     };
@@ -34,19 +39,30 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
 
     // Reserve 1 line at bottom for transient status (or empty).
     let table_area = if transient_status.is_some() && area.height > 3 {
-        Rect { height: area.height - 1, ..area }
+        Rect {
+            height: area.height - 1,
+            ..area
+        }
     } else {
         area
     };
     let status_area = if transient_status.is_some() && area.height > 3 {
-        Some(Rect { y: area.y + area.height - 1, height: 1, ..area })
+        Some(Rect {
+            y: area.y + area.height - 1,
+            height: 1,
+            ..area
+        })
     } else {
         None
     };
 
     if packs.is_empty() {
         let p = Paragraph::new("No packs installed — press Esc and R/S to browse")
-            .style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM))
+            .style(
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
+            )
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -63,22 +79,30 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
                     ModSource::CurseForge => ("[CF]", Style::default()),
                     ModSource::Manual => (
                         "manual",
-                        Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::DIM),
                     ),
                     ModSource::Modpack => (
                         "modpack",
-                        Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::DIM),
                     ),
                     ModSource::Local => (
                         "local",
-                        Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::DIM),
                     ),
                 };
                 // Shader packs cannot be toggled — state cell shows "n/a".
                 let (state_label, state_style) = match kind {
                     PackKind::Shader => (
                         "n/a",
-                        Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::DIM),
                     ),
                     PackKind::Resource => {
                         if m.enabled {
@@ -86,7 +110,9 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
                         } else {
                             (
                                 "disabled",
-                                Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                                Style::default()
+                                    .fg(Color::DarkGray)
+                                    .add_modifier(Modifier::DIM),
                             )
                         }
                     }
@@ -126,8 +152,11 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
 
     // Transient status line (below table).
     if let (Some(area), Some(msg)) = (status_area, transient_status) {
-        let p = Paragraph::new(Line::from(msg.clone()))
-            .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::DIM));
+        let p = Paragraph::new(Line::from(msg.clone())).style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::DIM),
+        );
         f.render_widget(p, area);
     }
 }
@@ -139,28 +168,41 @@ pub fn map_installed_packs_list_event(ev: CtEvent, state: &AppState) -> Option<A
     };
 
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Up, .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
-            Some(Action::InstalledPacksMove(-1))
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Down, .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
-            Some(Action::InstalledPacksMove(1))
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Up, ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('k'),
+            ..
+        }) => Some(Action::InstalledPacksMove(-1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Down,
+            ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('j'),
+            ..
+        }) => Some(Action::InstalledPacksMove(1)),
         // Tab cycles Mod→Resource→Shader→Mod.
-        CtEvent::Key(KeyEvent { code: KeyCode::Tab, .. }) => {
-            Some(Action::InstalledPacksCycleKind)
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Tab, ..
+        }) => Some(Action::InstalledPacksCycleKind),
         // `e` — toggle for Resource; notice for Shader.
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('e'), .. }) => match kind {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('e'),
+            ..
+        }) => match kind {
             PackKind::Resource => Some(Action::TogglePackEnabled),
             PackKind::Shader => Some(Action::ShaderToggleNotice),
         },
         // `x` — open uninstall confirm regardless of kind.
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('x'), .. }) => {
-            Some(Action::OpenUninstallPackConfirm)
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CloseInstalledMods),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('x'),
+            ..
+        }) => Some(Action::OpenUninstallPackConfirm),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::CloseInstalledMods),
         _ => None,
     }
 }

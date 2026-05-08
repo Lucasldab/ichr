@@ -39,7 +39,11 @@ pub enum AppError {
     Http(String),
 
     #[error("SHA1 mismatch for {target}: expected {expected}, got {got}")]
-    Sha1Mismatch { target: String, expected: String, got: String },
+    Sha1Mismatch {
+        target: String,
+        expected: String,
+        got: String,
+    },
 
     #[error("Instance manifest serde error: {0}")]
     InstanceSerde(String),
@@ -59,17 +63,27 @@ pub enum AppError {
     #[error("Java binary not found: checked MINELTUI_JAVA env var and PATH")]
     JavaNotFound,
 
-    #[error("Java override path does not exist: {path:?} — fix or clear instance.json `java_override`")]
+    #[error(
+        "Java override path does not exist: {path:?} — fix or clear instance.json `java_override`"
+    )]
     JavaOverrideNotFound { path: std::path::PathBuf },
 
     #[error("Java major version mismatch: Minecraft requires Java {required}, found Java {found} at {path:?} — {hint}")]
-    JavaMismatch { required: u32, found: u32, path: std::path::PathBuf, hint: String },
+    JavaMismatch {
+        required: u32,
+        found: u32,
+        path: std::path::PathBuf,
+        hint: String,
+    },
 
     #[error("Failed to download Java runtime ({variant}): {reason}")]
     JavaDownloadFailed { variant: String, reason: String },
 
     #[error("Failed to extract Java runtime to {dest:?}: {reason}")]
-    JavaExtractFailed { dest: std::path::PathBuf, reason: String },
+    JavaExtractFailed {
+        dest: std::path::PathBuf,
+        reason: String,
+    },
 
     #[error("Process spawn failed: {0}")]
     SpawnFailed(String),

@@ -42,8 +42,7 @@ impl CurseForgeClient {
     /// Reads `MINELTUI_CURSEFORGE_BASE_URL` env var for httpmock injection;
     /// falls back to `DEFAULT_CF_BASE`.
     pub fn new(api_key: &str) -> Result<Self, CurseForgeError> {
-        let base = std::env::var(CF_BASE_URL_ENV)
-            .unwrap_or_else(|_| DEFAULT_CF_BASE.to_owned());
+        let base = std::env::var(CF_BASE_URL_ENV).unwrap_or_else(|_| DEFAULT_CF_BASE.to_owned());
         Self::new_with_base_url(api_key, base)
     }
 
@@ -64,9 +63,7 @@ impl CurseForgeClient {
         headers.insert(
             "x-api-key",
             api_key.parse().map_err(|_| {
-                CurseForgeError::Http(
-                    "invalid api key header value (non-ASCII?)".into(),
-                )
+                CurseForgeError::Http("invalid api key header value (non-ASCII?)".into())
             })?,
         );
         headers.insert(
@@ -143,10 +140,7 @@ impl CurseForgeClient {
     ///
     /// 09-RESEARCH.md §Endpoint #2. 404 → `CurseForgeError::ModNotFound`.
     #[tracing::instrument(skip_all, fields(mod_id))]
-    pub async fn get_mod(
-        &self,
-        mod_id: u64,
-    ) -> Result<CurseForgeProjectDetail, CurseForgeError> {
+    pub async fn get_mod(&self, mod_id: u64) -> Result<CurseForgeProjectDetail, CurseForgeError> {
         let url = format!("{}/v1/mods/{}", self.base_url, mod_id);
         let resp = self
             .http
@@ -251,9 +245,8 @@ impl CurseForgeClient {
         struct Env {
             data: String,
         }
-        let env: Env = serde_json::from_slice(&bytes).map_err(|e| {
-            CurseForgeError::Parse(format!("get_file_download_url {url}: {e}"))
-        })?;
+        let env: Env = serde_json::from_slice(&bytes)
+            .map_err(|e| CurseForgeError::Parse(format!("get_file_download_url {url}: {e}")))?;
         Ok(Some(env.data))
     }
 
@@ -523,9 +516,8 @@ mod tests {
         server.mock(|when, then| {
             when.method(GET)
                 .path("/v1/mods/443959/files/4567890/download-url");
-            then.status(200).body(
-                r#"{"data":"https://edge.forgecdn.net/files/4567/890/sodium.jar"}"#,
-            );
+            then.status(200)
+                .body(r#"{"data":"https://edge.forgecdn.net/files/4567/890/sodium.jar"}"#);
         });
         let c = make_client(&server);
         let url = c.get_file_download_url(443959, 4567890).await.unwrap();

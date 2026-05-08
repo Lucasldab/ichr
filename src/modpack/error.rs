@@ -43,7 +43,11 @@ pub enum ModpackError {
 
     /// SHA-512 hash of a downloaded file did not match the manifest.
     #[error("SHA-512 mismatch for {path}: expected {expected}, got {got}")]
-    HashMismatch { path: String, expected: String, got: String },
+    HashMismatch {
+        path: String,
+        expected: String,
+        got: String,
+    },
 
     /// ZIP extraction error (reading `.mrpack` archive or override zip entries).
     #[error("zip error: {0}")]
@@ -72,7 +76,10 @@ mod tests {
         let e = ModpackError::UnsupportedFormat { version: 2 };
         let s = e.to_string();
         assert!(s.contains("2"), "expected '2' in display: {s}");
-        assert!(s.contains("unsupported format version"), "missing headline: {s}");
+        assert!(
+            s.contains("unsupported format version"),
+            "missing headline: {s}"
+        );
     }
 
     #[test]

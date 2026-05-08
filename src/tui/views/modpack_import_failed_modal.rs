@@ -10,8 +10,11 @@ use ratatui::Frame;
 use crate::tui::app::{Action, ActiveView, AppState};
 
 pub fn render_modpack_import_failed_modal(f: &mut Frame, area: Rect, state: &AppState) {
-    let ActiveView::ModpackImportFailedModal { modpack_name, error, log_tail } =
-        &state.active_view
+    let ActiveView::ModpackImportFailedModal {
+        modpack_name,
+        error,
+        log_tail,
+    } = &state.active_view
     else {
         return;
     };
@@ -20,12 +23,17 @@ pub fn render_modpack_import_failed_modal(f: &mut Frame, area: Rect, state: &App
     let h = area.height.min(20);
     let x = area.x + (area.width.saturating_sub(w)) / 2;
     let y = area.y + (area.height.saturating_sub(h)) / 2;
-    let rect = Rect { x, y, width: w, height: h };
+    let rect = Rect {
+        x,
+        y,
+        width: w,
+        height: h,
+    };
 
     f.render_widget(Clear, rect);
-    let outer = Block::default()
-        .borders(Borders::ALL)
-        .title(format!("Modpack import failed: {modpack_name}   (Esc to dismiss)"));
+    let outer = Block::default().borders(Borders::ALL).title(format!(
+        "Modpack import failed: {modpack_name}   (Esc to dismiss)"
+    ));
     f.render_widget(outer, rect);
 
     let inner = Rect {
@@ -52,9 +60,9 @@ pub fn render_modpack_import_failed_modal(f: &mut Frame, area: Rect, state: &App
 pub fn map_modpack_import_failed_event(ev: ratatui::crossterm::event::Event) -> Option<Action> {
     use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => {
-            Some(Action::DismissModpackImportFailed)
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::DismissModpackImportFailed),
         _ => None,
     }
 }

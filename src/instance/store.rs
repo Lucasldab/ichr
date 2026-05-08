@@ -46,7 +46,9 @@ pub async fn mark_launch_started(
     slug: &str,
 ) -> Result<InstanceManifest, AppError> {
     if !tokio::fs::try_exists(&paths.instance_manifest(slug)).await? {
-        return Err(AppError::InstanceNotFound { slug: slug.to_string() });
+        return Err(AppError::InstanceNotFound {
+            slug: slug.to_string(),
+        });
     }
     let mut m = read_instance_manifest(paths, slug).await?;
     m.last_played_at = Some(crate::domain::instance::now_iso8601_utc());
@@ -62,7 +64,9 @@ pub async fn update_play_time(
     additional_ms: u64,
 ) -> Result<InstanceManifest, AppError> {
     if !tokio::fs::try_exists(&paths.instance_manifest(slug)).await? {
-        return Err(AppError::InstanceNotFound { slug: slug.to_string() });
+        return Err(AppError::InstanceNotFound {
+            slug: slug.to_string(),
+        });
     }
     let mut m = read_instance_manifest(paths, slug).await?;
     m.last_played_at = Some(crate::domain::instance::now_iso8601_utc());
@@ -104,7 +108,7 @@ pub async fn list_instance_manifests(paths: &AppPaths) -> Result<Vec<InstanceMan
     out.sort_by(|a, b| {
         match (a.last_played_at.as_deref(), b.last_played_at.as_deref()) {
             (Some(at), Some(bt)) => bt.cmp(at).then_with(|| a.display_name.cmp(&b.display_name)),
-            (Some(_), None) => std::cmp::Ordering::Less,   // a has date, b doesn't → a first
+            (Some(_), None) => std::cmp::Ordering::Less, // a has date, b doesn't → a first
             (None, Some(_)) => std::cmp::Ordering::Greater, // a has no date, b does → b first
             (None, None) => a.display_name.cmp(&b.display_name),
         }

@@ -45,7 +45,11 @@ async fn live_msa_round_trip_prints_code_and_expects_sign_in() {
     let logger = tokio::spawn(async move {
         while let Some(ev) = rx.recv().await {
             match ev {
-                AccountAuthEvent::Started { user_code, verification_uri, expires_in } => {
+                AccountAuthEvent::Started {
+                    user_code,
+                    verification_uri,
+                    expires_in,
+                } => {
                     println!("\n=============================================");
                     println!(">> Visit: {verification_uri}");
                     println!(">> Enter code: {user_code}");
@@ -65,7 +69,10 @@ async fn live_msa_round_trip_prints_code_and_expects_sign_in() {
         .expect("live auth should succeed — check console for device code prompt");
     logger.abort();
 
-    println!("Signed in as {} ({})", out.account.mc_username, out.account.mc_uuid);
+    println!(
+        "Signed in as {} ({})",
+        out.account.mc_username, out.account.mc_uuid
+    );
     assert!(!out.account.mc_username.is_empty());
     assert!(!out.account.mc_uuid.is_empty());
     // mc_uuid should be 36-char hyphenated form

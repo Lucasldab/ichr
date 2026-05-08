@@ -40,8 +40,14 @@ pub fn resolve_jvm_args(version: &ResolvedVersion, ctx: &RuleContext) -> Vec<Str
 }
 
 /// Resolve both game and JVM args in a single sweep. Returns `(game, jvm)`.
-pub fn resolve_arguments(version: &ResolvedVersion, ctx: &RuleContext) -> (Vec<String>, Vec<String>) {
-    (resolve_game_args(version, ctx), resolve_jvm_args(version, ctx))
+pub fn resolve_arguments(
+    version: &ResolvedVersion,
+    ctx: &RuleContext,
+) -> (Vec<String>, Vec<String>) {
+    (
+        resolve_game_args(version, ctx),
+        resolve_jvm_args(version, ctx),
+    )
 }
 
 fn resolve_arg_entries(entries: &[ArgumentEntry], ctx: &RuleContext) -> Vec<String> {

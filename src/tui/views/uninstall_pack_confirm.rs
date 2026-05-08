@@ -17,7 +17,13 @@ use crate::packs::kind::PackKind;
 use crate::tui::app::{Action, ActiveView, AppState};
 
 pub fn render_uninstall_pack_confirm(f: &mut Frame, area: Rect, state: &AppState) {
-    let ActiveView::UninstallPackConfirm { slug, kind, file_name, .. } = &state.active_view else {
+    let ActiveView::UninstallPackConfirm {
+        slug,
+        kind,
+        file_name,
+        ..
+    } = &state.active_view
+    else {
         return;
     };
 
@@ -26,7 +32,12 @@ pub fn render_uninstall_pack_confirm(f: &mut Frame, area: Rect, state: &AppState
     let h = 5u16.min(area.height);
     let x = area.x + (area.width.saturating_sub(w)) / 2;
     let y = area.y + (area.height.saturating_sub(h)) / 2;
-    let modal_area = Rect { x, y, width: w, height: h };
+    let modal_area = Rect {
+        x,
+        y,
+        width: w,
+        height: h,
+    };
 
     f.render_widget(Clear, modal_area);
 
@@ -41,7 +52,9 @@ pub fn render_uninstall_pack_confirm(f: &mut Frame, area: Rect, state: &AppState
 
     let lines = vec![
         Line::from(format!("Remove {kind_label} {file_name} from {slug}?")),
-        Line::from(format!("The pack file will be deleted from .minecraft/{pack_dir}.")),
+        Line::from(format!(
+            "The pack file will be deleted from .minecraft/{pack_dir}."
+        )),
         Line::from(ratatui::text::Span::styled(
             "y to confirm  n/Esc to cancel",
             Style::default().add_modifier(Modifier::DIM),
@@ -61,10 +74,14 @@ pub fn render_uninstall_pack_confirm(f: &mut Frame, area: Rect, state: &AppState
 
 pub fn map_uninstall_pack_confirm_event(ev: CtEvent) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('y'), .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('Y'), .. }) => {
-            Some(Action::ConfirmUninstallPack)
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('y'),
+            ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('Y'),
+            ..
+        }) => Some(Action::ConfirmUninstallPack),
         CtEvent::Key(_) => Some(Action::CancelUninstallPack),
         _ => None,
     }

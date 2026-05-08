@@ -272,9 +272,7 @@ mod tests {
 
     #[test]
     fn iter_path_candidates_nonexistent_dir_is_skipped() {
-        let result = with_path("/definitely/does/not/exist/ever", || {
-            iter_path_candidates()
-        });
+        let result = with_path("/definitely/does/not/exist/ever", iter_path_candidates);
         assert!(result.is_empty());
     }
 

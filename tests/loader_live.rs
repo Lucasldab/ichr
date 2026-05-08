@@ -74,7 +74,11 @@ async fn live_fabric_install_1_21_4() {
 
     let expected_id = format!("fabric-loader-{loader_version}-{mc}");
     let vjson = paths.version_json(&expected_id);
-    assert!(vjson.is_file(), "version JSON missing at {}", vjson.display());
+    assert!(
+        vjson.is_file(),
+        "version JSON missing at {}",
+        vjson.display()
+    );
 
     // Manifest now has loader set with the profile.id verbatim (Pitfall 7)
     let m = mineltui::instance::store::read_instance_manifest(&paths, slug)
@@ -117,7 +121,10 @@ async fn live_quilt_install_1_21_4() {
         .list_loader_versions(LoaderType::Quilt, mc)
         .await
         .expect("list_loader_versions Quilt");
-    assert!(!versions.is_empty(), "Quilt loader list should not be empty");
+    assert!(
+        !versions.is_empty(),
+        "Quilt loader list should not be empty"
+    );
     let loader_version = versions[0].version.clone();
     println!("[loader_live] picked Quilt loader version: {loader_version}");
 

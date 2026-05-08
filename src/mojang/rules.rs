@@ -24,7 +24,11 @@ pub struct RuleContext {
 
 impl RuleContext {
     pub fn for_os_arch(os: OsName, arch: Arch) -> Self {
-        Self { os, arch, features: HashSet::new() }
+        Self {
+            os,
+            arch,
+            features: HashSet::new(),
+        }
     }
 
     pub fn current() -> Self {

@@ -175,8 +175,7 @@ impl ModrinthService {
     ) -> Result<ResolvedDepGraph, ModrinthError> {
         let root = self.client.get_version(root_version_id).await?;
         let (loaders_vec, _) = modrinth_filter_for(loader, mc);
-        let loaders_strings: Vec<String> =
-            loaders_vec.iter().map(|s| (*s).to_string()).collect();
+        let loaders_strings: Vec<String> = loaders_vec.iter().map(|s| (*s).to_string()).collect();
 
         let installed: HashMap<String, String> = read_ledger(paths, slug)
             .await?
@@ -189,13 +188,10 @@ impl ModrinthService {
         // we capture by clone and re-clone inside each invocation. ModrinthClient
         // is `Clone + Send + Sync` (its only field is reqwest::Client).
         let client_for_latest = self.client.clone();
-        let fetch_latest = move |project_id: String,
-                                 mc_q: String,
-                                 loaders_q: Vec<String>| {
+        let fetch_latest = move |project_id: String, mc_q: String, loaders_q: Vec<String>| {
             let client = client_for_latest.clone();
             async move {
-                let loaders_refs: Vec<&str> =
-                    loaders_q.iter().map(|s| s.as_str()).collect();
+                let loaders_refs: Vec<&str> = loaders_q.iter().map(|s| s.as_str()).collect();
                 let versions = client
                     .list_versions(&project_id, Some(&mc_q), &loaders_refs)
                     .await?;
@@ -218,10 +214,8 @@ impl ModrinthService {
             async move {
                 let refs: Vec<&str> = ids.iter().map(|s| s.as_str()).collect();
                 let pairs = client.get_projects_batch(&refs).await?;
-                let map: HashMap<String, String> = pairs
-                    .into_iter()
-                    .map(|p| (p.id, p.title))
-                    .collect();
+                let map: HashMap<String, String> =
+                    pairs.into_iter().map(|p| (p.id, p.title)).collect();
                 Ok(map)
             }
         };
@@ -364,8 +358,7 @@ mod tests {
     use tempfile::TempDir;
 
     fn make_client(server: &MockServer) -> ModrinthClient {
-        ModrinthClient::new_with_base_url(server.base_url())
-            .expect("client::new_with_base_url")
+        ModrinthClient::new_with_base_url(server.base_url()).expect("client::new_with_base_url")
     }
 
     fn test_paths(td: &TempDir) -> AppPaths {

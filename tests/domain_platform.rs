@@ -33,7 +33,7 @@ fn arch_mojang_str_format() {
 #[test]
 fn arch_is_copy_and_eq() {
     let a = Arch::X86_64;
-    let b = a;           // compiles because Arch: Copy
+    let b = a; // compiles because Arch: Copy
     assert_eq!(a, b);
 }
 
@@ -54,7 +54,9 @@ fn os_name_windows() {
 #[test]
 fn app_error_display() {
     assert_eq!(AppError::Cancelled.to_string(), "Operation cancelled");
-    assert!(AppError::PathResolution.to_string().contains("Path resolution failed"));
+    assert!(AppError::PathResolution
+        .to_string()
+        .contains("Path resolution failed"));
 }
 
 #[test]

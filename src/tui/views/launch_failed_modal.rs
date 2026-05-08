@@ -11,14 +11,24 @@ use ratatui::Frame;
 use crate::tui::app::{ActiveView, AppState};
 
 pub fn render_launch_failed_modal(f: &mut Frame, area: Rect, state: &AppState) {
-    let ActiveView::LaunchFailedModal { slug, error, log_tail } = &state.active_view else {
+    let ActiveView::LaunchFailedModal {
+        slug,
+        error,
+        log_tail,
+    } = &state.active_view
+    else {
         return;
     };
     let w = area.width.min(80);
     let h = area.height.min(20);
     let x = area.x + (area.width.saturating_sub(w)) / 2;
     let y = area.y + (area.height.saturating_sub(h)) / 2;
-    let rect = Rect { x, y, width: w, height: h };
+    let rect = Rect {
+        x,
+        y,
+        width: w,
+        height: h,
+    };
 
     f.render_widget(Clear, rect);
     let outer = Block::default()

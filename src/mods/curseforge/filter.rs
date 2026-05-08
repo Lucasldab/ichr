@@ -29,10 +29,10 @@ use crate::loader::types::LoaderInfo;
 pub fn curseforge_loader_type(loader: Option<&LoaderInfo>) -> Option<i32> {
     match loader.map(|l| l.kind) {
         None | Some(ModloaderKind::Vanilla) => None,
-        Some(ModloaderKind::Forge)          => Some(1),
-        Some(ModloaderKind::Fabric)         => Some(4),
-        Some(ModloaderKind::Quilt)          => Some(5),
-        Some(ModloaderKind::NeoForge)       => Some(6),
+        Some(ModloaderKind::Forge) => Some(1),
+        Some(ModloaderKind::Fabric) => Some(4),
+        Some(ModloaderKind::Quilt) => Some(5),
+        Some(ModloaderKind::NeoForge) => Some(6),
     }
 }
 
@@ -90,10 +90,10 @@ mod tests {
     fn test_all_loaders_map_to_distinct_values() {
         // Regression guard against accidentally mapping two loaders to the
         // same value (Pitfall 4 cascade).
-        let f  = curseforge_loader_type(Some(&loader(ModloaderKind::Forge))).unwrap();
+        let f = curseforge_loader_type(Some(&loader(ModloaderKind::Forge))).unwrap();
         let fa = curseforge_loader_type(Some(&loader(ModloaderKind::Fabric))).unwrap();
-        let q  = curseforge_loader_type(Some(&loader(ModloaderKind::Quilt))).unwrap();
-        let n  = curseforge_loader_type(Some(&loader(ModloaderKind::NeoForge))).unwrap();
+        let q = curseforge_loader_type(Some(&loader(ModloaderKind::Quilt))).unwrap();
+        let n = curseforge_loader_type(Some(&loader(ModloaderKind::NeoForge))).unwrap();
         // All four values are distinct.
         assert!(f != fa && f != q && f != n);
         assert!(fa != q && fa != n);

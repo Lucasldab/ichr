@@ -102,8 +102,7 @@ impl ModrinthClient {
             limit
         );
         if mc.is_some() || !loaders.is_empty() {
-            let mc_versions: Vec<String> =
-                mc.map(|v| vec![v.to_string()]).unwrap_or_default();
+            let mc_versions: Vec<String> = mc.map(|v| vec![v.to_string()]).unwrap_or_default();
             let facets = search_facets(loaders, &mc_versions, "mod");
             url.push_str("&facets=");
             url.push_str(&urlencoding::encode(&facets));
@@ -161,8 +160,7 @@ impl ModrinthClient {
         limit: u32,
     ) -> Result<Vec<ModrinthSearchHit>, ModrinthError> {
         let url = {
-            let mc_versions: Vec<String> =
-                mc.map(|v| vec![v.to_string()]).unwrap_or_default();
+            let mc_versions: Vec<String> = mc.map(|v| vec![v.to_string()]).unwrap_or_default();
             // Unconditionally build facets including project_type (HIGH-1).
             let facets = search_facets(loaders, &mc_versions, project_type);
             format!(
@@ -265,7 +263,11 @@ impl ModrinthClient {
             project_id: p.id,
             title: p.title,
             author: String::new(), // see comment above
-            body: if !p.body.is_empty() { p.body } else { p.description },
+            body: if !p.body.is_empty() {
+                p.body
+            } else {
+                p.description
+            },
             downloads: p.downloads,
             latest_version_label: String::new(),
             latest_version_channel: String::new(),
@@ -351,10 +353,7 @@ impl ModrinthClient {
     /// 08-RESEARCH.md §Endpoint #4. Used by 08-04 dep resolver when a dep pins
     /// a specific version_id (Q2 from 08-RESEARCH.md).
     #[tracing::instrument(skip_all, fields(version_id))]
-    pub async fn get_version(
-        &self,
-        version_id: &str,
-    ) -> Result<ModrinthVersion, ModrinthError> {
+    pub async fn get_version(&self, version_id: &str) -> Result<ModrinthVersion, ModrinthError> {
         if !is_safe_modrinth_slug(version_id) {
             return Err(ModrinthError::Http(format!(
                 "invalid version_id: {version_id}"
@@ -463,8 +462,7 @@ mod tests {
     use serde_json::json;
 
     fn make_client(server: &MockServer) -> ModrinthClient {
-        ModrinthClient::new_with_base_url(server.base_url())
-            .expect("client::new_with_base_url")
+        ModrinthClient::new_with_base_url(server.base_url()).expect("client::new_with_base_url")
     }
 
     // --- search --------------------------------------------------------------

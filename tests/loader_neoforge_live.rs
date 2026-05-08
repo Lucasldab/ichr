@@ -117,7 +117,10 @@ async fn live_neoforge_install_1_21_4() {
         .list_loader_versions(LoaderType::NeoForge, mc)
         .await
         .expect("list_loader_versions NeoForge");
-    assert!(!versions.is_empty(), "NeoForge must publish loaders for MC {mc}");
+    assert!(
+        !versions.is_empty(),
+        "NeoForge must publish loaders for MC {mc}"
+    );
     let loader_version = versions
         .iter()
         .find(|v| v.stable)
@@ -183,11 +186,7 @@ async fn live_neoforge_install_1_21_4() {
     let instance_dir = paths.instance_dir(slug);
     let mut found_log = false;
     if let Ok(mut entries) = tokio::fs::read_dir(&instance_dir).await {
-        while let Some(entry) = entries
-            .next_entry()
-            .await
-            .expect("read instance dir")
-        {
+        while let Some(entry) = entries.next_entry().await.expect("read instance dir") {
             if entry
                 .file_name()
                 .to_string_lossy()
@@ -252,7 +251,10 @@ async fn live_neoforge_meta_lists_versions() {
         versions.iter().map(|v| &v.version).collect::<Vec<_>>()
     );
 
-    println!("[neoforge_meta_live] {} versions for MC 1.21.4", versions.len());
+    println!(
+        "[neoforge_meta_live] {} versions for MC 1.21.4",
+        versions.len()
+    );
     for v in versions.iter().take(5) {
         println!("[neoforge_meta_live]   {} (stable={})", v.version, v.stable);
     }
@@ -390,9 +392,7 @@ async fn live_neoforge_install_1_21_4_reaches_100_percent() {
     // 7) Assert 100% reached. Drop the sender side (already done by
     //    moving `tx` into `install_loader`); wait for the drain task
     //    to terminate, then read the collected pct vector.
-    drain_handle
-        .await
-        .expect("progress drain task panicked");
+    drain_handle.await.expect("progress drain task panicked");
     let pcts = collected.lock().expect("lock progress").clone();
     assert!(
         pcts.contains(&100u8),
@@ -415,7 +415,9 @@ async fn live_neoforge_install_1_21_4_reaches_100_percent() {
     let m = mineltui::instance::store::read_instance_manifest(&paths, slug)
         .await
         .expect("read manifest");
-    let loader = m.loader.expect("manifest.loader must be Some after install");
+    let loader = m
+        .loader
+        .expect("manifest.loader must be Some after install");
     assert_eq!(loader.kind, ModloaderKind::NeoForge);
     assert!(
         loader.version_id.starts_with("neoforge-"),
@@ -423,10 +425,7 @@ async fn live_neoforge_install_1_21_4_reaches_100_percent() {
     );
 
     // 9) Assert NeoForge libraries landed in shared libraries tree
-    let neoforge_libs_dir = paths
-        .libraries_dir()
-        .join("net")
-        .join("neoforged");
+    let neoforge_libs_dir = paths.libraries_dir().join("net").join("neoforged");
     assert!(
         neoforge_libs_dir.is_dir(),
         "NeoForge libraries dir missing — harvest did not copy libraries: {}",

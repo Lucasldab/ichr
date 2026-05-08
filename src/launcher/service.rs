@@ -11,8 +11,8 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use crate::error::AppError;
-use crate::instance::store::{mark_launch_started, update_play_time};
 use crate::instance::read_instance_manifest;
+use crate::instance::store::{mark_launch_started, update_play_time};
 use crate::mojang::inherits::resolve_inherits;
 use crate::mojang::rules::RuleContext;
 use crate::mojang::types::VersionJson;
@@ -89,7 +89,8 @@ pub async fn launch_instance(
         .map_err(|e| AppError::Http(format!("init fabric client: {e}")))?;
     let quilt_client = crate::loader::quilt::QuiltMetaClient::new()
         .map_err(|e| AppError::Http(format!("init quilt client: {e}")))?;
-    migrate_loader_json_in_place_if_needed(paths, launch_version_id, &fabric_client, &quilt_client).await?;
+    migrate_loader_json_in_place_if_needed(paths, launch_version_id, &fabric_client, &quilt_client)
+        .await?;
 
     let root_version = read_version_json_from_disk(paths, launch_version_id).await?;
 
@@ -100,7 +101,9 @@ pub async fn launch_instance(
 
     // Step 5 — resolve Java runtime (Phase 5: per-instance + auto-download)
     send_progress(&tx, job_id, 25, "resolving Java runtime").await;
-    let java = java_service.resolve_jre_for_launch(paths, &manifest, &version).await?;
+    let java = java_service
+        .resolve_jre_for_launch(paths, &manifest, &version)
+        .await?;
 
     // Step 6 — compose the LaunchCommand
     send_progress(&tx, job_id, 30, "composing command").await;
@@ -272,16 +275,30 @@ async fn migrate_loader_json_in_place_if_needed(
         return Ok(());
     }
     let bytes = tokio::fs::read(&json_path).await?;
-    let v: serde_json::Value = serde_json::from_slice(&bytes)
-        .map_err(|e| AppError::Http(format!("parse {} for migration check: {e}", json_path.display())))?;
+    let v: serde_json::Value = serde_json::from_slice(&bytes).map_err(|e| {
+        AppError::Http(format!(
+            "parse {} for migration check: {e}",
+            json_path.display()
+        ))
+    })?;
 
     if !is_flat_fabric_meta_shape(&v) {
-        return Ok(());  // already Mojang shape (idempotent no-op)
+        return Ok(()); // already Mojang shape (idempotent no-op)
     }
 
-    let id = v.get("id").and_then(|x| x.as_str()).unwrap_or(version_id).to_string();
-    let mc_version = v.get("inheritsFrom").and_then(|x| x.as_str())
-        .ok_or_else(|| AppError::Http(format!("flat-shape JSON for {version_id} missing inheritsFrom")))?
+    let id = v
+        .get("id")
+        .and_then(|x| x.as_str())
+        .unwrap_or(version_id)
+        .to_string();
+    let mc_version = v
+        .get("inheritsFrom")
+        .and_then(|x| x.as_str())
+        .ok_or_else(|| {
+            AppError::Http(format!(
+                "flat-shape JSON for {version_id} missing inheritsFrom"
+            ))
+        })?
         .to_string();
 
     let (loader_type, prefix) = if id.starts_with("fabric-loader-") {
@@ -295,32 +312,46 @@ async fn migrate_loader_json_in_place_if_needed(
         )));
     };
 
-    let after_prefix = id.strip_prefix(prefix)
+    let after_prefix = id
+        .strip_prefix(prefix)
         .ok_or_else(|| AppError::Http(format!("loader id {id} missing prefix {prefix}")))?;
     let suffix = format!("-{mc_version}");
-    let loader_version = after_prefix.strip_suffix(&suffix)
+    let loader_version = after_prefix
+        .strip_suffix(&suffix)
         .ok_or_else(|| AppError::Http(format!("loader id {id} missing suffix {suffix}")))?
         .to_string();
 
     let raw_bytes = match loader_type {
-        crate::loader::types::LoaderType::Fabric => fabric_client
-            .fetch_profile(&mc_version, &loader_version)
-            .await
-            .map_err(|e| AppError::Http(format!("re-fetch fabric profile during migration: {e}")))?
-            .raw_bytes,
-        crate::loader::types::LoaderType::Quilt => quilt_client
-            .fetch_profile(&mc_version, &loader_version)
-            .await
-            .map_err(|e| AppError::Http(format!("re-fetch quilt profile during migration: {e}")))?
-            .raw_bytes,
+        crate::loader::types::LoaderType::Fabric => {
+            fabric_client
+                .fetch_profile(&mc_version, &loader_version)
+                .await
+                .map_err(|e| {
+                    AppError::Http(format!("re-fetch fabric profile during migration: {e}"))
+                })?
+                .raw_bytes
+        }
+        crate::loader::types::LoaderType::Quilt => {
+            quilt_client
+                .fetch_profile(&mc_version, &loader_version)
+                .await
+                .map_err(|e| {
+                    AppError::Http(format!("re-fetch quilt profile during migration: {e}"))
+                })?
+                .raw_bytes
+        }
         _ => unreachable!(),
     };
 
     let mojang_bytes = match loader_type {
-        crate::loader::types::LoaderType::Fabric => crate::loader::fabric::to_mojang_shape(&raw_bytes)
-            .map_err(|e| AppError::Http(format!("translate during migration: {e}")))?,
-        crate::loader::types::LoaderType::Quilt => crate::loader::quilt::to_mojang_shape(&raw_bytes)
-            .map_err(|e| AppError::Http(format!("translate during migration: {e}")))?,
+        crate::loader::types::LoaderType::Fabric => {
+            crate::loader::fabric::to_mojang_shape(&raw_bytes)
+                .map_err(|e| AppError::Http(format!("translate during migration: {e}")))?
+        }
+        crate::loader::types::LoaderType::Quilt => {
+            crate::loader::quilt::to_mojang_shape(&raw_bytes)
+                .map_err(|e| AppError::Http(format!("translate during migration: {e}")))?
+        }
         _ => unreachable!(),
     };
 
@@ -388,9 +419,21 @@ mod tests {
         // client.jar intentionally NOT created
         let (tx, _rx) = mpsc::channel::<TaskEvent>(16);
         let token = CancellationToken::new();
-        let auth_ctx = crate::auth::AuthContext::Offline { username: "TestUser".to_string() };
+        let auth_ctx = crate::auth::AuthContext::Offline {
+            username: "TestUser".to_string(),
+        };
         let java_service = JavaService::new().expect("JavaService::new");
-        let result = launch_instance(&paths, "x", auth_ctx, None, &java_service, tx, token, JobId(1)).await;
+        let result = launch_instance(
+            &paths,
+            "x",
+            auth_ctx,
+            None,
+            &java_service,
+            tx,
+            token,
+            JobId(1),
+        )
+        .await;
         assert!(
             matches!(result, Err(AppError::VersionNotInstalled { .. })),
             "expected VersionNotInstalled; got {result:?}"
@@ -439,8 +482,12 @@ mod tests {
         // keep it to preserve the historical fixture shape that distinguishes
         // GAP-8-E bug from fix.
         let vanilla_jar = paths.version_jar("1.20.4");
-        tokio::fs::create_dir_all(vanilla_jar.parent().unwrap()).await.unwrap();
-        tokio::fs::write(&vanilla_jar, b"fake client.jar").await.unwrap();
+        tokio::fs::create_dir_all(vanilla_jar.parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(&vanilla_jar, b"fake client.jar")
+            .await
+            .unwrap();
 
         // Manifest declares a Fabric loader. NO loader version JSON exists on
         // disk — this is the lever that fires `VersionNotInstalled` from
@@ -456,12 +503,22 @@ mod tests {
 
         let (tx, _rx) = mpsc::channel::<TaskEvent>(16);
         let token = CancellationToken::new();
-        let auth_ctx = crate::auth::AuthContext::Offline { username: "TestUser".to_string() };
+        let auth_ctx = crate::auth::AuthContext::Offline {
+            username: "TestUser".to_string(),
+        };
         let java_service = JavaService::new().expect("JavaService::new");
 
         let result = launch_instance(
-            &paths, "modded", auth_ctx, None, &java_service, tx, token, JobId(2),
-        ).await;
+            &paths,
+            "modded",
+            auth_ctx,
+            None,
+            &java_service,
+            tx,
+            token,
+            JobId(2),
+        )
+        .await;
 
         match result {
             Err(AppError::VersionNotInstalled { slug }) => {
@@ -522,8 +579,12 @@ mod tests {
         // --- Vanilla 1.20.4 fixture (both .jar AND .json) -------------------
         let vanilla_id = "1.20.4";
         let vanilla_jar = paths.version_jar(vanilla_id);
-        tokio::fs::create_dir_all(vanilla_jar.parent().unwrap()).await.unwrap();
-        tokio::fs::write(&vanilla_jar, b"fake vanilla client.jar").await.unwrap();
+        tokio::fs::create_dir_all(vanilla_jar.parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(&vanilla_jar, b"fake vanilla client.jar")
+            .await
+            .unwrap();
 
         // Minimum vanilla VersionJson — must parse as VersionJson and serve
         // as a leaf parent (inherits_from = None). Modeled on the
@@ -549,12 +610,16 @@ mod tests {
             "releaseTime": "2023-12-07T00:00:00Z",
             "time": "2023-12-07T00:00:00Z"
         }"#;
-        tokio::fs::write(&vanilla_json_path, vanilla_json).await.unwrap();
+        tokio::fs::write(&vanilla_json_path, vanilla_json)
+            .await
+            .unwrap();
 
         // --- Loader 0.16.9 fixture (ONLY .json, with inheritsFrom='1.20.4') -
         let loader_id = "fabric-loader-0.16.9-1.20.4";
         let loader_json_path = paths.version_json(loader_id);
-        tokio::fs::create_dir_all(loader_json_path.parent().unwrap()).await.unwrap();
+        tokio::fs::create_dir_all(loader_json_path.parent().unwrap())
+            .await
+            .unwrap();
         // Loader JSON inherits from vanilla and carries Fabric mainClass.
         // resolve_inherits walks `inherits_from`, fetches the parent from
         // the parents map, and merges. PRODUCTION SHAPE: real Fabric/Quilt/
@@ -577,7 +642,9 @@ mod tests {
             "releaseTime": "2024-12-15T00:00:00Z",
             "time": "2024-12-15T00:00:00Z"
         }"#;
-        tokio::fs::write(&loader_json_path, loader_json).await.unwrap();
+        tokio::fs::write(&loader_json_path, loader_json)
+            .await
+            .unwrap();
         // INTENTIONALLY: NO `versions/fabric-loader-0.16.9-1.20.4/...jar`.
         // The fix relies on the launcher NOT looking for one.
 
@@ -598,12 +665,22 @@ mod tests {
 
         let (tx, _rx) = mpsc::channel::<TaskEvent>(16);
         let token = CancellationToken::new();
-        let auth_ctx = crate::auth::AuthContext::Offline { username: "TestUser".to_string() };
+        let auth_ctx = crate::auth::AuthContext::Offline {
+            username: "TestUser".to_string(),
+        };
         let java_service = JavaService::new().expect("JavaService::new");
 
         let result = launch_instance(
-            &paths, "modded", auth_ctx, None, &java_service, tx, token, JobId(3),
-        ).await;
+            &paths,
+            "modded",
+            auth_ctx,
+            None,
+            &java_service,
+            tx,
+            token,
+            JobId(3),
+        )
+        .await;
 
         // Restore env BEFORE assertions so a panic doesn't leak state.
         match prior_java {
@@ -633,9 +710,7 @@ mod tests {
                 // the early jar/json existence checks. With MINELTUI_JAVA
                 // set to a non-existent path, the expected variant is
                 // JavaNotFound (Step 7). Log for diagnosis:
-                eprintln!(
-                    "[gap-08-launch-jar] post-guard failure (expected): {other:?}"
-                );
+                eprintln!("[gap-08-launch-jar] post-guard failure (expected): {other:?}");
             }
         }
     }

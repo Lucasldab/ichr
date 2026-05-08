@@ -117,7 +117,10 @@ mod tests {
         let chars: Vec<char> = uuid.chars().collect();
         // positions: 0-7 = first group, 8 = hyphen, 9-12 = second group,
         // 13 = hyphen, 14 = version digit
-        assert_eq!(chars[14], '3', "version nibble at position 14 must be '3'; uuid={uuid}");
+        assert_eq!(
+            chars[14], '3',
+            "version nibble at position 14 must be '3'; uuid={uuid}"
+        );
     }
 
     #[test]
@@ -137,7 +140,11 @@ mod tests {
         // Assert form: xxxxxxxx-xxxx-3xxx-[89ab]xxx-xxxxxxxxxxxx
         let uuid = offline_uuid("TestUser");
         let parts: Vec<&str> = uuid.split('-').collect();
-        assert_eq!(parts.len(), 5, "UUID must have 5 hyphen-separated groups; uuid={uuid}");
+        assert_eq!(
+            parts.len(),
+            5,
+            "UUID must have 5 hyphen-separated groups; uuid={uuid}"
+        );
         assert_eq!(parts[0].len(), 8);
         assert_eq!(parts[1].len(), 4);
         assert_eq!(parts[2].len(), 4);
@@ -146,11 +153,17 @@ mod tests {
 
         // All characters must be hex digits (lowercase).
         for part in &parts {
-            assert!(part.chars().all(|c| c.is_ascii_hexdigit()), "non-hex char in {part}; uuid={uuid}");
+            assert!(
+                part.chars().all(|c| c.is_ascii_hexdigit()),
+                "non-hex char in {part}; uuid={uuid}"
+            );
         }
 
         // version nibble
-        assert!(parts[2].starts_with('3'), "3rd group must start with '3'; uuid={uuid}");
+        assert!(
+            parts[2].starts_with('3'),
+            "3rd group must start with '3'; uuid={uuid}"
+        );
 
         // variant nibble (first char of 4th group)
         let variant = parts[3].chars().next().unwrap();

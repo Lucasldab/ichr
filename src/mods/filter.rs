@@ -33,10 +33,10 @@ pub fn modrinth_filter_for(
 ) -> (Vec<&'static str>, Vec<String>) {
     let loaders = match loader.map(|l| l.kind) {
         None | Some(ModloaderKind::Vanilla) => vec!["minecraft"],
-        Some(ModloaderKind::Fabric)         => vec!["fabric"],
-        Some(ModloaderKind::Quilt)          => vec!["fabric", "quilt"],
-        Some(ModloaderKind::Forge)          => vec!["forge"],
-        Some(ModloaderKind::NeoForge)       => vec!["neoforge"],
+        Some(ModloaderKind::Fabric) => vec!["fabric"],
+        Some(ModloaderKind::Quilt) => vec!["fabric", "quilt"],
+        Some(ModloaderKind::Forge) => vec!["forge"],
+        Some(ModloaderKind::NeoForge) => vec!["neoforge"],
     };
     (loaders, vec![mc_version_id.to_string()])
 }
@@ -95,7 +95,9 @@ pub fn pick_primary_file(files: &[ModrinthFile]) -> Option<&ModrinthFile> {
 /// Modrinth uses ISO 8601 with `Z` suffix on every timestamp, so lex sort
 /// equals chronological sort.
 pub fn pick_latest_by_date(versions: &[ModrinthVersion]) -> Option<&ModrinthVersion> {
-    versions.iter().max_by(|a, b| a.date_published.cmp(&b.date_published))
+    versions
+        .iter()
+        .max_by(|a, b| a.date_published.cmp(&b.date_published))
 }
 
 // ============================================================================
@@ -106,7 +108,8 @@ pub fn pick_latest_by_date(versions: &[ModrinthVersion]) -> Option<&ModrinthVers
 /// Mirrors the `is_safe_maven_segment` allowlist from `src/loader/maven.rs`.
 pub fn is_safe_modrinth_slug(s: &str) -> bool {
     !s.is_empty()
-        && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+        && s.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
 /// True iff `s` is a safe `.jar` filename — no path-traversal characters.
@@ -120,12 +123,17 @@ pub fn is_safe_modrinth_slug(s: &str) -> bool {
 /// - Must NOT contain `/`, `\`, or any `..` substring.
 /// - Every byte must be `[A-Za-z0-9._+-]`.
 pub fn is_safe_mod_filename(s: &str) -> bool {
-    if !s.ends_with(".jar") { return false; }
-    if s.starts_with('.') { return false; }
-    if s.contains('/') || s.contains('\\') || s.contains("..") { return false; }
-    s.bytes().all(|b| {
-        b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'+' || b == b'-'
-    })
+    if !s.ends_with(".jar") {
+        return false;
+    }
+    if s.starts_with('.') {
+        return false;
+    }
+    if s.contains('/') || s.contains('\\') || s.contains("..") {
+        return false;
+    }
+    s.bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'+' || b == b'-')
 }
 
 /// 500 MB cap for resource/shader pack files. Larger than mods because
@@ -141,12 +149,17 @@ pub const MAX_PACK_FILE_BYTES: u64 = 500 * 1024 * 1024;
 ///      ASCII alphanumeric + `._+- ` allowlist.
 pub fn is_safe_pack_filename(s: &str) -> bool {
     let lower = s.to_ascii_lowercase();
-    if !lower.ends_with(".zip") { return false; }
-    if s.starts_with('.') { return false; }
-    if s.contains('/') || s.contains('\\') || s.contains("..") { return false; }
+    if !lower.ends_with(".zip") {
+        return false;
+    }
+    if s.starts_with('.') {
+        return false;
+    }
+    if s.contains('/') || s.contains('\\') || s.contains("..") {
+        return false;
+    }
     s.bytes().all(|b| {
-        b.is_ascii_alphanumeric()
-            || b == b'.' || b == b'_' || b == b'+' || b == b'-' || b == b' '
+        b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'+' || b == b'-' || b == b' '
     })
 }
 
@@ -181,14 +194,22 @@ mod tests {
 
     #[test]
     fn test_filter_vanilla_explicit() {
-        let info = LoaderInfo { kind: ModloaderKind::Vanilla, version: "".into(), version_id: "".into() };
+        let info = LoaderInfo {
+            kind: ModloaderKind::Vanilla,
+            version: "".into(),
+            version_id: "".into(),
+        };
         let (loaders, _) = modrinth_filter_for(Some(&info), "1.20.4");
         assert_eq!(loaders, vec!["minecraft"]);
     }
 
     #[test]
     fn test_filter_fabric() {
-        let info = LoaderInfo { kind: ModloaderKind::Fabric, version: "0.16.9".into(), version_id: "fabric-loader-0.16.9-1.20.4".into() };
+        let info = LoaderInfo {
+            kind: ModloaderKind::Fabric,
+            version: "0.16.9".into(),
+            version_id: "fabric-loader-0.16.9-1.20.4".into(),
+        };
         let (loaders, _) = modrinth_filter_for(Some(&info), "1.20.4");
         assert_eq!(loaders, vec!["fabric"]);
     }
@@ -197,21 +218,37 @@ mod tests {
     fn test_filter_quilt_expands_to_fabric_plus_quilt() {
         // PITFALL 2 — load-bearing: Quilt is binary-compatible with Fabric.
         // Modrinth's facet system does AND/OR not "compat-aware OR".
-        let info = LoaderInfo { kind: ModloaderKind::Quilt, version: "0.30.0".into(), version_id: "quilt-loader-0.30.0-1.20.4".into() };
+        let info = LoaderInfo {
+            kind: ModloaderKind::Quilt,
+            version: "0.30.0".into(),
+            version_id: "quilt-loader-0.30.0-1.20.4".into(),
+        };
         let (loaders, _) = modrinth_filter_for(Some(&info), "1.20.4");
-        assert_eq!(loaders, vec!["fabric", "quilt"], "Quilt MUST expand to ['fabric','quilt']");
+        assert_eq!(
+            loaders,
+            vec!["fabric", "quilt"],
+            "Quilt MUST expand to ['fabric','quilt']"
+        );
     }
 
     #[test]
     fn test_filter_forge() {
-        let info = LoaderInfo { kind: ModloaderKind::Forge, version: "0.0.0".into(), version_id: "x".into() };
+        let info = LoaderInfo {
+            kind: ModloaderKind::Forge,
+            version: "0.0.0".into(),
+            version_id: "x".into(),
+        };
         let (loaders, _) = modrinth_filter_for(Some(&info), "1.20.4");
         assert_eq!(loaders, vec!["forge"]);
     }
 
     #[test]
     fn test_filter_neoforge() {
-        let info = LoaderInfo { kind: ModloaderKind::NeoForge, version: "0.0.0".into(), version_id: "x".into() };
+        let info = LoaderInfo {
+            kind: ModloaderKind::NeoForge,
+            version: "0.0.0".into(),
+            version_id: "x".into(),
+        };
         let (loaders, _) = modrinth_filter_for(Some(&info), "1.20.4");
         assert_eq!(loaders, vec!["neoforge"]);
     }
@@ -252,8 +289,7 @@ mod tests {
     fn test_search_facets_empty_loaders_with_mc_no_empty_and_group() {
         let f = search_facets(&[], &["1.20.4".to_string()], "mod");
         assert_eq!(
-            f,
-            "[[\"versions:1.20.4\"],[\"project_type:mod\"]]",
+            f, "[[\"versions:1.20.4\"],[\"project_type:mod\"]]",
             "empty loaders must drop the categories AND group entirely; got: {f}"
         );
         assert!(
@@ -270,8 +306,7 @@ mod tests {
     fn test_search_facets_with_loader_no_mc_no_empty_and_group() {
         let f = search_facets(&["fabric"], &[], "mod");
         assert_eq!(
-            f,
-            "[[\"categories:fabric\"],[\"project_type:mod\"]]",
+            f, "[[\"categories:fabric\"],[\"project_type:mod\"]]",
             "empty mc_versions must drop the versions AND group entirely; got: {f}"
         );
         assert!(!f.contains("[]"), "got: {f}");
@@ -282,8 +317,7 @@ mod tests {
     fn test_search_facets_both_empty_only_project_type() {
         let f = search_facets(&[], &[], "mod");
         assert_eq!(
-            f,
-            "[[\"project_type:mod\"]]",
+            f, "[[\"project_type:mod\"]]",
             "both empty: only project_type AND group remains; got: {f}"
         );
         assert!(!f.contains("[]"), "got: {f}");
@@ -297,13 +331,20 @@ mod tests {
             filename: name.to_string(),
             primary,
             size: 1024,
-            hashes: ModrinthHashes { sha1: "abc".into(), sha512: "def".into() },
+            hashes: ModrinthHashes {
+                sha1: "abc".into(),
+                sha512: "def".into(),
+            },
         }
     }
 
     #[test]
     fn test_pick_primary_returns_primary_when_present() {
-        let files = vec![mk_file("a.jar", false), mk_file("b.jar", true), mk_file("c.jar", false)];
+        let files = vec![
+            mk_file("a.jar", false),
+            mk_file("b.jar", true),
+            mk_file("c.jar", false),
+        ];
         assert_eq!(pick_primary_file(&files).unwrap().filename, "b.jar");
     }
 

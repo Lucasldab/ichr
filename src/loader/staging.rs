@@ -46,12 +46,15 @@ impl StagingDir {
             .data_dir
             .join("staging")
             .join(format!("{slug}-{unix_ts}-{seq:04x}"));
-        tokio::fs::create_dir_all(&root).await.map_err(|e| {
-            LoaderError::StagingPopulate {
+        tokio::fs::create_dir_all(&root)
+            .await
+            .map_err(|e| LoaderError::StagingPopulate {
                 reason: format!("mkdir staging root {}: {e}", root.display()),
-            }
-        })?;
-        Ok(Self { root, slug: slug.to_string() })
+            })?;
+        Ok(Self {
+            root,
+            slug: slug.to_string(),
+        })
     }
 
     /// Root of this staging directory.
@@ -95,40 +98,40 @@ impl StagingDir {
         mc_version: &str,
     ) -> Result<(), LoaderError> {
         let staging_versions = self.versions_dir().join(mc_version);
-        tokio::fs::create_dir_all(&staging_versions).await.map_err(|e| {
-            LoaderError::StagingPopulate {
+        tokio::fs::create_dir_all(&staging_versions)
+            .await
+            .map_err(|e| LoaderError::StagingPopulate {
                 reason: format!("mkdir {}: {e}", staging_versions.display()),
-            }
-        })?;
-        tokio::fs::create_dir_all(&self.libraries_dir()).await.map_err(|e| {
-            LoaderError::StagingPopulate {
+            })?;
+        tokio::fs::create_dir_all(&self.libraries_dir())
+            .await
+            .map_err(|e| LoaderError::StagingPopulate {
                 reason: format!("mkdir {}: {e}", self.libraries_dir().display()),
-            }
-        })?;
+            })?;
 
         let src_json = paths.version_json(mc_version);
         let dst_json = staging_versions.join(format!("{mc_version}.json"));
-        tokio::fs::copy(&src_json, &dst_json).await.map_err(|e| {
-            LoaderError::StagingPopulate {
+        tokio::fs::copy(&src_json, &dst_json)
+            .await
+            .map_err(|e| LoaderError::StagingPopulate {
                 reason: format!(
                     "copy version JSON {} -> {}: {e}",
                     src_json.display(),
                     dst_json.display()
                 ),
-            }
-        })?;
+            })?;
 
         let src_jar = paths.version_jar(mc_version);
         let dst_jar = staging_versions.join(format!("{mc_version}.jar"));
-        tokio::fs::copy(&src_jar, &dst_jar).await.map_err(|e| {
-            LoaderError::StagingPopulate {
+        tokio::fs::copy(&src_jar, &dst_jar)
+            .await
+            .map_err(|e| LoaderError::StagingPopulate {
                 reason: format!(
                     "copy client JAR {} -> {}: {e}",
                     src_jar.display(),
                     dst_jar.display()
                 ),
-            }
-        })?;
+            })?;
 
         Ok(())
     }
@@ -166,7 +169,11 @@ mod tests {
         let paths = make_paths(&td);
         let a = StagingDir::create(&paths, "myslug").await.unwrap();
         let b = StagingDir::create(&paths, "myslug").await.unwrap();
-        assert_ne!(a.root(), b.root(), "two creates must produce distinct paths");
+        assert_ne!(
+            a.root(),
+            b.root(),
+            "two creates must produce distinct paths"
+        );
         assert!(a.root().is_dir());
         assert!(b.root().is_dir());
     }
@@ -177,7 +184,9 @@ mod tests {
         let paths = make_paths(&td);
         let s = StagingDir::create(&paths, "test").await.unwrap();
         s.write_launcher_profiles().await.unwrap();
-        let body = tokio::fs::read(s.root().join("launcher_profiles.json")).await.unwrap();
+        let body = tokio::fs::read(s.root().join("launcher_profiles.json"))
+            .await
+            .unwrap();
         assert_eq!(body, LAUNCHER_PROFILES_SKELETON.to_vec());
     }
 
@@ -189,8 +198,12 @@ mod tests {
         let mc = "1.21.4";
         let json_src = paths.version_json(mc);
         let jar_src = paths.version_jar(mc);
-        tokio::fs::create_dir_all(json_src.parent().unwrap()).await.unwrap();
-        tokio::fs::write(&json_src, b"{\"id\":\"1.21.4\"}").await.unwrap();
+        tokio::fs::create_dir_all(json_src.parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(&json_src, b"{\"id\":\"1.21.4\"}")
+            .await
+            .unwrap();
         tokio::fs::write(&jar_src, b"FAKE_JAR_BYTES").await.unwrap();
 
         let s = StagingDir::create(&paths, "test").await.unwrap();
@@ -198,7 +211,10 @@ mod tests {
 
         let dst_json = s.versions_dir().join(mc).join("1.21.4.json");
         let dst_jar = s.versions_dir().join(mc).join("1.21.4.jar");
-        assert_eq!(tokio::fs::read(&dst_json).await.unwrap(), b"{\"id\":\"1.21.4\"}");
+        assert_eq!(
+            tokio::fs::read(&dst_json).await.unwrap(),
+            b"{\"id\":\"1.21.4\"}"
+        );
         assert_eq!(tokio::fs::read(&dst_jar).await.unwrap(), b"FAKE_JAR_BYTES");
     }
 

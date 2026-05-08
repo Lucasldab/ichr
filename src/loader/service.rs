@@ -56,7 +56,12 @@ impl LoaderService {
         forge: ForgeMetaClient,
         neoforge: NeoForgeMetaClient,
     ) -> Self {
-        Self { fabric, quilt, forge, neoforge }
+        Self {
+            fabric,
+            quilt,
+            forge,
+            neoforge,
+        }
     }
 
     /// List all loader versions for the given loader type.
@@ -86,11 +91,7 @@ impl LoaderService {
     ///
     /// Does NOT touch `libraries/` — Maven layout is shared across instances.
     #[tracing::instrument(skip_all, fields(slug = %slug))]
-    pub async fn remove_loader(
-        &self,
-        paths: &AppPaths,
-        slug: &str,
-    ) -> Result<(), LoaderError> {
+    pub async fn remove_loader(&self, paths: &AppPaths, slug: &str) -> Result<(), LoaderError> {
         let mut manifest = crate::instance::store::read_instance_manifest(paths, slug)
             .await
             .map_err(map_app_error)?;
@@ -224,7 +225,11 @@ async fn install_subprocess_loader(
     macro_rules! send_progress {
         ($pct:expr, $msg:expr) => {{
             let _ = progress_tx
-                .send(TaskEvent::Progress { id: job_id, pct: $pct, msg: $msg.to_string() })
+                .send(TaskEvent::Progress {
+                    id: job_id,
+                    pct: $pct,
+                    msg: $msg.to_string(),
+                })
                 .await;
         }};
     }
@@ -235,7 +240,10 @@ async fn install_subprocess_loader(
     // skip steps 2-5 and jump straight to manifest write.
     // ------------------------------------------------------------------
     let predicted_json = paths.version_json(&expected_version_id);
-    if tokio::fs::try_exists(&predicted_json).await.unwrap_or(false) {
+    if tokio::fs::try_exists(&predicted_json)
+        .await
+        .unwrap_or(false)
+    {
         if let Ok(bytes) = tokio::fs::read(&predicted_json).await {
             #[derive(serde::Deserialize)]
             struct VJ {
@@ -261,7 +269,14 @@ async fn install_subprocess_loader(
                         "re-attach: all artifacts on disk, skipping install"
                     );
                     send_progress!(99, "Re-attach: writing manifest");
-                    write_manifest_loader(paths, slug, modloader_kind, loader_version, &expected_version_id).await?;
+                    write_manifest_loader(
+                        paths,
+                        slug,
+                        modloader_kind,
+                        loader_version,
+                        &expected_version_id,
+                    )
+                    .await?;
                     send_progress!(100, "Done");
                     return Ok(());
                 }
@@ -464,23 +479,20 @@ async fn install_subprocess_loader(
         // STEP 5 — Harvest
         // 07-WARNING-4 fix: pass vanilla_mc_id so harvest excludes vanilla dir.
         // --------------------------------------------------------------
-        let harvested = match harvest::harvest_install(
-            staging.root(),
-            Some(&expected_version_id),
-            mc_version,
-        )
-        .await
-        {
-            Ok(h) => h,
-            Err(_) => {
-                // Fallback: accept whatever the installer produced.
-                tracing::warn!(
-                    expected = %expected_version_id,
-                    "expected version_id not found in staging; accepting installer output"
-                );
-                harvest::harvest_install(staging.root(), None, mc_version).await?
-            }
-        };
+        let harvested =
+            match harvest::harvest_install(staging.root(), Some(&expected_version_id), mc_version)
+                .await
+            {
+                Ok(h) => h,
+                Err(_) => {
+                    // Fallback: accept whatever the installer produced.
+                    tracing::warn!(
+                        expected = %expected_version_id,
+                        "expected version_id not found in staging; accepting installer output"
+                    );
+                    harvest::harvest_install(staging.root(), None, mc_version).await?
+                }
+            };
         harvest::copy_libraries_into_shared(paths, &harvested.libraries, &token).await?;
         harvest::write_version_json(paths, &harvested.version_id, &harvested.version_json_bytes)
             .await?;
@@ -578,7 +590,11 @@ async fn install_loader_impl(
         let progress_tx = progress_tx.clone();
         async move {
             let _ = progress_tx
-                .send(TaskEvent::Progress { id: job_id, pct, msg })
+                .send(TaskEvent::Progress {
+                    id: job_id,
+                    pct,
+                    msg,
+                })
                 .await;
         }
     };
@@ -673,7 +689,11 @@ async fn install_loader_impl(
         }
         LoaderType::Forge | LoaderType::NeoForge => {
             return Err(LoaderError::MetaFetch {
-                loader: if loader_type == LoaderType::Forge { "forge" } else { "neoforge" },
+                loader: if loader_type == LoaderType::Forge {
+                    "forge"
+                } else {
+                    "neoforge"
+                },
                 reason: "Forge/NeoForge installer pipeline not yet implemented (07-03)".into(),
             });
         }
@@ -687,8 +707,7 @@ async fn install_loader_impl(
     // thorough is_already_installed check.
     // -----------------------------------------------------------------
     let version_json_path = paths.version_json(&profile_id);
-    let already_attached =
-        is_already_installed(paths, &version_json_path, &libs).await?;
+    let already_attached = is_already_installed(paths, &version_json_path, &libs).await?;
 
     if already_attached {
         tracing::info!(
@@ -896,7 +915,8 @@ async fn try_reattach_from_disk(
     let parsed: MinimalProfile = serde_json::from_slice(&bytes).ok()?;
 
     // Check every library is on disk (existence-only after re-attach).
-    let mut libs: Vec<crate::loader::types::LoaderLibrary> = Vec::with_capacity(parsed.libraries.len());
+    let mut libs: Vec<crate::loader::types::LoaderLibrary> =
+        Vec::with_capacity(parsed.libraries.len());
     for lib in &parsed.libraries {
         let rel = maven_coord_to_path(&lib.name).ok()?;
         let dest = paths.library_path(&rel);
@@ -905,7 +925,12 @@ async fn try_reattach_from_disk(
         }
         libs.push(crate::loader::types::LoaderLibrary {
             name: lib.name.clone(),
-            url: None, sha1: None, sha256: None, sha512: None, md5: None, size: None,
+            url: None,
+            sha1: None,
+            sha256: None,
+            sha512: None,
+            md5: None,
+            size: None,
         });
     }
 
@@ -920,7 +945,10 @@ async fn is_already_installed(
     version_json_path: &std::path::PathBuf,
     libs: &[crate::loader::types::LoaderLibrary],
 ) -> Result<bool, LoaderError> {
-    if !tokio::fs::try_exists(version_json_path).await.unwrap_or(false) {
+    if !tokio::fs::try_exists(version_json_path)
+        .await
+        .unwrap_or(false)
+    {
         return Ok(false);
     }
     for lib in libs {
@@ -947,12 +975,13 @@ async fn download_one_library(
     if tokio::fs::try_exists(&dest).await.unwrap_or(false) {
         match &lib.sha1 {
             Some(expected) => {
-                let ok = verify_sha1(&dest, expected)
-                    .await
-                    .map_err(|e| LoaderError::ProfileWrite {
-                        path: dest.display().to_string(),
-                        reason: format!("sha1 verify (existing): {e}"),
-                    })?;
+                let ok =
+                    verify_sha1(&dest, expected)
+                        .await
+                        .map_err(|e| LoaderError::ProfileWrite {
+                            path: dest.display().to_string(),
+                            reason: format!("sha1 verify (existing): {e}"),
+                        })?;
                 if ok {
                     return Ok(());
                 }
@@ -1306,9 +1335,8 @@ mod tests {
         assert!(vj.exists(), "version JSON should be written");
 
         // Check library written
-        let lib_path = paths.library_path(
-            "net/fabricmc/fabric-loader/0.16.9/fabric-loader-0.16.9.jar",
-        );
+        let lib_path =
+            paths.library_path("net/fabricmc/fabric-loader/0.16.9/fabric-loader-0.16.9.jar");
         assert!(lib_path.exists(), "library file should exist");
         assert_eq!(tokio::fs::read(&lib_path).await.unwrap(), fabric_lib_bytes);
 
@@ -1375,9 +1403,8 @@ mod tests {
         assert!(vj.exists(), "quilt version JSON should be written");
 
         // Library written (no hash check for Quilt)
-        let lib_path = paths.library_path(
-            "org/quiltmc/quilt-loader/0.30.0-beta.7/quilt-loader-0.30.0-beta.7.jar",
-        );
+        let lib_path = paths
+            .library_path("org/quiltmc/quilt-loader/0.30.0-beta.7/quilt-loader-0.30.0-beta.7.jar");
         assert!(lib_path.exists(), "quilt library should exist");
     }
 
@@ -1432,10 +1459,12 @@ mod tests {
             paths.version_json("fabric-loader-0.16.9-1.21.4").exists(),
             "version JSON should be present after first install"
         );
-        let lib_path = paths.library_path(
-            "net/fabricmc/fabric-loader/0.16.9/fabric-loader-0.16.9.jar",
+        let lib_path =
+            paths.library_path("net/fabricmc/fabric-loader/0.16.9/fabric-loader-0.16.9.jar");
+        assert!(
+            lib_path.exists(),
+            "library should be present after first install"
         );
-        assert!(lib_path.exists(), "library should be present after first install");
 
         // Reset loader field so we can re-install (simulates re-launch after crash etc.)
         let mut m = crate::instance::store::read_instance_manifest(&paths, slug)
@@ -1470,10 +1499,7 @@ mod tests {
             .await
             .unwrap();
         assert!(m2.loader.is_some(), "loader should be set after re-attach");
-        assert_eq!(
-            m2.loader.unwrap().version_id,
-            "fabric-loader-0.16.9-1.21.4"
-        );
+        assert_eq!(m2.loader.unwrap().version_id, "fabric-loader-0.16.9-1.21.4");
     }
 
     #[tokio::test]
@@ -1628,7 +1654,10 @@ mod tests {
             .unwrap();
         assert_eq!(m.loader.as_ref().unwrap().kind, ModloaderKind::Fabric);
         let fabric_version_dir = paths.versions_dir().join("fabric-loader-0.16.9-1.21.4");
-        assert!(fabric_version_dir.exists(), "fabric version dir should exist");
+        assert!(
+            fabric_version_dir.exists(),
+            "fabric version dir should exist"
+        );
 
         // 2. Remove Fabric
         svc.remove_loader(&paths, slug).await.unwrap();
@@ -1666,12 +1695,10 @@ mod tests {
         assert_eq!(loader.version_id, "quilt-loader-0.30.0-beta.7-1.21.4");
 
         // Quilt version JSON written
-        let quilt_version_dir =
-            paths.versions_dir().join("quilt-loader-0.30.0-beta.7-1.21.4");
-        assert!(
-            quilt_version_dir.exists(),
-            "quilt version dir should exist"
-        );
+        let quilt_version_dir = paths
+            .versions_dir()
+            .join("quilt-loader-0.30.0-beta.7-1.21.4");
+        assert!(quilt_version_dir.exists(), "quilt version dir should exist");
         // Old Fabric dir still gone
         assert!(
             !fabric_version_dir.exists(),
@@ -1808,10 +1835,7 @@ mod forge_neoforge_tests {
             )
             .await;
         // Expect Cancelled or an error (download might fail before cancel is checked)
-        assert!(
-            r.is_err(),
-            "expected error after cancel, got: {r:?}"
-        );
+        assert!(r.is_err(), "expected error after cancel, got: {r:?}");
 
         // Atomicity invariant: manifest loader must stay None.
         let m = crate::instance::store::read_instance_manifest(&paths, slug)
@@ -1840,11 +1864,17 @@ mod forge_neoforge_tests {
 
         // Pre-create vanilla version JSON so staging populate_vanilla doesn't fail.
         let vj_path = paths.version_json(mc);
-        tokio::fs::create_dir_all(vj_path.parent().unwrap()).await.unwrap();
-        tokio::fs::write(&vj_path, br#"{"id":"1.20.1"}"#).await.unwrap();
+        tokio::fs::create_dir_all(vj_path.parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(&vj_path, br#"{"id":"1.20.1"}"#)
+            .await
+            .unwrap();
         // Pre-create vanilla JAR (also needed by populate_vanilla).
         let vjar_path = paths.version_jar(mc);
-        tokio::fs::create_dir_all(vjar_path.parent().unwrap()).await.unwrap();
+        tokio::fs::create_dir_all(vjar_path.parent().unwrap())
+            .await
+            .unwrap();
         tokio::fs::write(&vjar_path, b"FAKE_JAR").await.unwrap();
 
         // Pre-cache the installer JAR so the download step short-circuits.
@@ -1852,8 +1882,12 @@ mod forge_neoforge_tests {
             .cache_dir
             .join("installers")
             .join(format!("forge-{mc}-{loader_v}-installer.jar"));
-        tokio::fs::create_dir_all(installer.parent().unwrap()).await.unwrap();
-        tokio::fs::write(&installer, b"PK\x03\x04FAKE").await.unwrap();
+        tokio::fs::create_dir_all(installer.parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(&installer, b"PK\x03\x04FAKE")
+            .await
+            .unwrap();
 
         let svc = make_svc();
         let (tx, _rx) = mpsc::channel(64);

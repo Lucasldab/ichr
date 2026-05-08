@@ -97,21 +97,15 @@ pub fn view(state: &AppState, f: &mut Frame) {
         ActiveView::LoaderSwitchConfirm { .. } => render_loader_switch_confirm(f, main, state),
         // Phase 8 (08-08): Modrinth views.
         ActiveView::ModBrowser { .. } => render_mod_browser(f, main, state),
-        ActiveView::ModVersionPickerModal { .. } => {
-            render_mod_version_picker_modal(f, main, state)
-        }
+        ActiveView::ModVersionPickerModal { .. } => render_mod_version_picker_modal(f, main, state),
         ActiveView::DepConfirmModal { .. } => render_dep_confirm_modal(f, main, state),
         ActiveView::InstalledModsList { .. } => render_installed_mods_list(f, main, state),
         ActiveView::UninstallModConfirm { .. } => render_uninstall_mod_confirm(f, main, state),
-        ActiveView::ModInstallFailedModal { .. } => {
-            render_mod_install_failed_modal(f, main, state)
-        }
+        ActiveView::ModInstallFailedModal { .. } => render_mod_install_failed_modal(f, main, state),
         // Phase 9 (09-07): CurseForge views.
         ActiveView::CfBrowser { .. } => render_cf_browser(f, main, state),
         ActiveView::CfFilePickerModal { .. } => render_cf_file_picker_modal(f, main, state),
-        ActiveView::CfInstallFailedModal { .. } => {
-            render_cf_install_failed_modal(f, main, state)
-        }
+        ActiveView::CfInstallFailedModal { .. } => render_cf_install_failed_modal(f, main, state),
         // Phase 10 (10-06): Modpack import views.
         ActiveView::ModpackImportPathInput { .. } => {
             render_modpack_import_path_modal(f, main, state)

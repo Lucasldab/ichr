@@ -26,14 +26,22 @@ fn task_progress_upserts_active_jobs() {
 
     let _ = update(
         &mut state,
-        Action::Task(TaskEvent::Progress { id, pct: 10, msg: "starting".into() }),
+        Action::Task(TaskEvent::Progress {
+            id,
+            pct: 10,
+            msg: "starting".into(),
+        }),
     );
     assert_eq!(state.active_jobs.len(), 1);
     assert_eq!(state.active_jobs[0].1, 10);
 
     let _ = update(
         &mut state,
-        Action::Task(TaskEvent::Progress { id, pct: 50, msg: "halfway".into() }),
+        Action::Task(TaskEvent::Progress {
+            id,
+            pct: 50,
+            msg: "halfway".into(),
+        }),
     );
     assert_eq!(state.active_jobs.len(), 1, "should upsert, not append");
     assert_eq!(state.active_jobs[0].1, 50);
@@ -47,7 +55,11 @@ fn task_completed_removes_from_active_jobs() {
 
     let _ = update(
         &mut state,
-        Action::Task(TaskEvent::Progress { id, pct: 25, msg: "running".into() }),
+        Action::Task(TaskEvent::Progress {
+            id,
+            pct: 25,
+            msg: "running".into(),
+        }),
     );
     assert_eq!(state.active_jobs.len(), 1);
 
@@ -130,7 +142,10 @@ fn test_toggle_version_filter_cycles_releases_and_all() {
     assert_eq!(state.versions_filter, VersionFilter::Releases);
     let _effects = update(&mut state, Action::SetVersionFilter(VersionFilter::All));
     assert_eq!(state.versions_filter, VersionFilter::All);
-    let _effects = update(&mut state, Action::SetVersionFilter(VersionFilter::Releases));
+    let _effects = update(
+        &mut state,
+        Action::SetVersionFilter(VersionFilter::Releases),
+    );
     assert_eq!(state.versions_filter, VersionFilter::Releases);
 }
 
@@ -157,7 +172,10 @@ fn test_select_version_emits_create_instance_effect() {
 
     let effects = update(&mut state, Action::SelectVersion("1.21.4".into()));
     assert_eq!(effects.len(), 1);
-    let Effect::CreateInstance { ref mc_version_id, .. } = effects[0] else {
+    let Effect::CreateInstance {
+        ref mc_version_id, ..
+    } = effects[0]
+    else {
         panic!("expected CreateInstance, got {:?}", effects[0]);
     };
     assert_eq!(mc_version_id, "1.21.4");
@@ -169,7 +187,11 @@ fn test_progress_updates_active_jobs() {
     let id = JobId(1);
     let _effects = update(
         &mut state,
-        Action::Task(TaskEvent::Progress { id, pct: 50, msg: "libs".into() }),
+        Action::Task(TaskEvent::Progress {
+            id,
+            pct: 50,
+            msg: "libs".into(),
+        }),
     );
     assert_eq!(state.active_jobs.len(), 1);
     assert_eq!(state.active_jobs[0].0, JobId(1));
@@ -198,7 +220,9 @@ fn test_confirm_delete_emits_delete_instance_effect() {
     };
     let effects = update(&mut state, Action::ConfirmDelete);
     assert!(
-        effects.iter().any(|e| matches!(e, Effect::DeleteInstance(s) if s == "alpha")),
+        effects
+            .iter()
+            .any(|e| matches!(e, Effect::DeleteInstance(s) if s == "alpha")),
         "expected DeleteInstance(alpha)"
     );
     assert!(matches!(state.active_view, ActiveView::InstanceList { .. }));
@@ -276,7 +300,9 @@ fn test_version_filter_includes_releases_and_excludes_old_beta() {
     // All: release + snapshot pass; old_beta and old_alpha still excluded.
     let all = filter_version_list(&versions, VersionFilter::All, "");
     assert_eq!(all.len(), 2);
-    assert!(all.iter().all(|v| v.version_type != "old_beta" && v.version_type != "old_alpha"));
+    assert!(all
+        .iter()
+        .all(|v| v.version_type != "old_beta" && v.version_type != "old_alpha"));
 
     // Search filters by id substring.
     let searched = filter_version_list(&versions, VersionFilter::All, "1.21");
@@ -294,7 +320,9 @@ fn test_view_renders_empty_state_without_crash() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
     let state = AppState::default();
-    terminal.draw(|f| mineltui::tui::view::view(&state, f)).unwrap();
+    terminal
+        .draw(|f| mineltui::tui::view::view(&state, f))
+        .unwrap();
 }
 
 #[test]
@@ -307,7 +335,9 @@ fn test_view_dispatches_without_panic() {
 
     // InstanceList (default)
     let state = AppState::default();
-    terminal.draw(|f| mineltui::tui::view::view(&state, f)).unwrap();
+    terminal
+        .draw(|f| mineltui::tui::view::view(&state, f))
+        .unwrap();
 
     // CreateModal / NameInput
     let state = AppState {
@@ -317,7 +347,9 @@ fn test_view_dispatches_without_panic() {
         }),
         ..AppState::default()
     };
-    terminal.draw(|f| mineltui::tui::view::view(&state, f)).unwrap();
+    terminal
+        .draw(|f| mineltui::tui::view::view(&state, f))
+        .unwrap();
 
     // CreateModal / VersionPicker
     let state = AppState {
@@ -329,7 +361,9 @@ fn test_view_dispatches_without_panic() {
         }),
         ..AppState::default()
     };
-    terminal.draw(|f| mineltui::tui::view::view(&state, f)).unwrap();
+    terminal
+        .draw(|f| mineltui::tui::view::view(&state, f))
+        .unwrap();
 
     // DeleteConfirm
     let state = AppState {
@@ -339,7 +373,9 @@ fn test_view_dispatches_without_panic() {
         },
         ..AppState::default()
     };
-    terminal.draw(|f| mineltui::tui::view::view(&state, f)).unwrap();
+    terminal
+        .draw(|f| mineltui::tui::view::view(&state, f))
+        .unwrap();
 
     // RenameInline
     let state = AppState {
@@ -350,7 +386,9 @@ fn test_view_dispatches_without_panic() {
         },
         ..AppState::default()
     };
-    terminal.draw(|f| mineltui::tui::view::view(&state, f)).unwrap();
+    terminal
+        .draw(|f| mineltui::tui::view::view(&state, f))
+        .unwrap();
 
     // GroupInline
     let state = AppState {
@@ -362,7 +400,9 @@ fn test_view_dispatches_without_panic() {
         instances: vec![],
         ..AppState::default()
     };
-    terminal.draw(|f| mineltui::tui::view::view(&state, f)).unwrap();
+    terminal
+        .draw(|f| mineltui::tui::view::view(&state, f))
+        .unwrap();
 }
 
 // ---- INST-06 group-assign smoke tests (Task 2-09-01) ------------------------
@@ -384,10 +424,13 @@ fn test_group_assign_emits_set_group_effect() {
     };
 
     // Open the group editor for the selected row.
-    let _ = update(&mut state, Action::OpenGroupInput {
-        slug: "alpha".into(),
-        current: String::new(),
-    });
+    let _ = update(
+        &mut state,
+        Action::OpenGroupInput {
+            slug: "alpha".into(),
+            current: String::new(),
+        },
+    );
     assert!(
         matches!(&state.active_view, ActiveView::GroupInline { slug, buffer, .. } if slug == "alpha" && buffer.is_empty()),
         "expected GroupInline state with empty buffer"
@@ -424,10 +467,13 @@ fn test_group_assign_empty_buffer_clears_group() {
     };
 
     // Open the editor prefilled with "smp" (as run.rs would do).
-    let _ = update(&mut state, Action::OpenGroupInput {
-        slug: "beta".into(),
-        current: "smp".into(),
-    });
+    let _ = update(
+        &mut state,
+        Action::OpenGroupInput {
+            slug: "beta".into(),
+            current: "smp".into(),
+        },
+    );
     // Clear the buffer with three backspaces.
     let _ = update(&mut state, Action::BackspaceGroup);
     let _ = update(&mut state, Action::BackspaceGroup);
@@ -439,7 +485,10 @@ fn test_group_assign_empty_buffer_clears_group() {
         panic!("expected Effect::SetGroup, got {:?}", effects[0]);
     };
     assert_eq!(slug, "beta");
-    assert!(group.is_none(), "empty submission must clear the group (pass None)");
+    assert!(
+        group.is_none(),
+        "empty submission must clear the group (pass None)"
+    );
 }
 
 #[test]
@@ -468,7 +517,12 @@ fn test_enter_on_non_running_emits_launch_effect() {
         instances: vec![make_instance("alpha", "Alpha", None)],
         ..AppState::default()
     };
-    let effects = update(&mut state, Action::LaunchInstance { slug: "alpha".into() });
+    let effects = update(
+        &mut state,
+        Action::LaunchInstance {
+            slug: "alpha".into(),
+        },
+    );
     assert_eq!(effects.len(), 1);
     assert!(
         matches!(&effects[0], Effect::LaunchInstance { slug, .. } if slug == "alpha"),
@@ -483,9 +537,19 @@ fn test_enter_on_running_is_noop() {
         instances: vec![make_instance("alpha", "Alpha", None)],
         ..AppState::default()
     };
-    state.running_instances.insert("alpha".into(), CancellationToken::new());
-    let effects = update(&mut state, Action::LaunchInstance { slug: "alpha".into() });
-    assert!(effects.is_empty(), "launching an already-running instance must be a no-op");
+    state
+        .running_instances
+        .insert("alpha".into(), CancellationToken::new());
+    let effects = update(
+        &mut state,
+        Action::LaunchInstance {
+            slug: "alpha".into(),
+        },
+    );
+    assert!(
+        effects.is_empty(),
+        "launching an already-running instance must be a no-op"
+    );
 }
 
 #[test]
@@ -493,7 +557,12 @@ fn test_s_on_running_emits_kill_effect() {
     let mut state = AppState::default();
     let token = CancellationToken::new();
     state.running_instances.insert("beta".into(), token.clone());
-    let effects = update(&mut state, Action::StopInstance { slug: "beta".into() });
+    let effects = update(
+        &mut state,
+        Action::StopInstance {
+            slug: "beta".into(),
+        },
+    );
     assert_eq!(effects.len(), 1);
     assert!(
         matches!(&effects[0], Effect::KillProcess { slug } if slug == "beta"),
@@ -515,7 +584,9 @@ fn test_s_on_running_emits_kill_effect() {
 #[test]
 fn test_launch_failed_transitions_to_modal() {
     let mut state = AppState::default();
-    state.running_instances.insert("gamma".into(), CancellationToken::new());
+    state
+        .running_instances
+        .insert("gamma".into(), CancellationToken::new());
     let effects = update(
         &mut state,
         Action::LaunchFailed {
@@ -540,10 +611,15 @@ fn test_launch_failed_transitions_to_modal() {
 #[test]
 fn test_instance_exited_refreshes_list() {
     let mut state = AppState::default();
-    state.running_instances.insert("delta".into(), CancellationToken::new());
+    state
+        .running_instances
+        .insert("delta".into(), CancellationToken::new());
     let effects = update(
         &mut state,
-        Action::InstanceExited { slug: "delta".into(), duration_ms: 1234 },
+        Action::InstanceExited {
+            slug: "delta".into(),
+            duration_ms: 1234,
+        },
     );
     assert!(
         !state.running_instances.contains_key("delta"),
@@ -562,9 +638,15 @@ fn test_launch_job_started_inserts_token() {
     let token = CancellationToken::new();
     let effects = update(
         &mut state,
-        Action::LaunchJobStarted { slug: "epsilon".into(), token },
+        Action::LaunchJobStarted {
+            slug: "epsilon".into(),
+            token,
+        },
     );
-    assert!(effects.is_empty(), "LaunchJobStarted must produce no effects");
+    assert!(
+        effects.is_empty(),
+        "LaunchJobStarted must produce no effects"
+    );
     assert!(
         state.running_instances.contains_key("epsilon"),
         "LaunchJobStarted must insert slug into running_instances"
@@ -581,7 +663,9 @@ fn test_d_on_running_is_noop() {
         instances: vec![make_instance("zeta", "Zeta", None)],
         ..AppState::default()
     };
-    state.running_instances.insert("zeta".into(), CancellationToken::new());
+    state
+        .running_instances
+        .insert("zeta".into(), CancellationToken::new());
 
     let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
     let action = map_event_pub(ev, &state);
@@ -720,7 +804,10 @@ fn test_launch_effect_with_active_account_is_msa() {
     };
     let effects = update(&mut state, Action::LaunchInstance { slug: "s".into() });
     match effects.as_slice() {
-        [Effect::LaunchInstance { auth_ctx: AuthContext::Msa { account_id }, .. }] => {
+        [Effect::LaunchInstance {
+            auth_ctx: AuthContext::Msa { account_id },
+            ..
+        }] => {
             assert_eq!(account_id, "acc-1");
         }
         other => panic!("expected Msa launch, got {other:?}"),
@@ -739,12 +826,15 @@ fn test_accounts_loaded_sets_active_id() {
 // ---- Phase 5 Java picker smoke tests (Task 05-08-01) ------------------------
 
 use mineltui::java::detect::SystemJava;
-use mineltui::tui::app::JavaPickerRow;
 use mineltui::java::types::JavaRuntimeId;
+use mineltui::tui::app::JavaPickerRow;
 use std::path::PathBuf;
 
 fn make_system_java(path: &str, major: u32) -> SystemJava {
-    SystemJava { path: PathBuf::from(path), major_version: major }
+    SystemJava {
+        path: PathBuf::from(path),
+        major_version: major,
+    }
 }
 
 // (1) j on a running instance is a no-op
@@ -757,7 +847,9 @@ fn test_j_on_running_instance_is_noop() {
         instances: vec![make_instance("alpha", "Alpha", None)],
         ..AppState::default()
     };
-    state.running_instances.insert("alpha".into(), CancellationToken::new());
+    state
+        .running_instances
+        .insert("alpha".into(), CancellationToken::new());
 
     let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
     let action = map_event_pub(ev, &state);
@@ -793,7 +885,9 @@ fn test_j_on_non_running_opens_java_picker() {
         "expected JavaPickerModal after OpenJavaPicker"
     );
     assert!(
-        effects.iter().any(|e| matches!(e, Effect::FetchSystemJavas { slug } if slug == "beta")),
+        effects
+            .iter()
+            .any(|e| matches!(e, Effect::FetchSystemJavas { slug } if slug == "beta")),
         "expected FetchSystemJavas effect"
     );
 }
@@ -815,13 +909,18 @@ fn test_java_picker_options_loaded_populates_modal() {
         JavaPickerRow::Detected(make_system_java("/usr/bin/java", 21)),
         JavaPickerRow::Manual,
     ];
-    let _ = update(&mut state, Action::JavaPickerOptionsLoaded {
-        slug: "gamma".into(),
-        options: new_options,
-    });
+    let _ = update(
+        &mut state,
+        Action::JavaPickerOptionsLoaded {
+            slug: "gamma".into(),
+            options: new_options,
+        },
+    );
 
     match &state.active_view {
-        ActiveView::JavaPickerModal { options, selected, .. } => {
+        ActiveView::JavaPickerModal {
+            options, selected, ..
+        } => {
             assert_eq!(options.len(), 3, "options must be replaced");
             assert_eq!(*selected, 0, "selected must reset to 0");
         }
@@ -852,7 +951,10 @@ fn test_java_picker_move_wraps_around() {
 
     match &state.active_view {
         ActiveView::JavaPickerModal { selected, .. } => {
-            assert_eq!(*selected, 0, "three +1 moves on 3 options must wrap back to 0");
+            assert_eq!(
+                *selected, 0,
+                "three +1 moves on 3 options must wrap back to 0"
+            );
         }
         other => panic!("expected JavaPickerModal, got {other:?}"),
     }
@@ -908,7 +1010,10 @@ fn test_java_picker_enter_on_detected_dispatches_set_override_system() {
             override_id: Some(JavaRuntimeId::System { path, major_version: 21 }),
         } if slug == "zeta" && path == &PathBuf::from("/usr/lib/jvm/java-21/bin/java"))
     });
-    assert!(found, "expected SetJavaOverride with System{{path,21}}, got {effects:?}");
+    assert!(
+        found,
+        "expected SetJavaOverride with System{{path,21}}, got {effects:?}"
+    );
 }
 
 // (7) Esc returns to InstanceList with no Effect
@@ -962,7 +1067,8 @@ fn key_l() -> CtEvent {
 
 fn state_with_one_instance(slug: &str, mc: &str) -> AppState {
     let mut s = AppState::default();
-    s.instances.push(InstanceManifest::new(slug.into(), slug.into(), mc.into()));
+    s.instances
+        .push(InstanceManifest::new(slug.into(), slug.into(), mc.into()));
     s
 }
 
@@ -981,7 +1087,8 @@ fn test_uppercase_L_on_instance_list_opens_loader_picker() {
 #[allow(non_snake_case)]
 fn test_uppercase_L_on_running_instance_is_noop() {
     let mut s = state_with_one_instance("ti", "1.21.4");
-    s.running_instances.insert("ti".into(), CancellationToken::new());
+    s.running_instances
+        .insert("ti".into(), CancellationToken::new());
     let action = map_event_pub(key_l(), &s);
     assert!(action.is_none(), "L on a running instance should be no-op");
 }
@@ -990,9 +1097,13 @@ fn test_uppercase_L_on_running_instance_is_noop() {
 #[allow(non_snake_case)]
 fn test_uppercase_L_blocked_when_loader_install_in_flight() {
     let mut s = state_with_one_instance("ti", "1.21.4");
-    s.running_loader_installs.insert("ti".into(), CancellationToken::new());
+    s.running_loader_installs
+        .insert("ti".into(), CancellationToken::new());
     let action = map_event_pub(key_l(), &s);
-    assert!(action.is_none(), "L during in-flight install should be no-op");
+    assert!(
+        action.is_none(),
+        "L during in-flight install should be no-op"
+    );
 }
 
 #[test]
@@ -1002,7 +1113,10 @@ fn test_loader_picker_select_quilt_emits_fetch_effect() {
     let _ = update(&mut s, Action::LoaderPickerMove(2)); // Quilt at index 2
     let effects = update(&mut s, Action::LoaderPickerSelect);
     match effects.as_slice() {
-        [Effect::FetchLoaderVersions { loader_type: LoaderType::Quilt, .. }] => {}
+        [Effect::FetchLoaderVersions {
+            loader_type: LoaderType::Quilt,
+            ..
+        }] => {}
         other => panic!("expected FetchLoaderVersions(Quilt); got {other:?}"),
     }
 }
@@ -1024,14 +1138,23 @@ fn test_loader_install_progress_action_updates_modal_fields() {
         },
         ..AppState::default()
     };
-    let _ = update(&mut s, Action::LoaderInstallProgress {
-        slug: "ti".into(),
-        pct: 42,
-        step_label: "Downloading loader libraries".into(),
-        bytes_done: 100,
-        bytes_total: 200,
-    });
-    if let ActiveView::LoaderInstallProgressModal { step_label, bytes_done, bytes_total, .. } = &s.active_view {
+    let _ = update(
+        &mut s,
+        Action::LoaderInstallProgress {
+            slug: "ti".into(),
+            pct: 42,
+            step_label: "Downloading loader libraries".into(),
+            bytes_done: 100,
+            bytes_total: 200,
+        },
+    );
+    if let ActiveView::LoaderInstallProgressModal {
+        step_label,
+        bytes_done,
+        bytes_total,
+        ..
+    } = &s.active_view
+    {
         assert_eq!(step_label, "Downloading loader libraries");
         assert_eq!(*bytes_done, 100);
         assert_eq!(*bytes_total, 200);
@@ -1043,7 +1166,8 @@ fn test_loader_install_progress_action_updates_modal_fields() {
 #[test]
 fn test_loader_installed_clears_token_and_emits_fetch_instances() {
     let mut s = AppState::default();
-    s.running_loader_installs.insert("ti".into(), CancellationToken::new());
+    s.running_loader_installs
+        .insert("ti".into(), CancellationToken::new());
     let effects = update(&mut s, Action::LoaderInstalled { slug: "ti".into() });
     assert!(s.running_loader_installs.is_empty());
     assert!(matches!(s.active_view, ActiveView::InstanceList { .. }));
@@ -1053,16 +1177,23 @@ fn test_loader_installed_clears_token_and_emits_fetch_instances() {
 #[test]
 fn test_loader_install_failed_routes_to_failed_modal() {
     let mut s = AppState::default();
-    s.running_loader_installs.insert("ti".into(), CancellationToken::new());
-    let _ = update(&mut s, Action::LoaderInstallFailed {
-        slug: "ti".into(),
-        loader: LoaderType::Quilt,
-        version: "0.30.0-beta.7".into(),
-        error: "no network".into(),
-        log_tail: "GET ...".into(),
-    });
+    s.running_loader_installs
+        .insert("ti".into(), CancellationToken::new());
+    let _ = update(
+        &mut s,
+        Action::LoaderInstallFailed {
+            slug: "ti".into(),
+            loader: LoaderType::Quilt,
+            version: "0.30.0-beta.7".into(),
+            error: "no network".into(),
+            log_tail: "GET ...".into(),
+        },
+    );
     assert!(s.running_loader_installs.is_empty());
-    assert!(matches!(s.active_view, ActiveView::LoaderInstallFailedModal { .. }));
+    assert!(matches!(
+        s.active_view,
+        ActiveView::LoaderInstallFailedModal { .. }
+    ));
 }
 
 #[test]
@@ -1105,7 +1236,11 @@ fn test_confirm_loader_switch_to_quilt_emits_install_effect() {
     };
     let effects = update(&mut s, Action::ConfirmLoaderSwitch);
     match effects.as_slice() {
-        [Effect::InstallLoader { loader_type: LoaderType::Quilt, loader_version, .. }] => {
+        [Effect::InstallLoader {
+            loader_type: LoaderType::Quilt,
+            loader_version,
+            ..
+        }] => {
             assert_eq!(loader_version, "0.30.0-beta.7");
         }
         other => panic!("expected Effect::InstallLoader(Quilt); got {other:?}"),
@@ -1133,7 +1268,10 @@ fn test_cancel_loader_install_cancels_token_and_returns_to_list() {
     assert!(t.is_cancelled());
     assert!(s.running_loader_installs.is_empty());
     assert!(matches!(s.active_view, ActiveView::InstanceList { .. }));
-    assert!(matches!(effects.as_slice(), [Effect::CancelLoaderInstall { .. }]));
+    assert!(matches!(
+        effects.as_slice(),
+        [Effect::CancelLoaderInstall { .. }]
+    ));
 }
 
 // ========================================================================
@@ -1152,7 +1290,8 @@ use mineltui::tui::app::ModInstallFailedReturnTo;
 /// loader-bearing helpers can coexist.
 fn make_state_with_one_instance(slug: &str, mc: &str) -> AppState {
     let mut s = AppState::default();
-    s.instances.push(InstanceManifest::new(slug.into(), slug.into(), mc.into()));
+    s.instances
+        .push(InstanceManifest::new(slug.into(), slug.into(), mc.into()));
     s
 }
 
@@ -1219,7 +1358,12 @@ fn test_open_mod_browser_emits_search_effect_and_sets_active_view() {
     let effects = update(&mut state, Action::OpenModBrowser { slug: "foo".into() });
     assert!(matches!(state.active_view, ActiveView::ModBrowser { .. }));
     match effects.as_slice() {
-        [Effect::SearchModrinth { slug, query, mc, loader: _ }] => {
+        [Effect::SearchModrinth {
+            slug,
+            query,
+            mc,
+            loader: _,
+        }] => {
             assert_eq!(slug, "foo");
             assert_eq!(query, "");
             assert_eq!(mc.as_deref(), Some("1.20.4"));
@@ -1232,9 +1376,14 @@ fn test_open_mod_browser_emits_search_effect_and_sets_active_view() {
 fn test_open_mod_browser_blocked_when_install_in_flight() {
     // Pitfall 8 — T-08-07-01.
     let mut state = make_state_with_one_instance("foo", "1.20.4");
-    state.running_mod_jobs.insert("foo".into(), CancellationToken::new());
+    state
+        .running_mod_jobs
+        .insert("foo".into(), CancellationToken::new());
     let prev_active_view_marker = matches!(state.active_view, ActiveView::InstanceList { .. });
-    assert!(prev_active_view_marker, "precondition: starts on InstanceList");
+    assert!(
+        prev_active_view_marker,
+        "precondition: starts on InstanceList"
+    );
     let effects = update(&mut state, Action::OpenModBrowser { slug: "foo".into() });
     assert!(effects.is_empty(), "guard should produce no effect");
     // active_view must NOT have transitioned to ModBrowser.
@@ -1264,7 +1413,12 @@ fn test_mod_browser_search_loaded_replaces_results() {
             hits: vec![hit("P1", "sodium"), hit("P2", "iris")],
         },
     );
-    if let ActiveView::ModBrowser { results, fetch_state, .. } = &state.active_view {
+    if let ActiveView::ModBrowser {
+        results,
+        fetch_state,
+        ..
+    } = &state.active_view
+    {
         assert_eq!(results.len(), 2);
         assert_eq!(*fetch_state, ModBrowserFetchState::Ready);
     } else {
@@ -1337,7 +1491,10 @@ fn test_mod_version_picker_select_emits_resolve_deps_effect() {
         other => panic!("expected ResolveModDependencies; got {other:?}"),
     }
     // Stays on the version picker until ModDepsResolved arrives.
-    assert!(matches!(state.active_view, ActiveView::ModVersionPickerModal { .. }));
+    assert!(matches!(
+        state.active_view,
+        ActiveView::ModVersionPickerModal { .. }
+    ));
 }
 
 #[test]
@@ -1371,7 +1528,11 @@ fn test_dep_confirm_y_emits_install_effect_when_no_conflict() {
     };
     let effects = update(&mut state, Action::ConfirmModInstall);
     match effects.as_slice() {
-        [Effect::InstallModWithDeps { slug, project_title, .. }] => {
+        [Effect::InstallModWithDeps {
+            slug,
+            project_title,
+            ..
+        }] => {
             assert_eq!(slug, "foo");
             assert_eq!(project_title, "Sodium");
         }
@@ -1405,7 +1566,10 @@ fn test_dep_confirm_y_blocked_when_has_conflict() {
     let effects = update(&mut state, Action::ConfirmModInstall);
     assert!(effects.is_empty(), "y must be a no-op when has_conflict");
     // Stays on the same modal.
-    assert!(matches!(state.active_view, ActiveView::DepConfirmModal { .. }));
+    assert!(matches!(
+        state.active_view,
+        ActiveView::DepConfirmModal { .. }
+    ));
 }
 
 #[test]
@@ -1424,11 +1588,20 @@ fn test_mod_installed_stamps_already_installed_in_browser_results() {
     };
     let _ = update(
         &mut state,
-        Action::ModInstalled { slug: "foo".into(), project_id: "P1".into() },
+        Action::ModInstalled {
+            slug: "foo".into(),
+            project_id: "P1".into(),
+        },
     );
     if let ActiveView::ModBrowser { results, .. } = &state.active_view {
-        assert!(results[0].already_installed, "Pitfall 10 — already_installed must be stamped");
-        assert!(!results[1].already_installed, "non-matching project_id must NOT be stamped");
+        assert!(
+            results[0].already_installed,
+            "Pitfall 10 — already_installed must be stamped"
+        );
+        assert!(
+            !results[1].already_installed,
+            "non-matching project_id must NOT be stamped"
+        );
     } else {
         panic!("active_view changed unexpectedly")
     }
@@ -1447,7 +1620,9 @@ fn test_install_failed_routes_to_failed_modal_with_return_to() {
         fetch_state: ModBrowserFetchState::Ready,
         selected_detail: None,
     };
-    state.running_mod_jobs.insert("foo".into(), CancellationToken::new());
+    state
+        .running_mod_jobs
+        .insert("foo".into(), CancellationToken::new());
     let _ = update(
         &mut state,
         Action::ModInstallFailed {
@@ -1471,7 +1646,10 @@ fn test_install_failed_routes_to_failed_modal_with_return_to() {
 fn test_open_installed_mods_emits_fetch_effect() {
     let mut state = make_state_with_one_instance("foo", "1.20.4");
     let effects = update(&mut state, Action::OpenInstalledMods { slug: "foo".into() });
-    assert!(matches!(state.active_view, ActiveView::InstalledModsList { .. }));
+    assert!(matches!(
+        state.active_view,
+        ActiveView::InstalledModsList { .. }
+    ));
     match effects.as_slice() {
         [Effect::FetchInstalledMods { slug }] => assert_eq!(slug, "foo"),
         other => panic!("expected FetchInstalledMods; got {other:?}"),
@@ -1488,7 +1666,10 @@ fn test_uninstall_confirm_y_emits_uninstall_effect() {
     };
     let effects = update(&mut state, Action::ConfirmUninstallMod);
     // Returns to InstalledModsList immediately for responsive UX.
-    assert!(matches!(state.active_view, ActiveView::InstalledModsList { .. }));
+    assert!(matches!(
+        state.active_view,
+        ActiveView::InstalledModsList { .. }
+    ));
     // Effects: UninstallMod followed by FetchInstalledMods refresh.
     match effects.as_slice() {
         [Effect::UninstallMod { slug, mod_id }, Effect::FetchInstalledMods { slug: slug2 }] => {
@@ -1523,10 +1704,17 @@ fn test_toggle_mod_enabled_emits_correct_effect() {
     };
     let effects = update(&mut state, Action::ToggleModEnabled);
     match effects.as_slice() {
-        [Effect::ToggleModEnabledEff { slug, mod_id, want_enabled }] => {
+        [Effect::ToggleModEnabledEff {
+            slug,
+            mod_id,
+            want_enabled,
+        }] => {
             assert_eq!(slug, "foo");
             assert_eq!(mod_id, "P1");
-            assert!(!*want_enabled, "currently enabled → want_enabled should flip to false");
+            assert!(
+                !*want_enabled,
+                "currently enabled → want_enabled should flip to false"
+            );
         }
         other => panic!("expected ToggleModEnabledEff; got {other:?}"),
     }
@@ -1548,7 +1736,10 @@ fn test_toggle_mc_filter_cycles_state_and_re_emits_search() {
     };
     // First toggle: None -> Some("any"). Effect must use mc=None (any filter).
     let effects = update(&mut state, Action::ToggleModMcFilter);
-    if let ActiveView::ModBrowser { mc_filter_override, .. } = &state.active_view {
+    if let ActiveView::ModBrowser {
+        mc_filter_override, ..
+    } = &state.active_view
+    {
         assert_eq!(mc_filter_override.as_deref(), Some("any"));
     } else {
         panic!()
@@ -1563,7 +1754,10 @@ fn test_toggle_mc_filter_cycles_state_and_re_emits_search() {
     // Second toggle: Some("any") -> None. Effect must use mc=Some("1.20.4")
     // (instance default restored).
     let effects = update(&mut state, Action::ToggleModMcFilter);
-    if let ActiveView::ModBrowser { mc_filter_override, .. } = &state.active_view {
+    if let ActiveView::ModBrowser {
+        mc_filter_override, ..
+    } = &state.active_view
+    {
         assert!(mc_filter_override.is_none(), "second toggle restores None");
     } else {
         panic!()
@@ -1609,7 +1803,9 @@ fn test_uppercase_M_on_instance_list_emits_open_mod_browser() {
 fn test_uppercase_M_on_instance_list_blocked_when_install_in_flight() {
     // Pitfall 8 (defense in depth at the keymap layer).
     let mut state = instance_list_state_with("alpha", "1.20.4");
-    state.running_mod_jobs.insert("alpha".into(), CancellationToken::new());
+    state
+        .running_mod_jobs
+        .insert("alpha".into(), CancellationToken::new());
     let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('M'), KeyModifiers::NONE));
     assert!(
         map_event_pub(ev, &state).is_none(),
@@ -1968,7 +2164,10 @@ fn test_cf_mod_install_failed_transitions_to_modal_with_web_url() {
             web_url: Some(url.clone()),
         },
     );
-    if let ActiveView::CfInstallFailedModal { web_url: Some(u), .. } = &s.active_view {
+    if let ActiveView::CfInstallFailedModal {
+        web_url: Some(u), ..
+    } = &s.active_view
+    {
         assert_eq!(*u, url);
     } else {
         panic!(
@@ -2038,7 +2237,9 @@ fn render_state_to_string(state: &AppState, width: u16, height: u16) -> String {
     use ratatui::Terminal;
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).unwrap();
-    terminal.draw(|f| mineltui::tui::view::view(state, f)).unwrap();
+    terminal
+        .draw(|f| mineltui::tui::view::view(state, f))
+        .unwrap();
     let buf = terminal.backend().buffer().clone();
     let mut out = String::new();
     for row in 0..height {
@@ -2052,12 +2253,27 @@ fn render_state_to_string(state: &AppState, width: u16, height: u16) -> String {
 #[test]
 fn test_loader_picker_shows_5_rows_for_supported_mc() {
     let mut s = state_with_one_instance("ti", "1.20.1");
-    s.active_view = ActiveView::LoaderPickerModal { slug: "ti".into(), selected: 0 };
+    s.active_view = ActiveView::LoaderPickerModal {
+        slug: "ti".into(),
+        selected: 0,
+    };
     let rendered = render_state_to_string(&s, 80, 24);
-    assert!(rendered.contains("Fabric Loader"), "picker must show Fabric row: {rendered}");
-    assert!(rendered.contains("Quilt Loader"), "picker must show Quilt row: {rendered}");
-    assert!(rendered.contains("Forge"), "picker must show Forge row: {rendered}");
-    assert!(rendered.contains("NeoForge"), "picker must show NeoForge row: {rendered}");
+    assert!(
+        rendered.contains("Fabric Loader"),
+        "picker must show Fabric row: {rendered}"
+    );
+    assert!(
+        rendered.contains("Quilt Loader"),
+        "picker must show Quilt row: {rendered}"
+    );
+    assert!(
+        rendered.contains("Forge"),
+        "picker must show Forge row: {rendered}"
+    );
+    assert!(
+        rendered.contains("NeoForge"),
+        "picker must show NeoForge row: {rendered}"
+    );
 }
 
 #[test]
@@ -2078,7 +2294,10 @@ fn test_loader_install_progress_renders_log_tail() {
         ..AppState::default()
     };
     let rendered = render_state_to_string(&s, 80, 30);
-    assert!(rendered.contains("Running Processor 3/7"), "log_tail not rendered: {rendered}");
+    assert!(
+        rendered.contains("Running Processor 3/7"),
+        "log_tail not rendered: {rendered}"
+    );
 }
 
 #[test]
@@ -2193,7 +2412,10 @@ fn test_path_input_paste_appends_to_buffer() {
         },
         ..AppState::default()
     };
-    update(&mut s, Action::ImportPathPasteSearch("/path/to/pack.mrpack".into()));
+    update(
+        &mut s,
+        Action::ImportPathPasteSearch("/path/to/pack.mrpack".into()),
+    );
     match &s.active_view {
         ActiveView::ModpackImportPathInput { buffer, .. } => {
             assert_eq!(buffer, "x/path/to/pack.mrpack");
@@ -2238,7 +2460,10 @@ fn test_path_input_submit_empty_sets_error() {
     );
     match &s.active_view {
         ActiveView::ModpackImportPathInput { error: Some(e), .. } => {
-            assert!(e.contains("path required"), "error must mention 'path required'; got {e}");
+            assert!(
+                e.contains("path required"),
+                "error must mention 'path required'; got {e}"
+            );
         }
         ActiveView::ModpackImportPathInput { error: None, .. } => {
             panic!("submit with empty path must set error")
@@ -2339,7 +2564,11 @@ fn test_modpack_import_progress_updates_modal_step_label() {
         },
     );
     match &s.active_view {
-        ActiveView::ModpackImportProgressModal { step_label, bytes_done, .. } => {
+        ActiveView::ModpackImportProgressModal {
+            step_label,
+            bytes_done,
+            ..
+        } => {
             assert_eq!(step_label, "Downloading mods 5/10");
             assert_eq!(*bytes_done, 1024);
         }
@@ -2383,7 +2612,9 @@ fn test_cancel_modpack_import_calls_token_cancel_and_returns_to_instance_list() 
         "running_modpack_imports must be empty after cancel"
     );
     assert!(
-        effects.iter().any(|e| matches!(e, Effect::CancelModpackImport)),
+        effects
+            .iter()
+            .any(|e| matches!(e, Effect::CancelModpackImport)),
         "must emit Effect::CancelModpackImport; got {effects:?}"
     );
 }
@@ -2407,7 +2638,12 @@ fn test_modpack_imported_clears_state_and_emits_fetch_instances() {
     };
     s.running_modpack_imports.insert("test-pack".into(), token);
 
-    let effects = update(&mut s, Action::ModpackImported { slug: "test-pack".into() });
+    let effects = update(
+        &mut s,
+        Action::ModpackImported {
+            slug: "test-pack".into(),
+        },
+    );
 
     assert!(
         matches!(s.active_view, ActiveView::InstanceList { selected: 0 }),
@@ -2552,18 +2788,42 @@ fn test_uppercase_R_opens_resource_pack_browser() {
     let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('R'), KeyModifiers::SHIFT));
     let action = map_event_pub(ev, &s);
     assert!(
-        matches!(action, Some(Action::OpenPackBrowser { kind: PackKind::Resource, .. })),
+        matches!(
+            action,
+            Some(Action::OpenPackBrowser {
+                kind: PackKind::Resource,
+                ..
+            })
+        ),
         "expected OpenPackBrowser{{Resource}}; got {action:?}"
     );
     // State transition.
     let mut s2 = pack_instance_state("foo");
-    let effects = update(&mut s2, Action::OpenPackBrowser { slug: "foo".into(), kind: PackKind::Resource });
+    let effects = update(
+        &mut s2,
+        Action::OpenPackBrowser {
+            slug: "foo".into(),
+            kind: PackKind::Resource,
+        },
+    );
     assert!(
-        matches!(s2.active_view, ActiveView::PackBrowser { kind: PackKind::Resource, .. }),
+        matches!(
+            s2.active_view,
+            ActiveView::PackBrowser {
+                kind: PackKind::Resource,
+                ..
+            }
+        ),
         "active_view should be PackBrowser(Resource)"
     );
     assert!(
-        effects.iter().any(|e| matches!(e, Effect::SearchPacks { kind: PackKind::Resource, .. })),
+        effects.iter().any(|e| matches!(
+            e,
+            Effect::SearchPacks {
+                kind: PackKind::Resource,
+                ..
+            }
+        )),
         "should emit SearchPacks(Resource)"
     );
 }
@@ -2578,17 +2838,41 @@ fn test_uppercase_S_opens_shader_pack_browser() {
     let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::SHIFT));
     let action = map_event_pub(ev, &s);
     assert!(
-        matches!(action, Some(Action::OpenPackBrowser { kind: PackKind::Shader, .. })),
+        matches!(
+            action,
+            Some(Action::OpenPackBrowser {
+                kind: PackKind::Shader,
+                ..
+            })
+        ),
         "expected OpenPackBrowser{{Shader}}; got {action:?}"
     );
     let mut s2 = pack_instance_state("foo");
-    let effects = update(&mut s2, Action::OpenPackBrowser { slug: "foo".into(), kind: PackKind::Shader });
+    let effects = update(
+        &mut s2,
+        Action::OpenPackBrowser {
+            slug: "foo".into(),
+            kind: PackKind::Shader,
+        },
+    );
     assert!(
-        matches!(s2.active_view, ActiveView::PackBrowser { kind: PackKind::Shader, .. }),
+        matches!(
+            s2.active_view,
+            ActiveView::PackBrowser {
+                kind: PackKind::Shader,
+                ..
+            }
+        ),
         "active_view should be PackBrowser(Shader)"
     );
     assert!(
-        effects.iter().any(|e| matches!(e, Effect::SearchPacks { kind: PackKind::Shader, .. })),
+        effects.iter().any(|e| matches!(
+            e,
+            Effect::SearchPacks {
+                kind: PackKind::Shader,
+                ..
+            }
+        )),
         "should emit SearchPacks(Shader)"
     );
 }
@@ -2619,7 +2903,8 @@ fn test_lowercase_s_running_still_stops_instance() {
     use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
 
     let mut s = pack_instance_state("foo");
-    s.running_instances.insert("foo".into(), CancellationToken::new());
+    s.running_instances
+        .insert("foo".into(), CancellationToken::new());
     let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
     let action = map_event_pub(ev, &s);
     assert!(
@@ -2641,7 +2926,10 @@ fn test_lowercase_s_not_running_is_no_op() {
     let s = pack_instance_state("foo");
     let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
     let action = map_event_pub(ev, &s);
-    assert!(action.is_none(), "lowercase 's' on non-running instance should be no-op; got {action:?}");
+    assert!(
+        action.is_none(),
+        "lowercase 's' on non-running instance should be no-op; got {action:?}"
+    );
 }
 
 #[test]
@@ -2659,9 +2947,21 @@ fn test_uppercase_D_inside_resource_browser_opens_drop_modal_with_resource_kind(
         },
         ..AppState::default()
     };
-    let effects = update(&mut s, Action::PackDropPathOpen { slug: "foo".into(), kind: PackKind::Resource });
+    let effects = update(
+        &mut s,
+        Action::PackDropPathOpen {
+            slug: "foo".into(),
+            kind: PackKind::Resource,
+        },
+    );
     assert!(
-        matches!(s.active_view, ActiveView::PackDropPathInput { kind: PackKind::Resource, .. }),
+        matches!(
+            s.active_view,
+            ActiveView::PackDropPathInput {
+                kind: PackKind::Resource,
+                ..
+            }
+        ),
         "active_view should be PackDropPathInput(Resource)"
     );
     assert!(effects.is_empty());
@@ -2681,9 +2981,21 @@ fn test_uppercase_D_inside_shader_browser_opens_drop_modal_with_shader_kind() {
         },
         ..AppState::default()
     };
-    let effects = update(&mut s, Action::PackDropPathOpen { slug: "bar".into(), kind: PackKind::Shader });
+    let effects = update(
+        &mut s,
+        Action::PackDropPathOpen {
+            slug: "bar".into(),
+            kind: PackKind::Shader,
+        },
+    );
     assert!(
-        matches!(s.active_view, ActiveView::PackDropPathInput { kind: PackKind::Shader, .. }),
+        matches!(
+            s.active_view,
+            ActiveView::PackDropPathInput {
+                kind: PackKind::Shader,
+                ..
+            }
+        ),
         "active_view should be PackDropPathInput(Shader)"
     );
     assert!(effects.is_empty());
@@ -2707,7 +3019,13 @@ fn test_pack_drop_path_cancel_returns_to_browser() {
         "should return to PackBrowser(Resource, foo)"
     );
     assert!(
-        effects.iter().any(|e| matches!(e, Effect::SearchPacks { kind: PackKind::Resource, .. })),
+        effects.iter().any(|e| matches!(
+            e,
+            Effect::SearchPacks {
+                kind: PackKind::Resource,
+                ..
+            }
+        )),
         "should emit SearchPacks to repopulate browser"
     );
 }
@@ -2727,7 +3045,8 @@ fn test_lowercase_m_enters_installed_mods() {
     }
     assert!(
         matches!(s2.active_view, ActiveView::InstalledModsList { .. }),
-        "m should enter InstalledModsList (Mod kind); got {:?}", s2.active_view
+        "m should enter InstalledModsList (Mod kind); got {:?}",
+        s2.active_view
     );
     assert!(
         !matches!(s2.active_view, ActiveView::InstalledPacksList { .. }),
@@ -2738,16 +3057,32 @@ fn test_lowercase_m_enters_installed_mods() {
 #[test]
 fn test_tab_from_installed_mods_cycles_to_resource() {
     let mut s = AppState {
-        active_view: ActiveView::InstalledModsList { slug: "foo".into(), mods: Vec::new(), selected: 0 },
+        active_view: ActiveView::InstalledModsList {
+            slug: "foo".into(),
+            mods: Vec::new(),
+            selected: 0,
+        },
         ..AppState::default()
     };
     let effects = update(&mut s, Action::InstalledPacksCycleKind);
     assert!(
-        matches!(s.active_view, ActiveView::InstalledPacksList { kind: PackKind::Resource, .. }),
+        matches!(
+            s.active_view,
+            ActiveView::InstalledPacksList {
+                kind: PackKind::Resource,
+                ..
+            }
+        ),
         "Tab from InstalledMods should cycle to InstalledPacksList(Resource)"
     );
     assert!(
-        effects.iter().any(|e| matches!(e, Effect::FetchInstalledPacks { kind: PackKind::Resource, .. })),
+        effects.iter().any(|e| matches!(
+            e,
+            Effect::FetchInstalledPacks {
+                kind: PackKind::Resource,
+                ..
+            }
+        )),
         "should emit FetchInstalledPacks(Resource)"
     );
 }
@@ -2766,11 +3101,23 @@ fn test_tab_from_resource_cycles_to_shader() {
     };
     let effects = update(&mut s, Action::InstalledPacksCycleKind);
     assert!(
-        matches!(s.active_view, ActiveView::InstalledPacksList { kind: PackKind::Shader, .. }),
+        matches!(
+            s.active_view,
+            ActiveView::InstalledPacksList {
+                kind: PackKind::Shader,
+                ..
+            }
+        ),
         "Tab from Resource should cycle to InstalledPacksList(Shader)"
     );
     assert!(
-        effects.iter().any(|e| matches!(e, Effect::FetchInstalledPacks { kind: PackKind::Shader, .. })),
+        effects.iter().any(|e| matches!(
+            e,
+            Effect::FetchInstalledPacks {
+                kind: PackKind::Shader,
+                ..
+            }
+        )),
         "should emit FetchInstalledPacks(Shader)"
     );
 }
@@ -2793,7 +3140,9 @@ fn test_tab_from_shader_cycles_back_to_mods() {
         "Tab from Shader should cycle back to InstalledModsList"
     );
     assert!(
-        effects.iter().any(|e| matches!(e, Effect::FetchInstalledMods { .. })),
+        effects
+            .iter()
+            .any(|e| matches!(e, Effect::FetchInstalledMods { .. })),
         "should emit FetchInstalledMods"
     );
 }
@@ -2813,7 +3162,13 @@ fn test_e_on_resource_row_dispatches_toggle() {
     };
     let effects = update(&mut s, Action::TogglePackEnabled);
     assert!(
-        effects.iter().any(|e| matches!(e, Effect::TogglePackEnabledEff { kind: PackKind::Resource, .. })),
+        effects.iter().any(|e| matches!(
+            e,
+            Effect::TogglePackEnabledEff {
+                kind: PackKind::Resource,
+                ..
+            }
+        )),
         "TogglePackEnabled on Resource should emit TogglePackEnabledEff(Resource); got {effects:?}"
     );
 }
@@ -2832,9 +3187,13 @@ fn test_e_on_shader_row_dispatches_shader_toggle_notice() {
     };
     let effects = update(&mut s, Action::ShaderToggleNotice);
     assert!(effects.is_empty());
-    if let ActiveView::InstalledPacksList { transient_status, .. } = &s.active_view {
+    if let ActiveView::InstalledPacksList {
+        transient_status, ..
+    } = &s.active_view
+    {
         assert!(
-            transient_status.as_deref() == Some("Shaders cannot be toggled — use Iris/OptiFine in-game"),
+            transient_status.as_deref()
+                == Some("Shaders cannot be toggled — use Iris/OptiFine in-game"),
             "transient_status should be set to shader notice; got {transient_status:?}"
         );
     } else {
@@ -2867,10 +3226,14 @@ fn test_x_on_any_pack_kind_opens_confirm() {
 
 #[test]
 fn test_pack_browser_search_loaded_with_matching_slug_kind_populates_results() {
-    let hits = vec![
-        ModrinthSearchHit { project_id: "p1".into(), slug: "cool".into(), title: "Cool Pack".into(),
-            description: "nice".into(), downloads: 100, already_installed: false },
-    ];
+    let hits = vec![ModrinthSearchHit {
+        project_id: "p1".into(),
+        slug: "cool".into(),
+        title: "Cool Pack".into(),
+        description: "nice".into(),
+        downloads: 100,
+        already_installed: false,
+    }];
     let mut s = AppState {
         active_view: ActiveView::PackBrowser {
             slug: "foo".into(),
@@ -2882,14 +3245,25 @@ fn test_pack_browser_search_loaded_with_matching_slug_kind_populates_results() {
         },
         ..AppState::default()
     };
-    let _ = update(&mut s, Action::PackBrowserSearchLoaded {
-        slug: "foo".into(),
-        kind: PackKind::Resource,
-        hits: hits.clone(),
-    });
-    if let ActiveView::PackBrowser { results, fetch_state, .. } = &s.active_view {
+    let _ = update(
+        &mut s,
+        Action::PackBrowserSearchLoaded {
+            slug: "foo".into(),
+            kind: PackKind::Resource,
+            hits: hits.clone(),
+        },
+    );
+    if let ActiveView::PackBrowser {
+        results,
+        fetch_state,
+        ..
+    } = &s.active_view
+    {
         assert_eq!(results.len(), 1, "results should be populated");
-        assert_eq!(*fetch_state, mineltui::mods::types::ModBrowserFetchState::Ready);
+        assert_eq!(
+            *fetch_state,
+            mineltui::mods::types::ModBrowserFetchState::Ready
+        );
     } else {
         panic!("active_view changed unexpectedly");
     }
@@ -2909,14 +3283,26 @@ fn test_pack_browser_search_loaded_with_mismatched_slug_does_not_overwrite() {
         },
         ..AppState::default()
     };
-    let _ = update(&mut s, Action::PackBrowserSearchLoaded {
-        slug: "bar".into(),  // mismatched slug
-        kind: PackKind::Resource,
-        hits: vec![ModrinthSearchHit { project_id: "p1".into(), slug: "x".into(),
-            title: "X".into(), description: "x".into(), downloads: 0, already_installed: false }],
-    });
+    let _ = update(
+        &mut s,
+        Action::PackBrowserSearchLoaded {
+            slug: "bar".into(), // mismatched slug
+            kind: PackKind::Resource,
+            hits: vec![ModrinthSearchHit {
+                project_id: "p1".into(),
+                slug: "x".into(),
+                title: "X".into(),
+                description: "x".into(),
+                downloads: 0,
+                already_installed: false,
+            }],
+        },
+    );
     if let ActiveView::PackBrowser { results, .. } = &s.active_view {
-        assert!(results.is_empty(), "mismatched slug should NOT overwrite results");
+        assert!(
+            results.is_empty(),
+            "mismatched slug should NOT overwrite results"
+        );
     } else {
         panic!("active_view changed unexpectedly");
     }
@@ -2936,14 +3322,26 @@ fn test_pack_browser_search_loaded_with_mismatched_kind_does_not_overwrite() {
         },
         ..AppState::default()
     };
-    let _ = update(&mut s, Action::PackBrowserSearchLoaded {
-        slug: "foo".into(),
-        kind: PackKind::Shader,  // mismatched kind
-        hits: vec![ModrinthSearchHit { project_id: "p1".into(), slug: "x".into(),
-            title: "X".into(), description: "x".into(), downloads: 0, already_installed: false }],
-    });
+    let _ = update(
+        &mut s,
+        Action::PackBrowserSearchLoaded {
+            slug: "foo".into(),
+            kind: PackKind::Shader, // mismatched kind
+            hits: vec![ModrinthSearchHit {
+                project_id: "p1".into(),
+                slug: "x".into(),
+                title: "X".into(),
+                description: "x".into(),
+                downloads: 0,
+                already_installed: false,
+            }],
+        },
+    );
     if let ActiveView::PackBrowser { results, .. } = &s.active_view {
-        assert!(results.is_empty(), "mismatched kind should NOT overwrite results");
+        assert!(
+            results.is_empty(),
+            "mismatched kind should NOT overwrite results"
+        );
     } else {
         panic!("active_view changed unexpectedly");
     }
@@ -2952,9 +3350,20 @@ fn test_pack_browser_search_loaded_with_mismatched_kind_does_not_overwrite() {
 #[test]
 fn test_pack_installed_action_clears_running_pack_jobs_entry() {
     let mut s = AppState::default();
-    s.running_pack_jobs.insert(("foo".into(), PackKind::Resource), CancellationToken::new());
-    assert_eq!(s.running_pack_jobs.len(), 1, "precondition: one entry in running_pack_jobs");
-    let _ = update(&mut s, Action::PackInstalled { slug: "foo".into(), kind: PackKind::Resource });
+    s.running_pack_jobs
+        .insert(("foo".into(), PackKind::Resource), CancellationToken::new());
+    assert_eq!(
+        s.running_pack_jobs.len(),
+        1,
+        "precondition: one entry in running_pack_jobs"
+    );
+    let _ = update(
+        &mut s,
+        Action::PackInstalled {
+            slug: "foo".into(),
+            kind: PackKind::Resource,
+        },
+    );
     assert!(
         s.running_pack_jobs.is_empty(),
         "PackInstalled should clear the running_pack_jobs entry"

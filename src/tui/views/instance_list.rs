@@ -7,11 +7,7 @@ use crate::tui::app::{ActiveView, AppState};
 
 pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
     // Reserve the last row for the active-account footer.
-    let chunks = Layout::vertical([
-        Constraint::Min(1),
-        Constraint::Length(1),
-    ])
-    .split(area);
+    let chunks = Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).split(area);
 
     let table_area = chunks[0];
     let footer_area = chunks[1];
@@ -76,14 +72,18 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
     f.render_widget(table, table_area);
 
     // Active-account footer row.
-    let footer_text = match state.active_account_id.as_ref().and_then(|id| {
-        state.accounts.iter().find(|a| &a.id == id)
-    }) {
-        Some(a) => format!("Launching as: {}  (press A to manage accounts)", a.mc_username),
+    let footer_text = match state
+        .active_account_id
+        .as_ref()
+        .and_then(|id| state.accounts.iter().find(|a| &a.id == id))
+    {
+        Some(a) => format!(
+            "Launching as: {}  (press A to manage accounts)",
+            a.mc_username
+        ),
         None => "Offline mode — press A to add a Microsoft account".to_string(),
     };
-    let footer = Paragraph::new(footer_text)
-        .style(Style::default().add_modifier(Modifier::DIM));
+    let footer = Paragraph::new(footer_text).style(Style::default().add_modifier(Modifier::DIM));
     f.render_widget(footer, footer_area);
 }
 
@@ -93,10 +93,17 @@ pub fn render_group_inline_overlay(f: &mut Frame, area: Rect, state: &AppState) 
         let h = 3u16;
         let x = area.x + (area.width.saturating_sub(w)) / 2;
         let y = area.y + (area.height.saturating_sub(h)) / 2;
-        let rect = Rect { x, y, width: w, height: h };
+        let rect = Rect {
+            x,
+            y,
+            width: w,
+            height: h,
+        };
         let text = format!("Group for {slug}: {buffer}_   (Enter=save, empty=clear, Esc=cancel)");
         let p = Paragraph::new(text).block(
-            Block::default().borders(Borders::ALL).title("Set group (g)"),
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Set group (g)"),
         );
         f.render_widget(ratatui::widgets::Clear, rect);
         f.render_widget(p, rect);

@@ -62,7 +62,10 @@ async fn spawn_task_completes_ok() {
 
     let ev = recv_next(&mut rx).await;
     match ev {
-        TaskEvent::Completed { id: got_id, result: Ok(()) } => assert_eq!(got_id, id),
+        TaskEvent::Completed {
+            id: got_id,
+            result: Ok(()),
+        } => assert_eq!(got_id, id),
         other => panic!("expected Completed(Ok), got {other:?}"),
     }
 }
@@ -92,7 +95,10 @@ async fn cancel_single_job_does_not_cancel_siblings() {
     let mut saw_b_ok = false;
     for _ in 0..2 {
         match recv_next(&mut rx).await {
-            TaskEvent::Completed { id, result: Err(msg) } if id == id_a => {
+            TaskEvent::Completed {
+                id,
+                result: Err(msg),
+            } if id == id_a => {
                 assert_eq!(msg, "Cancelled");
                 saw_a_cancelled = true;
             }
@@ -126,7 +132,10 @@ async fn cancel_all_cancels_everything() {
     let mut cancelled = 0;
     for _ in 0..4 {
         let ev = recv_next(&mut rx).await;
-        if let TaskEvent::Completed { result: Err(msg), .. } = ev {
+        if let TaskEvent::Completed {
+            result: Err(msg), ..
+        } = ev
+        {
             assert_eq!(msg, "Cancelled");
             cancelled += 1;
         }
@@ -184,8 +193,13 @@ async fn error_from_job_surfaces_in_completed() {
 
     let ev = recv_next(&mut rx).await;
     match ev {
-        TaskEvent::Completed { result: Err(msg), .. } => {
-            assert!(msg.contains("boom"), "error message should mention 'boom': {msg}");
+        TaskEvent::Completed {
+            result: Err(msg), ..
+        } => {
+            assert!(
+                msg.contains("boom"),
+                "error message should mention 'boom': {msg}"
+            );
         }
         other => panic!("expected Completed(Err), got {other:?}"),
     }

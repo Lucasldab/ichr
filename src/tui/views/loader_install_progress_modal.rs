@@ -43,7 +43,12 @@ pub fn render_loader_install_progress_modal(f: &mut Frame, area: Rect, state: &A
     let modal_h = 22u16.min(area.height.saturating_sub(4));
     let x = area.x + area.width.saturating_sub(modal_w) / 2;
     let y = area.y + area.height.saturating_sub(modal_h) / 2;
-    let modal_area = Rect { x, y, width: modal_w, height: modal_h };
+    let modal_area = Rect {
+        x,
+        y,
+        width: modal_w,
+        height: modal_h,
+    };
 
     f.render_widget(Clear, modal_area);
     let block = Block::default()
@@ -95,8 +100,7 @@ pub fn render_loader_install_progress_modal(f: &mut Frame, area: Rect, state: &A
     f.render_widget(gauge, chunks[2]);
 
     // Row 4: step counter
-    let p_counter =
-        Paragraph::new(format!("Step {step_index} of {step_total}: {step_label}"));
+    let p_counter = Paragraph::new(format!("Step {step_index} of {step_total}: {step_label}"));
     f.render_widget(p_counter, chunks[4]);
 
     // Row 5: divider
@@ -128,7 +132,9 @@ pub fn map_loader_install_progress_event(
 ) -> Option<Action> {
     use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => {
             if let ActiveView::LoaderInstallProgressModal { slug, .. } = &state.active_view {
                 Some(Action::CancelLoaderInstall { slug: slug.clone() })
             } else {

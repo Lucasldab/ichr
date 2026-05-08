@@ -88,7 +88,10 @@ impl QuiltMetaClient {
                 loader: "quilt",
                 reason: format!("reqwest build: {e}"),
             })?;
-        Ok(Self { http, base_url: base_url.into() })
+        Ok(Self {
+            http,
+            base_url: base_url.into(),
+        })
     }
 
     #[tracing::instrument(skip_all)]
@@ -201,12 +204,11 @@ impl QuiltMetaClient {
 pub fn to_mojang_shape(raw_bytes: &[u8]) -> Result<Vec<u8>, LoaderError> {
     use serde_json::{Map, Value};
 
-    let mut root: Value = serde_json::from_slice(raw_bytes).map_err(|e| {
-        LoaderError::MetaParse {
+    let mut root: Value =
+        serde_json::from_slice(raw_bytes).map_err(|e| LoaderError::MetaParse {
             loader: "quilt",
             reason: format!("translate: parse profile json: {e}"),
-        }
-    })?;
+        })?;
     let obj = root.as_object_mut().ok_or_else(|| LoaderError::MetaParse {
         loader: "quilt",
         reason: "translate: top-level not an object".into(),
@@ -217,16 +219,20 @@ pub fn to_mojang_shape(raw_bytes: &[u8]) -> Result<Vec<u8>, LoaderError> {
             reason: format!("translate: serialize: {e}"),
         });
     };
-    let libs = libs_value.as_array_mut().ok_or_else(|| LoaderError::MetaParse {
-        loader: "quilt",
-        reason: "translate: libraries is not an array".into(),
-    })?;
+    let libs = libs_value
+        .as_array_mut()
+        .ok_or_else(|| LoaderError::MetaParse {
+            loader: "quilt",
+            reason: "translate: libraries is not an array".into(),
+        })?;
 
     for (idx, entry) in libs.iter_mut().enumerate() {
-        let entry_obj = entry.as_object_mut().ok_or_else(|| LoaderError::MetaParse {
-            loader: "quilt",
-            reason: format!("translate: libraries[{idx}] is not an object"),
-        })?;
+        let entry_obj = entry
+            .as_object_mut()
+            .ok_or_else(|| LoaderError::MetaParse {
+                loader: "quilt",
+                reason: format!("translate: libraries[{idx}] is not an object"),
+            })?;
         let name = entry_obj
             .get("name")
             .and_then(|v| v.as_str())
@@ -248,7 +254,10 @@ pub fn to_mojang_shape(raw_bytes: &[u8]) -> Result<Vec<u8>, LoaderError> {
 
         // Quilt-meta does not carry sha1/size — but tolerate them anyway
         // (forward-compat if Quilt ever adds them).
-        let sha1 = entry_obj.get("sha1").and_then(|v| v.as_str()).map(String::from);
+        let sha1 = entry_obj
+            .get("sha1")
+            .and_then(|v| v.as_str())
+            .map(String::from);
         let size = entry_obj.get("size").and_then(|v| v.as_u64());
 
         let mut artifact = Map::new();
@@ -348,7 +357,13 @@ mod tests {
 
         let client = make_client(&server);
         let r = client.list_loader_versions().await;
-        assert!(matches!(r, Err(LoaderError::MetaFetch { loader: "quilt", .. })));
+        assert!(matches!(
+            r,
+            Err(LoaderError::MetaFetch {
+                loader: "quilt",
+                ..
+            })
+        ));
     }
 
     #[tokio::test]
@@ -361,7 +376,13 @@ mod tests {
 
         let client = make_client(&server);
         let r = client.list_loader_versions().await;
-        assert!(matches!(r, Err(LoaderError::MetaParse { loader: "quilt", .. })));
+        assert!(matches!(
+            r,
+            Err(LoaderError::MetaParse {
+                loader: "quilt",
+                ..
+            })
+        ));
     }
 
     // ---- fetch_profile ----
@@ -397,11 +418,23 @@ mod tests {
         assert_eq!(p.id, "quilt-loader-0.30.0-beta.7-1.21.4");
         assert_eq!(p.libraries.len(), 2);
         // Critical assertion per Pattern 6: Quilt has NO hashes (parse-time invariant).
-        assert!(p.libraries[0].sha1.is_none(), "Quilt libs must NOT have sha1");
-        assert!(p.libraries[0].sha256.is_none(), "Quilt libs must NOT have sha256");
-        assert!(p.libraries[0].sha512.is_none(), "Quilt libs must NOT have sha512");
+        assert!(
+            p.libraries[0].sha1.is_none(),
+            "Quilt libs must NOT have sha1"
+        );
+        assert!(
+            p.libraries[0].sha256.is_none(),
+            "Quilt libs must NOT have sha256"
+        );
+        assert!(
+            p.libraries[0].sha512.is_none(),
+            "Quilt libs must NOT have sha512"
+        );
         assert!(p.libraries[0].md5.is_none(), "Quilt libs must NOT have md5");
-        assert!(p.libraries[0].size.is_none(), "Quilt libs must NOT have size");
+        assert!(
+            p.libraries[0].size.is_none(),
+            "Quilt libs must NOT have size"
+        );
         // Same for the second library
         assert!(p.libraries[1].sha1.is_none());
         assert!(p.libraries[1].sha256.is_none());
@@ -424,7 +457,13 @@ mod tests {
 
         let client = make_client(&server);
         let r = client.fetch_profile("1.21.4", "9.9.9").await;
-        assert!(matches!(r, Err(LoaderError::MetaFetch { loader: "quilt", .. })));
+        assert!(matches!(
+            r,
+            Err(LoaderError::MetaFetch {
+                loader: "quilt",
+                ..
+            })
+        ));
     }
 
     // ---- env override ----
@@ -476,7 +515,10 @@ mod tests {
             .expect("translated quilt bytes parse as Mojang VersionJson");
         assert_eq!(v.id, "quilt-loader-0.30.0-beta.7-1.20.4");
         for lib in &v.libraries {
-            let art = lib.downloads.artifact.as_ref()
+            let art = lib
+                .downloads
+                .artifact
+                .as_ref()
                 .unwrap_or_else(|| panic!("library {} must have artifact", lib.name));
             // Quilt has NO upstream hashes — sha1 + size MUST be None.
             assert!(art.sha1.is_none(), "quilt {} sha1 must be None", lib.name);
@@ -495,19 +537,35 @@ mod tests {
         let v: VersionJson = serde_json::from_slice(&translated).unwrap();
 
         // sponge-mixin pulls from Fabric Maven (per-entry url override).
-        let mixin = v.libraries.iter()
-            .find(|l| l.name == "net.fabricmc:sponge-mixin:0.17.0+mixin.0.8.7").unwrap();
+        let mixin = v
+            .libraries
+            .iter()
+            .find(|l| l.name == "net.fabricmc:sponge-mixin:0.17.0+mixin.0.8.7")
+            .unwrap();
         assert!(
-            mixin.downloads.artifact.as_ref().unwrap().url
+            mixin
+                .downloads
+                .artifact
+                .as_ref()
+                .unwrap()
+                .url
                 .starts_with("https://maven.fabricmc.net/"),
             "sponge-mixin url must come from per-entry override"
         );
 
         // quilt-loader pulls from Quilt Maven (per-entry url override).
-        let loader = v.libraries.iter()
-            .find(|l| l.name == "org.quiltmc:quilt-loader:0.30.0-beta.7").unwrap();
+        let loader = v
+            .libraries
+            .iter()
+            .find(|l| l.name == "org.quiltmc:quilt-loader:0.30.0-beta.7")
+            .unwrap();
         assert!(
-            loader.downloads.artifact.as_ref().unwrap().url
+            loader
+                .downloads
+                .artifact
+                .as_ref()
+                .unwrap()
+                .url
                 .starts_with("https://maven.quiltmc.org/"),
             "quilt-loader url must come from per-entry override"
         );
@@ -519,7 +577,10 @@ mod tests {
         let v: serde_json::Value = serde_json::from_slice(&translated).unwrap();
         assert_eq!(v["id"], "quilt-loader-0.30.0-beta.7-1.20.4");
         assert_eq!(v["inheritsFrom"], "1.20.4");
-        assert_eq!(v["mainClass"], "org.quiltmc.loader.impl.launch.knot.KnotClient");
+        assert_eq!(
+            v["mainClass"],
+            "org.quiltmc.loader.impl.launch.knot.KnotClient"
+        );
         // arguments.game empty array preserved.
         assert!(v["arguments"]["game"].is_array());
     }

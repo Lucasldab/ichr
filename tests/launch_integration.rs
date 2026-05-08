@@ -50,13 +50,23 @@ async fn test_end_to_end_launch_1_20_4() {
         .cloned()
         .expect("1.20.4 in manifest");
 
-    let inst = create_instance(&paths, "SmokeTest", "1.20.4").await.unwrap();
+    let inst = create_instance(&paths, "SmokeTest", "1.20.4")
+        .await
+        .unwrap();
 
     let (tx, _rx) = mpsc::channel::<TaskEvent>(256);
     let token = CancellationToken::new();
-    install_version(JobId(1), &paths, &mojang, tx.clone(), token.clone(), &inst.slug, &entry)
-        .await
-        .expect("install 1.20.4");
+    install_version(
+        JobId(1),
+        &paths,
+        &mojang,
+        tx.clone(),
+        token.clone(),
+        &inst.slug,
+        &entry,
+    )
+    .await
+    .expect("install 1.20.4");
 
     assert!(
         paths.version_jar("1.20.4").exists(),
@@ -76,7 +86,9 @@ async fn test_end_to_end_launch_1_20_4() {
     let result = launch_instance(
         &paths,
         &inst.slug,
-        AuthContext::Offline { username: "TestUser".to_string() },
+        AuthContext::Offline {
+            username: "TestUser".to_string(),
+        },
         None,
         &java_service,
         launch_tx,
@@ -102,7 +114,10 @@ async fn test_end_to_end_launch_1_20_4() {
     let contents = tokio::fs::read_to_string(&log_path)
         .await
         .expect("read log file");
-    assert!(!contents.is_empty(), "log file must be non-empty after launch");
+    assert!(
+        !contents.is_empty(),
+        "log file must be non-empty after launch"
+    );
     let signals = ["Setting user", "Minecraft", "Loading", "LWJGL", "Mojang"];
     let found = signals.iter().any(|s| contents.contains(s));
     assert!(
@@ -119,7 +134,7 @@ async fn test_end_to_end_launch_1_20_4() {
 #[tokio::test]
 async fn test_launch_fails_early_on_java_mismatch() {
     use mineltui::instance::store::write_instance_manifest;
-    use mineltui::mojang::types::{AssetIndex, VersionDownloads, VersionJson, JavaVersion};
+    use mineltui::mojang::types::{AssetIndex, JavaVersion, VersionDownloads, VersionJson};
 
     let td = TempDir::new().unwrap();
     let paths = paths_in(&td);
@@ -139,7 +154,9 @@ async fn test_launch_fails_early_on_java_mismatch() {
     // Create a minimal client.jar so the VersionNotInstalled check passes.
     let version_dir = paths.versions_dir().join("1.21.4");
     tokio::fs::create_dir_all(&version_dir).await.unwrap();
-    tokio::fs::write(paths.version_jar("1.21.4"), b"fake").await.unwrap();
+    tokio::fs::write(paths.version_jar("1.21.4"), b"fake")
+        .await
+        .unwrap();
 
     // Write a minimal version JSON requiring Java 21.
     // Note: VersionJson::asset_index/assets/downloads are Option<_> after
@@ -173,7 +190,9 @@ async fn test_launch_fails_early_on_java_mismatch() {
         inherits_from: None,
     };
     let version_json_path = paths.version_json("1.21.4");
-    tokio::fs::write(&version_json_path, serde_json::to_string(&version).unwrap()).await.unwrap();
+    tokio::fs::write(&version_json_path, serde_json::to_string(&version).unwrap())
+        .await
+        .unwrap();
 
     let java_service = JavaService::new().expect("JavaService::new");
 
@@ -186,7 +205,9 @@ async fn test_launch_fails_early_on_java_mismatch() {
     let result = launch_instance(
         &paths,
         "mismatch",
-        AuthContext::Offline { username: "TestUser".to_string() },
+        AuthContext::Offline {
+            username: "TestUser".to_string(),
+        },
         None,
         &java_service,
         tx,
@@ -201,7 +222,14 @@ async fn test_launch_fails_early_on_java_mismatch() {
     }
 
     assert!(
-        matches!(result, Err(AppError::JavaMismatch { required: 21, found: 8, .. })),
+        matches!(
+            result,
+            Err(AppError::JavaMismatch {
+                required: 21,
+                found: 8,
+                ..
+            })
+        ),
         "expected JavaMismatch{{required:21,found:8}}; got: {result:?}"
     );
 }

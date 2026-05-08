@@ -46,13 +46,16 @@ async fn live_mojang_jre_download_java_runtime_delta() {
 
     println!("[jre_live] install_mojang returned: {}", exe.display());
 
-    assert!(exe.is_file(), "expected executable file at {}", exe.display());
+    assert!(
+        exe.is_file(),
+        "expected executable file at {}",
+        exe.display()
+    );
 
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let meta = std::fs::metadata(&exe)
-            .expect("metadata of java executable must be readable");
+        let meta = std::fs::metadata(&exe).expect("metadata of java executable must be readable");
         assert!(
             meta.permissions().mode() & 0o111 != 0,
             "java executable must have execute permission; path={}",

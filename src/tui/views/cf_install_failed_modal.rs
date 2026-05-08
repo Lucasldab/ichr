@@ -33,7 +33,12 @@ pub fn render_cf_install_failed_modal(f: &mut Frame, area: Rect, state: &AppStat
     let h = area.height.min(20);
     let x = area.x + (area.width.saturating_sub(w)) / 2;
     let y = area.y + (area.height.saturating_sub(h)) / 2;
-    let rect = Rect { x, y, width: w, height: h };
+    let rect = Rect {
+        x,
+        y,
+        width: w,
+        height: h,
+    };
 
     f.render_widget(Clear, rect);
     let outer = Block::default()
@@ -75,7 +80,11 @@ pub fn render_cf_install_failed_modal(f: &mut Frame, area: Rect, state: &AppStat
         format!("Failed to install {mod_title} {file_label}: {error_message}")
     };
     let head_p = Paragraph::new(headline)
-        .style(Style::default().add_modifier(Modifier::BOLD).fg(Color::Yellow))
+        .style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .fg(Color::Yellow),
+        )
         .wrap(Wrap { trim: false });
     f.render_widget(head_p, split[0]);
 
@@ -88,7 +97,9 @@ pub fn render_cf_install_failed_modal(f: &mut Frame, area: Rect, state: &AppStat
         let link_lines = vec![
             Line::from(Span::styled(
                 "Open in browser:".to_string(),
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
             )),
             Line::from(Span::styled(
                 format!("  {url}"),
@@ -102,13 +113,21 @@ pub fn render_cf_install_failed_modal(f: &mut Frame, area: Rect, state: &AppStat
         let body_text = "The mod author has disabled third-party downloads. \
 You can download the file from CurseForge in your browser, then drop it into the instance mods folder.";
         let body_p = Paragraph::new(body_text)
-            .style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM))
+            .style(
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
+            )
             .wrap(Wrap { trim: false });
         f.render_widget(body_p, split[3]);
     } else {
         // Body for non-restricted errors — repeat error_message for context.
         let body_p = Paragraph::new(error_message.as_str())
-            .style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM))
+            .style(
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
+            )
             .wrap(Wrap { trim: false });
         f.render_widget(body_p, split[1]);
     }
@@ -116,7 +135,9 @@ You can download the file from CurseForge in your browser, then drop it into the
 
 pub fn map_cf_install_failed_event(ev: CtEvent) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CfDismissInstallFailed),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::CfDismissInstallFailed),
         _ => None,
     }
 }

@@ -121,10 +121,7 @@ pub async fn load_refresh_token(
 
 /// Remove from BOTH tiers. Idempotent (no error if absent).
 #[tracing::instrument(name = "delete_refresh_token", skip_all, fields(account_id = %account_id))]
-pub async fn delete_refresh_token(
-    config: &StoreConfig,
-    account_id: &str,
-) -> Result<(), AuthError> {
+pub async fn delete_refresh_token(config: &StoreConfig, account_id: &str) -> Result<(), AuthError> {
     if !config.force_fallback {
         let aid = account_id.to_string();
         let _ = tokio::task::spawn_blocking(move || -> Result<(), String> {
@@ -215,8 +212,7 @@ async fn load_encrypted_map(config: &StoreConfig) -> Result<HashMap<String, Stri
     if raw.is_empty() {
         return Ok(HashMap::new());
     }
-    serde_json::from_slice(&raw)
-        .map_err(|e| AuthError::StorageIo(format!("parse {path:?}: {e}")))
+    serde_json::from_slice(&raw).map_err(|e| AuthError::StorageIo(format!("parse {path:?}: {e}")))
 }
 
 async fn write_encrypted_map(
@@ -304,10 +300,7 @@ fn read_machine_id() -> Vec<u8> {
 
 /// Atomically write the account list to `accounts.json` (non-secret).
 #[tracing::instrument(name = "save_accounts", skip_all, fields(count = accounts.len()))]
-pub async fn save_accounts(
-    config: &StoreConfig,
-    accounts: &[Account],
-) -> Result<(), AuthError> {
+pub async fn save_accounts(config: &StoreConfig, accounts: &[Account]) -> Result<(), AuthError> {
     let path = &config.accounts_json_path;
     if let Some(parent) = path.parent() {
         tokio::fs::create_dir_all(parent)
@@ -339,8 +332,7 @@ pub async fn load_accounts(config: &StoreConfig) -> Result<Vec<Account>, AuthErr
     if raw.is_empty() {
         return Ok(Vec::new());
     }
-    serde_json::from_slice(&raw)
-        .map_err(|e| AuthError::StorageIo(format!("parse {path:?}: {e}")))
+    serde_json::from_slice(&raw).map_err(|e| AuthError::StorageIo(format!("parse {path:?}: {e}")))
 }
 
 #[cfg(test)]
@@ -476,7 +468,9 @@ mod tests {
         let td = TempDir::new().unwrap();
         let cfg = test_config(&td);
         store_refresh_token(&cfg, "acc-1", "t").await.unwrap();
-        let perms = std::fs::metadata(&cfg.accounts_enc_path).unwrap().permissions();
+        let perms = std::fs::metadata(&cfg.accounts_enc_path)
+            .unwrap()
+            .permissions();
         let mode = perms.mode() & 0o777;
         assert_eq!(mode, 0o600, "expected 0600 perms, got {mode:o}");
     }

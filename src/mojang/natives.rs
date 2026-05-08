@@ -18,13 +18,13 @@ pub fn needs_native_extraction(lib: &Library) -> bool {
 /// Pick the correct classifier JAR for the current OS from a legacy
 /// classifier-style library. Returns `None` if the library is embedded-native
 /// (1.19+) or if no classifier exists for this OS.
-pub fn native_classifier_artifact(
-    lib: &Library,
-    os: OsName,
-) -> Option<&LibraryArtifact> {
+pub fn native_classifier_artifact(lib: &Library, os: OsName) -> Option<&LibraryArtifact> {
     let os_key = os.mojang_str();
     let classifier_key = lib.natives.as_ref()?.get(os_key)?;
-    lib.downloads.classifiers.as_ref()?.get(classifier_key.as_str())
+    lib.downloads
+        .classifiers
+        .as_ref()?
+        .get(classifier_key.as_str())
 }
 
 /// Return the Maven coordinate `group:artifact` prefix from a library's

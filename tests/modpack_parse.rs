@@ -10,7 +10,12 @@ use mineltui::modpack::ModpackError;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-fn minimal_json(format_version: u32, game: &str, deps_extra: &str, summary: Option<&str>) -> String {
+fn minimal_json(
+    format_version: u32,
+    game: &str,
+    deps_extra: &str,
+    summary: Option<&str>,
+) -> String {
     let summary_field = match summary {
         Some(s) => format!(r#""summary": "{s}","#),
         None => String::new(),
@@ -32,7 +37,12 @@ fn minimal_json(format_version: u32, game: &str, deps_extra: &str, summary: Opti
 
 #[test]
 fn parse_minimal_index_succeeds() {
-    let json = minimal_json(1, "minecraft", r#", "fabric-loader": "0.16.9""#, Some("a nice pack"));
+    let json = minimal_json(
+        1,
+        "minecraft",
+        r#", "fabric-loader": "0.16.9""#,
+        Some("a nice pack"),
+    );
     let idx: MrpackIndex = parse_index(&json).expect("parse must succeed");
 
     assert_eq!(idx.format_version, 1);

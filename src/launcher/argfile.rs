@@ -85,10 +85,17 @@ mod tests {
     #[test]
     fn test_argfile_creates_parent_dir() {
         let dir = TempDir::new().unwrap();
-        let nested = dir.path().join("nonexistent").join("subdir").join("args.txt");
+        let nested = dir
+            .path()
+            .join("nonexistent")
+            .join("subdir")
+            .join("args.txt");
         write_argfile(&["--foo".to_string()], &nested).unwrap();
         assert!(nested.exists(), "argfile must be created at nested path");
-        assert!(nested.parent().unwrap().exists(), "parent dirs must be created");
+        assert!(
+            nested.parent().unwrap().exists(),
+            "parent dirs must be created"
+        );
     }
 
     #[test]

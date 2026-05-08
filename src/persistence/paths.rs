@@ -50,7 +50,11 @@ impl AppPaths {
     /// Construct `AppPaths` from explicit directories — for tests that
     /// want to redirect all paths into a `tempfile::TempDir`.
     pub fn with_roots(data_dir: PathBuf, config_dir: PathBuf, cache_dir: PathBuf) -> Self {
-        Self { data_dir, config_dir, cache_dir }
+        Self {
+            data_dir,
+            config_dir,
+            cache_dir,
+        }
     }
 
     /// Absolute path to the mineltui log file (single-file; rotation deferred).
@@ -90,12 +94,16 @@ impl AppPaths {
 
     /// Path for per-version client jar: `versions/{id}/{id}.jar`.
     pub fn version_jar(&self, version_id: &str) -> PathBuf {
-        self.versions_dir().join(version_id).join(format!("{version_id}.jar"))
+        self.versions_dir()
+            .join(version_id)
+            .join(format!("{version_id}.jar"))
     }
 
     /// Path for per-version JSON: `versions/{id}/{id}.json`.
     pub fn version_json(&self, version_id: &str) -> PathBuf {
-        self.versions_dir().join(version_id).join(format!("{version_id}.json"))
+        self.versions_dir()
+            .join(version_id)
+            .join(format!("{version_id}.json"))
     }
 
     /// Shared library path (Maven-layout). `maven_path` is the full relative path
@@ -113,12 +121,18 @@ impl AppPaths {
     /// Asset object: `assets/objects/{hash[0..2]}/{hash}`.
     /// Caller is responsible for validating that `hash` is a 40-char lowercase hex string.
     pub fn asset_object(&self, hash: &str) -> PathBuf {
-        self.assets_dir().join("objects").join(&hash[..2]).join(hash)
+        self.assets_dir()
+            .join("objects")
+            .join(&hash[..2])
+            .join(hash)
     }
 
     /// Legacy virtual asset: `assets/virtual/{index_id}/{virtual_path}`.
     pub fn asset_virtual(&self, index_id: &str, virtual_path: &str) -> PathBuf {
-        self.assets_dir().join("virtual").join(index_id).join(virtual_path)
+        self.assets_dir()
+            .join("virtual")
+            .join(index_id)
+            .join(virtual_path)
     }
 
     /// Per-instance directory: `instances/{slug}/`.
@@ -149,17 +163,15 @@ impl AppPaths {
 
     /// Mod jar destination: `instances/{slug}/.minecraft/mods/{filename}`.
     pub fn instance_mod_file(&self, slug: &str, filename: &str) -> PathBuf {
-        self.instance_minecraft_dir(slug).join("mods").join(filename)
+        self.instance_minecraft_dir(slug)
+            .join("mods")
+            .join(filename)
     }
 
     /// Per-instance pack subdirectory: `instances/{slug}/.minecraft/{resourcepacks|shaderpacks}/`.
     /// Subdir resolved by `PackKind::subdir()`; matches the layout already
     /// created by `write_instance_manifest` (instance/store.rs:34).
-    pub fn instance_packs_dir(
-        &self,
-        slug: &str,
-        kind: crate::packs::kind::PackKind,
-    ) -> PathBuf {
+    pub fn instance_packs_dir(&self, slug: &str, kind: crate::packs::kind::PackKind) -> PathBuf {
         self.instance_minecraft_dir(slug).join(kind.subdir())
     }
 
@@ -221,13 +233,18 @@ impl AppPaths {
     /// Returns `{jre_dir}/{variant_id}/bin/java` on Linux/macOS and
     /// `{jre_dir}/{variant_id}/bin/java.exe` on Windows.
     pub fn jre_executable(&self, variant_id: &str) -> PathBuf {
-        let bin = if cfg!(target_os = "windows") { "bin/java.exe" } else { "bin/java" };
+        let bin = if cfg!(target_os = "windows") {
+            "bin/java.exe"
+        } else {
+            "bin/java"
+        };
         self.jre_dir(variant_id).join(bin)
     }
 
     /// Cached per-variant JRE manifest JSON: `{runtime_dir}/{variant_id}-manifest.json`.
     pub fn jre_manifest_cache(&self, variant_id: &str) -> PathBuf {
-        self.runtime_dir().join(format!("{variant_id}-manifest.json"))
+        self.runtime_dir()
+            .join(format!("{variant_id}-manifest.json"))
     }
 }
 
@@ -272,9 +289,15 @@ mod jre_paths_tests {
         let exe = p.jre_executable("java-runtime-delta");
         // On Linux the executable ends with bin/java (no .exe)
         #[cfg(not(target_os = "windows"))]
-        assert_eq!(exe, PathBuf::from("/data/runtime/java-runtime-delta/bin/java"));
+        assert_eq!(
+            exe,
+            PathBuf::from("/data/runtime/java-runtime-delta/bin/java")
+        );
         #[cfg(target_os = "windows")]
-        assert_eq!(exe, PathBuf::from("/data/runtime/java-runtime-delta/bin/java.exe"));
+        assert_eq!(
+            exe,
+            PathBuf::from("/data/runtime/java-runtime-delta/bin/java.exe")
+        );
     }
 
     #[test]
@@ -358,7 +381,8 @@ mod instance_pack_paths_tests {
         );
         // Verify it ends_with the expected suffix
         assert!(
-            file.to_string_lossy().ends_with(".minecraft/resourcepacks/Faithful.zip"),
+            file.to_string_lossy()
+                .ends_with(".minecraft/resourcepacks/Faithful.zip"),
             "got: {}",
             file.display()
         );

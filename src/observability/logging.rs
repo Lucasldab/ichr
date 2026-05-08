@@ -29,9 +29,8 @@ pub fn init(paths: &AppPaths) -> anyhow::Result<WorkerGuard> {
     let log_path = paths.log_file();
 
     if let Some(parent) = log_path.parent() {
-        std::fs::create_dir_all(parent).with_context(|| {
-            format!("creating log file parent directory {}", parent.display())
-        })?;
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("creating log file parent directory {}", parent.display()))?;
     }
 
     // Open append-create so multiple runs accumulate history.

@@ -120,11 +120,18 @@ async fn live_install_faithful_32x() -> Result<(), Box<dyn std::error::Error>> {
              curl 'https://api.modrinth.com/v2/search?query=faithful+32x&facets=[[\"project_type:resourcepack\"]]' | jq '.hits[] | {{slug: .slug, project_id: .project_id}}'"
         ))?;
 
-    eprintln!("[packs_live] Faithful 32x project_id={} slug={}", hit.project_id, hit.slug);
+    eprintln!(
+        "[packs_live] Faithful 32x project_id={} slug={}",
+        hit.project_id, hit.slug
+    );
 
     // 2. List versions — prefer pinned version_id, fall back to first.
     let version_entries = svc
-        .list_versions(&hit.project_id, Some(FAITHFUL_MC_VERSION), PackKind::Resource)
+        .list_versions(
+            &hit.project_id,
+            Some(FAITHFUL_MC_VERSION),
+            PackKind::Resource,
+        )
         .await
         .map_err(|e| format!("list_versions failed: {e:?}"))?;
 
@@ -132,7 +139,8 @@ async fn live_install_faithful_32x() -> Result<(), Box<dyn std::error::Error>> {
         !version_entries.is_empty(),
         "No versions returned for Faithful 32x (project_id={}). \
          Probe: curl 'https://api.modrinth.com/v2/project/{}/version?game_versions=[\"1.20.4\"]'",
-        hit.project_id, hit.project_id
+        hit.project_id,
+        hit.project_id
     );
 
     let chosen_entry = version_entries
@@ -283,7 +291,11 @@ async fn live_install_complementary_reimagined() -> Result<(), Box<dyn std::erro
 
     // 2. List versions — prefer pinned version_id, fall back to first.
     let version_entries = svc
-        .list_versions(&hit.project_id, Some(COMPLEMENTARY_MC_VERSION), PackKind::Shader)
+        .list_versions(
+            &hit.project_id,
+            Some(COMPLEMENTARY_MC_VERSION),
+            PackKind::Shader,
+        )
         .await
         .map_err(|e| format!("list_versions failed: {e:?}"))?;
 
@@ -291,7 +303,8 @@ async fn live_install_complementary_reimagined() -> Result<(), Box<dyn std::erro
         !version_entries.is_empty(),
         "No versions returned for Complementary Reimagined (project_id={}). \
          Probe: curl 'https://api.modrinth.com/v2/project/{}/version'",
-        hit.project_id, hit.project_id
+        hit.project_id,
+        hit.project_id
     );
 
     let chosen_entry = version_entries
@@ -362,11 +375,7 @@ async fn live_install_complementary_reimagined() -> Result<(), Box<dyn std::erro
         ledger.mods.len()
     );
     let r = &ledger.mods[0];
-    assert_eq!(
-        r.kind,
-        InstalledItemKind::Shader,
-        "row kind must be Shader"
-    );
+    assert_eq!(r.kind, InstalledItemKind::Shader, "row kind must be Shader");
     assert_eq!(
         r.source,
         mineltui::mods::types::ModSource::Modrinth,

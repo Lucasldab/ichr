@@ -15,7 +15,11 @@ use ratatui::Frame;
 use crate::tui::app::{Action, ActiveView, AppState};
 
 pub fn render_uninstall_mod_confirm(f: &mut Frame, area: Rect, state: &AppState) {
-    let ActiveView::UninstallModConfirm { slug, mod_id: _, display_name } = &state.active_view
+    let ActiveView::UninstallModConfirm {
+        slug,
+        mod_id: _,
+        display_name,
+    } = &state.active_view
     else {
         return;
     };
@@ -25,7 +29,12 @@ pub fn render_uninstall_mod_confirm(f: &mut Frame, area: Rect, state: &AppState)
     let h = 5u16.min(area.height);
     let x = area.x + (area.width.saturating_sub(w)) / 2;
     let y = area.y + (area.height.saturating_sub(h)) / 2;
-    let modal_area = Rect { x, y, width: w, height: h };
+    let modal_area = Rect {
+        x,
+        y,
+        width: w,
+        height: h,
+    };
 
     f.render_widget(Clear, modal_area);
 
@@ -39,18 +48,24 @@ pub fn render_uninstall_mod_confirm(f: &mut Frame, area: Rect, state: &AppState)
         )),
     ];
 
-    let para = Paragraph::new(lines)
-        .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL).title("Uninstall mod?"));
+    let para = Paragraph::new(lines).alignment(Alignment::Center).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Uninstall mod?"),
+    );
     f.render_widget(para, modal_area);
 }
 
 pub fn map_uninstall_mod_confirm_event(ev: CtEvent) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('y'), .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('Y'), .. }) => {
-            Some(Action::ConfirmUninstallMod)
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('y'),
+            ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('Y'),
+            ..
+        }) => Some(Action::ConfirmUninstallMod),
         CtEvent::Key(_) => Some(Action::CancelUninstallMod),
         _ => None,
     }

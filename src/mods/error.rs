@@ -21,15 +21,26 @@ pub enum ModrinthError {
     /// SHA-512 verification of a downloaded mod file failed (Pitfall 3 — case-insensitive compare).
     /// UI-SPEC line 676: "Downloaded file SHA-512 did not match Modrinth's manifest".
     #[error("SHA-512 mismatch for {url}: expected {expected}, got {got}")]
-    Sha512Mismatch { url: String, expected: String, got: String },
+    Sha512Mismatch {
+        url: String,
+        expected: String,
+        got: String,
+    },
 
     /// BFS dep resolution found an `incompatible` dep that is currently installed.
     #[error("Dependency conflict: project {conflicting_project_id} is incompatible with installed mod (required by {requested_by})")]
-    DependencyConflict { conflicting_project_id: String, requested_by: String },
+    DependencyConflict {
+        conflicting_project_id: String,
+        requested_by: String,
+    },
 
     /// No version of a required dep matches the instance's MC version + loader.
     #[error("No compatible version of project {project_id} for MC {mc} + loaders {loaders:?}")]
-    NoCompatibleVersion { project_id: String, mc: String, loaders: Vec<String> },
+    NoCompatibleVersion {
+        project_id: String,
+        mc: String,
+        loaders: Vec<String>,
+    },
 
     /// Ledger lookup miss for toggle/uninstall.
     #[error("Mod not found in instance ledger: {0}")]
@@ -65,7 +76,8 @@ mod tests {
 
     #[test]
     fn test_http_display_contains_message() {
-        let e = ModrinthError::Http("GET https://api.modrinth.com/v2/search: connect timeout".into());
+        let e =
+            ModrinthError::Http("GET https://api.modrinth.com/v2/search: connect timeout".into());
         let s = e.to_string();
         assert!(s.contains("connect timeout"), "missing reqwest err: {s}");
         assert!(s.contains("api.modrinth.com"), "missing URL: {s}");
@@ -132,7 +144,9 @@ mod tests {
 
     #[test]
     fn test_rate_limited_display() {
-        let e = ModrinthError::RateLimited { retry_after_secs: 42 };
+        let e = ModrinthError::RateLimited {
+            retry_after_secs: 42,
+        };
         let s = e.to_string();
         assert!(s.contains("42"), "retry_after missing: {s}");
         assert!(s.contains("rate limit"), "headline missing: {s}");
@@ -140,7 +154,9 @@ mod tests {
 
     #[test]
     fn test_file_not_downloadable_display() {
-        let e = ModrinthError::FileNotDownloadable { project_slug: "sodium".into() };
+        let e = ModrinthError::FileNotDownloadable {
+            project_slug: "sodium".into(),
+        };
         let s = e.to_string();
         assert!(s.contains("sodium"), "slug missing: {s}");
         assert!(s.contains("not downloadable"), "headline missing: {s}");

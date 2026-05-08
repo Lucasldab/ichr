@@ -268,7 +268,10 @@ impl MojangJreClient {
             }
             match entry {
                 MojangFileEntry::Directory {} => directories.push(rel_path),
-                MojangFileEntry::File { downloads, executable } => {
+                MojangFileEntry::File {
+                    downloads,
+                    executable,
+                } => {
                     files.push((rel_path, downloads.raw, executable));
                 }
                 MojangFileEntry::Link { target } => links.push((rel_path, target)),
@@ -278,12 +281,12 @@ impl MojangJreClient {
         // Create directories first
         for rel in &directories {
             let dest = tmp_dir.join(rel);
-            tokio::fs::create_dir_all(&dest).await.map_err(|e| {
-                AppError::JavaExtractFailed {
+            tokio::fs::create_dir_all(&dest)
+                .await
+                .map_err(|e| AppError::JavaExtractFailed {
                     dest: dest.clone(),
                     reason: format!("create_dir_all: {e}"),
-                }
-            })?;
+                })?;
         }
 
         // Download files in parallel, bounded by Semaphore(8)
@@ -375,18 +378,16 @@ impl MojangJreClient {
             {
                 let dest_c = dest.clone();
                 let target_c = target.clone();
-                tokio::task::spawn_blocking(move || {
-                    std::os::unix::fs::symlink(&target_c, &dest_c)
-                })
-                .await
-                .map_err(|e| AppError::JavaExtractFailed {
-                    dest: dest.clone(),
-                    reason: format!("spawn_blocking for symlink: {e}"),
-                })?
-                .map_err(|e| AppError::JavaExtractFailed {
-                    dest: dest.clone(),
-                    reason: format!("symlink({target}, {dest:?}): {e}"),
-                })?;
+                tokio::task::spawn_blocking(move || std::os::unix::fs::symlink(&target_c, &dest_c))
+                    .await
+                    .map_err(|e| AppError::JavaExtractFailed {
+                        dest: dest.clone(),
+                        reason: format!("spawn_blocking for symlink: {e}"),
+                    })?
+                    .map_err(|e| AppError::JavaExtractFailed {
+                        dest: dest.clone(),
+                        reason: format!("symlink({target}, {dest:?}): {e}"),
+                    })?;
             }
 
             #[cfg(windows)]
@@ -436,8 +437,8 @@ fn is_safe_rel_path(rel: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use httpmock::MockServer;
     use httpmock::Method::GET;
+    use httpmock::MockServer;
     use tempfile::TempDir;
 
     // -----------------------------------------------------------------------
@@ -466,7 +467,10 @@ mod tests {
         let index: MojangJreIndex = serde_json::from_str(raw).expect("parse fixture");
         let linux = index.0.get("linux").expect("linux key");
         assert!(linux.contains_key("java-runtime-delta"), "delta missing");
-        assert!(linux.contains_key("java-runtime-epsilon"), "epsilon missing");
+        assert!(
+            linux.contains_key("java-runtime-epsilon"),
+            "epsilon missing"
+        );
         let delta = linux.get("java-runtime-delta").unwrap();
         assert_eq!(delta.len(), 1);
         assert_eq!(delta[0].version.name, "21.0.7");
@@ -655,9 +659,11 @@ mod tests {
             .expect("install");
 
         let link_path = paths.jre_dir("java-runtime-delta").join("legal/LICENSE");
-        let meta = std::fs::symlink_metadata(&link_path)
-            .expect("link metadata");
-        assert!(meta.file_type().is_symlink(), "legal/LICENSE should be a symlink");
+        let meta = std::fs::symlink_metadata(&link_path).expect("link metadata");
+        assert!(
+            meta.file_type().is_symlink(),
+            "legal/LICENSE should be a symlink"
+        );
     }
 
     #[tokio::test]
@@ -706,8 +712,7 @@ mod tests {
         let correct_sha1 = crate::mojang::cache::sha1_hex_of_bytes(fixture_bytes());
         // manifest references correct sha1, but server serves wrong bytes
         let manifest_body = {
-            let template =
-                include_str!("../../tests/fixtures/java/mojang_variant_manifest.json");
+            let template = include_str!("../../tests/fixtures/java/mojang_variant_manifest.json");
             template
                 .replace("__SHA1_OF_FIXTURE_BYTES__", &correct_sha1)
                 .replace("PLACEHOLDER", &server.base_url())
@@ -758,8 +763,7 @@ mod tests {
 
         // Build a manifest with a path-traversal entry
         let traversal_manifest = r#"{"files": {"../evil/x": {"type": "directory"}}}"#;
-        let manifest_sha1 =
-            crate::mojang::cache::sha1_hex_of_bytes(traversal_manifest.as_bytes());
+        let manifest_sha1 = crate::mojang::cache::sha1_hex_of_bytes(traversal_manifest.as_bytes());
         let all_json_body = make_all_json_body(&server.base_url(), &manifest_sha1);
 
         let _m_all = server.mock(|when, then| {

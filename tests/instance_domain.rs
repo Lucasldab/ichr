@@ -2,8 +2,7 @@
 
 use mineltui::domain::{InstanceManifest, ModloaderKind};
 use mineltui::instance::{
-    list_instance_manifests, read_instance_manifest, slugify, unique_slug,
-    write_instance_manifest,
+    list_instance_manifests, read_instance_manifest, slugify, unique_slug, write_instance_manifest,
 };
 use mineltui::persistence::AppPaths;
 use tempfile::tempdir;
@@ -48,9 +47,18 @@ fn test_instance_manifest_omits_none_on_serialize() {
         total_play_time_ms: 0,
     };
     let json = serde_json::to_string(&m).expect("serialize");
-    assert!(!json.contains("last_played_at"), "JSON should not contain last_played_at: {json}");
-    assert!(!json.contains("notes"), "JSON should not contain notes: {json}");
-    assert!(!json.contains("group"), "JSON should not contain group: {json}");
+    assert!(
+        !json.contains("last_played_at"),
+        "JSON should not contain last_played_at: {json}"
+    );
+    assert!(
+        !json.contains("notes"),
+        "JSON should not contain notes: {json}"
+    );
+    assert!(
+        !json.contains("group"),
+        "JSON should not contain group: {json}"
+    );
 }
 
 #[test]
@@ -63,7 +71,8 @@ fn test_instance_manifest_unknown_fields_tolerated() {
 #[test]
 fn test_instance_manifest_defaults_for_missing_options() {
     let raw = r#"{"schema_version":1,"display_name":"Minimal","slug":"minimal","mc_version_id":"1.21.4","created_at":"2026-04-20T00:00:00Z"}"#;
-    let m: InstanceManifest = serde_json::from_str(raw).expect("deserialize with missing optional fields");
+    let m: InstanceManifest =
+        serde_json::from_str(raw).expect("deserialize with missing optional fields");
     assert_eq!(m.last_played_at, None);
     assert_eq!(m.notes, None);
     assert_eq!(m.group, None);
@@ -135,7 +144,9 @@ async fn test_unique_slug_single_collision() {
 async fn test_unique_slug_chain_collision() {
     let td = tempdir().unwrap();
     tokio::fs::create_dir(td.path().join("foo")).await.unwrap();
-    tokio::fs::create_dir(td.path().join("foo-2")).await.unwrap();
+    tokio::fs::create_dir(td.path().join("foo-2"))
+        .await
+        .unwrap();
     let result = unique_slug("foo", td.path()).await;
     assert_eq!(result, "foo-3");
 }
@@ -202,7 +213,9 @@ async fn test_list_instance_manifests_skips_invalid_and_sorts_by_last_played_des
     // Write a bad instance.json that should be skipped
     let bad_dir = paths.instance_dir("bad-instance");
     tokio::fs::create_dir_all(&bad_dir).await.unwrap();
-    tokio::fs::write(bad_dir.join("instance.json"), b"not valid json").await.unwrap();
+    tokio::fs::write(bad_dir.join("instance.json"), b"not valid json")
+        .await
+        .unwrap();
 
     let list = list_instance_manifests(&paths).await.unwrap();
     // Should return 3 valid manifests (bad one skipped), sorted C, A, B
@@ -233,7 +246,10 @@ async fn test_write_is_atomic_no_partial_file_visible() {
     // No .tmp file should remain
     let instance_dir = paths.instance_dir(&m.slug);
     let tmp_path = paths.instance_manifest(&m.slug).with_extension("tmp");
-    assert!(!tmp_path.exists(), ".tmp file should not exist after successful write");
+    assert!(
+        !tmp_path.exists(),
+        ".tmp file should not exist after successful write"
+    );
     // The real file should exist
     assert!(instance_dir.join("instance.json").exists());
 }

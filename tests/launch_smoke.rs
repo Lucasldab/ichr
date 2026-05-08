@@ -25,7 +25,7 @@ async fn launch_smoke_java_version_exits_clean() {
     let result = run_process(
         &java_bin(),
         &["-version".to_string()],
-        "",       // no main class — java stops after -version
+        "", // no main class — java stops after -version
         &[],
         td.path(),
         &log,

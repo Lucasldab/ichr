@@ -17,26 +17,28 @@ use ratatui::crossterm::event::{Event as CtEvent, EventStream, KeyCode, KeyEvent
 use tokio::sync::mpsc;
 use tokio::time::interval;
 
-use super::app::{update, Action, ActiveView, AppState, CreateStep, Effect, JavaPickerRow, VersionFilter};
+use super::app::{
+    update, Action, ActiveView, AppState, CreateStep, Effect, JavaPickerRow, VersionFilter,
+};
 use super::terminal::Tui;
 use super::view::view;
 use crate::auth::service::{AccountAuthEvent, AccountService};
+use crate::install::install_version;
 use crate::java::service::JavaService;
+use crate::launcher;
 use crate::loader::service::LoaderService;
 use crate::loader::types::{LoaderInfo, LoaderType};
-use crate::launcher;
 use crate::modpack::service::ModpackService;
 use crate::mods::curseforge::service::CurseForgeService;
 use crate::mods::service::ModrinthService;
-use crate::packs::kind::PackKind;
-use crate::packs::service::PackService;
 use crate::mojang::client::MojangClient;
 use crate::mojang::types::VersionEntry;
+use crate::packs::kind::PackKind;
+use crate::packs::service::PackService;
 use crate::persistence::paths::AppPaths;
 use crate::services::{
     clone_instance, create_instance, delete_instance, list_instances, rename_instance, set_group,
 };
-use crate::install::install_version;
 use crate::tasks::{TaskEvent, TaskManager, DEFAULT_MAX_CONCURRENT};
 
 /// Apply the version filter + case-insensitive substring search. Always
@@ -71,8 +73,8 @@ pub fn filter_version_list<'a>(
 /// this returns (whether Ok or Err).
 pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
     // Resolve platform paths.
-    let paths = AppPaths::resolve()
-        .ok_or_else(|| anyhow::anyhow!("cannot resolve platform paths"))?;
+    let paths =
+        AppPaths::resolve().ok_or_else(|| anyhow::anyhow!("cannot resolve platform paths"))?;
 
     // Build the shared Mojang HTTP client.
     let mojang = Arc::new(MojangClient::new()?);
@@ -86,10 +88,13 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
     let account_service = Arc::new(AccountService::new(&paths, http_for_auth));
 
     // Build the JavaService (owns Mojang JRE + Adoptium clients; constructed once).
-    let java_service = Arc::new(JavaService::new().map_err(|e| anyhow::anyhow!("JavaService::new: {e}"))?);
-    let loader_service = Arc::new(LoaderService::new().map_err(|e| anyhow::anyhow!("LoaderService::new: {e}"))?);
+    let java_service =
+        Arc::new(JavaService::new().map_err(|e| anyhow::anyhow!("JavaService::new: {e}"))?);
+    let loader_service =
+        Arc::new(LoaderService::new().map_err(|e| anyhow::anyhow!("LoaderService::new: {e}"))?);
     // Phase 8 (08-08): Modrinth service backs the mod browser/install flow.
-    let modrinth_service = Arc::new(ModrinthService::new().map_err(|e| anyhow::anyhow!("ModrinthService::new: {e}"))?);
+    let modrinth_service =
+        Arc::new(ModrinthService::new().map_err(|e| anyhow::anyhow!("ModrinthService::new: {e}"))?);
     // Phase 9 (09-07): CurseForge service backs the F-keybind browser/install flow.
     // Pitfall 1: `CurseForgeService::new` returns `Ok` even when no API key is
     // configured (the launcher continues to function for everything else; F
@@ -97,19 +102,14 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
     // defensive against unexpected ctor failures (e.g., malformed key string
     // tripping reqwest header parsing).
     let cf_service = Arc::new(
-        CurseForgeService::new()
-            .map_err(|e| anyhow::anyhow!("CurseForgeService::new: {e}"))?,
+        CurseForgeService::new().map_err(|e| anyhow::anyhow!("CurseForgeService::new: {e}"))?,
     );
     // Phase 10 (10-06): Modpack service backs the `i`-keybind import flow.
-    let modpack_service = Arc::new(
-        ModpackService::new()
-            .map_err(|e| anyhow::anyhow!("ModpackService::new: {e}"))?,
-    );
+    let modpack_service =
+        Arc::new(ModpackService::new().map_err(|e| anyhow::anyhow!("ModpackService::new: {e}"))?);
     // Phase 11 (11-04): Pack service backs R/S pack browser + install flows.
-    let pack_service = Arc::new(
-        PackService::new()
-            .map_err(|e| anyhow::anyhow!("PackService::new: {e}"))?,
-    );
+    let pack_service =
+        Arc::new(PackService::new().map_err(|e| anyhow::anyhow!("PackService::new: {e}"))?);
 
     // Build the task plumbing. TaskEvents arrive on task_rx; we convert each
     // into an Action::Task and forward to the event loop via action_tx.
@@ -230,7 +230,12 @@ pub fn map_event_pub(ev: CtEvent, state: &AppState) -> Option<Action> {
 
 fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
     // Global: Ctrl+C always quits.
-    if let CtEvent::Key(KeyEvent { code: KeyCode::Char('c'), modifiers, .. }) = &ev {
+    if let CtEvent::Key(KeyEvent {
+        code: KeyCode::Char('c'),
+        modifiers,
+        ..
+    }) = &ev
+    {
         if modifiers.contains(KeyModifiers::CONTROL) {
             return Some(Action::Quit);
         }
@@ -260,7 +265,9 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             super::views::loader_version_picker_modal::map_loader_version_picker_event(ev)
         }
         ActiveView::LoaderInstallProgressModal { .. } => {
-            super::views::loader_install_progress_modal::map_loader_install_progress_event(ev, state)
+            super::views::loader_install_progress_modal::map_loader_install_progress_event(
+                ev, state,
+            )
         }
         ActiveView::LoaderInstallFailedModal { .. } => {
             super::views::loader_install_failed_modal::map_loader_install_failed_event(ev)
@@ -288,9 +295,7 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             super::views::mod_install_failed_modal::map_mod_install_failed_event(ev)
         }
         // Phase 9 (09-07): CurseForge view event mappers.
-        ActiveView::CfBrowser { .. } => {
-            super::views::cf_browser::map_cf_browser_event(ev, state)
-        }
+        ActiveView::CfBrowser { .. } => super::views::cf_browser::map_cf_browser_event(ev, state),
         // Phase 10 (10-06): Modpack import view event mappers.
         ActiveView::ModpackImportPathInput { .. } => {
             super::views::modpack_import_path_modal::map_modpack_import_path_event(ev)
@@ -325,33 +330,57 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
 
 fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('q'), .. }) => Some(Action::Quit),
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::Quit),
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('c'), .. }) => Some(Action::OpenCreateModal),
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('i'), .. }) => Some(Action::OpenModpackImport),
-        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('q'),
+            ..
+        }) => Some(Action::Quit),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::Quit),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('c'),
+            ..
+        }) => Some(Action::OpenCreateModal),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('i'),
+            ..
+        }) => Some(Action::OpenModpackImport),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        }) => {
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
                     if state.running_instances.contains_key(&m.slug) {
                         // Already running — no-op (T-03-05-01 belt-and-suspenders).
                         return None;
                     }
-                    return Some(Action::LaunchInstance { slug: m.slug.clone() });
+                    return Some(Action::LaunchInstance {
+                        slug: m.slug.clone(),
+                    });
                 }
             }
             None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('s'), .. }) => {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('s'),
+            ..
+        }) => {
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
                     if state.running_instances.contains_key(&m.slug) {
-                        return Some(Action::StopInstance { slug: m.slug.clone() });
+                        return Some(Action::StopInstance {
+                            slug: m.slug.clone(),
+                        });
                     }
                 }
             }
             None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('r'), .. }) => {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('r'),
+            ..
+        }) => {
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
                     return Some(Action::OpenRenameInline {
@@ -362,8 +391,14 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             }
             None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('x'), .. }) => Some(Action::CloneSelected),
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('d'), .. }) => {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('x'),
+            ..
+        }) => Some(Action::CloneSelected),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('d'),
+            ..
+        }) => {
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
                     // T-03-05-02: block deletion of a running instance.
@@ -378,7 +413,10 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             }
             None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('g'), .. }) => {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('g'),
+            ..
+        }) => {
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
                     return Some(Action::OpenGroupInput {
@@ -389,26 +427,33 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             }
             None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('A'), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
-            Some(Action::OpenAccounts)
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('A'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::OpenAccounts),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('j'),
+            ..
+        }) => {
             // `j` on a non-running instance opens the Java picker.
             // On a running instance it is a no-op (can't change java mid-game).
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
                     if !state.running_instances.contains_key(&m.slug) {
-                        return Some(Action::OpenJavaPicker { slug: m.slug.clone() });
+                        return Some(Action::OpenJavaPicker {
+                            slug: m.slug.clone(),
+                        });
                     }
                 }
             }
             None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('L'), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('L'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
             // `L` (uppercase) opens the loader picker for a non-running instance
             // with no install already in flight (T-06-20).
             if let ActiveView::InstanceList { selected } = &state.active_view {
@@ -416,15 +461,19 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
                     if !state.running_instances.contains_key(&m.slug)
                         && !state.running_loader_installs.contains_key(&m.slug)
                     {
-                        return Some(Action::OpenLoaderPicker { slug: m.slug.clone() });
+                        return Some(Action::OpenLoaderPicker {
+                            slug: m.slug.clone(),
+                        });
                     }
                 }
             }
             None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('M'), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('M'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
             // `M` (uppercase) opens the Modrinth mod browser. Pitfall 8 guard:
             // silent no-op while a previous mod install is in flight for the same
             // instance. The update() arm in app.rs enforces this too (defense in
@@ -432,26 +481,34 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
                     if !state.running_mod_jobs.contains_key(&m.slug) {
-                        return Some(Action::OpenModBrowser { slug: m.slug.clone() });
+                        return Some(Action::OpenModBrowser {
+                            slug: m.slug.clone(),
+                        });
                     }
                 }
             }
             None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('m'), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('m'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
             // `m` (lowercase) opens the per-instance Installed Mods List.
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
-                    return Some(Action::OpenInstalledMods { slug: m.slug.clone() });
+                    return Some(Action::OpenInstalledMods {
+                        slug: m.slug.clone(),
+                    });
                 }
             }
             None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('F'), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('F'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
             // `F` (uppercase) opens the CurseForge mod browser. Pitfall 1
             // guard: silent no-op when no CurseForge API key was resolved at
             // startup. Pitfall 8 guard (inherited from Phase 8): silent no-op
@@ -460,10 +517,10 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             // depth) — see test_cf_open_no_op_when_api_key_absent.
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
-                    if state.cf_api_key_present
-                        && !state.running_mod_jobs.contains_key(&m.slug)
-                    {
-                        return Some(Action::OpenCfBrowser { slug: m.slug.clone() });
+                    if state.cf_api_key_present && !state.running_mod_jobs.contains_key(&m.slug) {
+                        return Some(Action::OpenCfBrowser {
+                            slug: m.slug.clone(),
+                        });
                     }
                 }
             }
@@ -471,12 +528,17 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         }
         // Phase 11 D-LOCK: uppercase R → Resource Pack browser.
         // lowercase 'r' (OpenRenameInline) is NOT modified.
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('R'), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('R'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
-                    if !state.running_pack_jobs.contains_key(&(m.slug.clone(), PackKind::Resource)) {
+                    if !state
+                        .running_pack_jobs
+                        .contains_key(&(m.slug.clone(), PackKind::Resource))
+                    {
                         return Some(Action::OpenPackBrowser {
                             slug: m.slug.clone(),
                             kind: PackKind::Resource,
@@ -488,12 +550,17 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         }
         // Phase 11 D-LOCK: uppercase S → Shader Pack browser.
         // lowercase 's' (StopInstance) is NOT modified.
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('S'), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('S'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
-                    if !state.running_pack_jobs.contains_key(&(m.slug.clone(), PackKind::Shader)) {
+                    if !state
+                        .running_pack_jobs
+                        .contains_key(&(m.slug.clone(), PackKind::Shader))
+                    {
                         return Some(Action::OpenPackBrowser {
                             slug: m.slug.clone(),
                             kind: PackKind::Shader,
@@ -503,71 +570,115 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             }
             None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Down, .. }) => Some(Action::MoveSelection(1)),
-        CtEvent::Key(KeyEvent { code: KeyCode::Up, .. }) => Some(Action::MoveSelection(-1)),
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => Some(Action::MoveSelection(-1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Down,
+            ..
+        }) => Some(Action::MoveSelection(1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Up, ..
+        }) => Some(Action::MoveSelection(-1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('k'),
+            ..
+        }) => Some(Action::MoveSelection(-1)),
         _ => None,
     }
 }
 
 fn map_accounts_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CloseAccounts),
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('a'), .. }) => Some(Action::AddAccount),
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('x'), .. }) => {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::CloseAccounts),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('a'),
+            ..
+        }) => Some(Action::AddAccount),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('x'),
+            ..
+        }) => {
             if let ActiveView::AccountsList { selected } = &state.active_view {
                 if let Some(account) = state.accounts.get(*selected) {
-                    return Some(Action::RemoveAccount { id: account.id.clone() });
+                    return Some(Action::RemoveAccount {
+                        id: account.id.clone(),
+                    });
                 }
             }
             None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        }) => {
             if let ActiveView::AccountsList { selected } = &state.active_view {
                 if let Some(account) = state.accounts.get(*selected) {
-                    return Some(Action::ActivateAccount { id: account.id.clone() });
+                    return Some(Action::ActivateAccount {
+                        id: account.id.clone(),
+                    });
                 }
             }
             None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Down, .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
-            Some(Action::MoveSelection(1))
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Up, .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
-            Some(Action::MoveSelection(-1))
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Down,
+            ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('j'),
+            ..
+        }) => Some(Action::MoveSelection(1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Up, ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('k'),
+            ..
+        }) => Some(Action::MoveSelection(-1)),
         _ => None,
     }
 }
 
 fn map_add_account_device_code_event(ev: CtEvent) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CancelAddAccount),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::CancelAddAccount),
         _ => None,
     }
 }
 
 fn map_account_auth_failed_event(ev: CtEvent) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CloseModal),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::CloseModal),
         _ => None,
     }
 }
 
 fn map_launch_failed_modal_event(ev: CtEvent) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CloseModal),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::CloseModal),
         _ => None,
     }
 }
 
 fn map_name_input_event(ev: CtEvent, state: &AppState) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CloseModal),
-        CtEvent::Key(KeyEvent { code: KeyCode::Backspace, .. }) => Some(Action::BackspaceName),
-        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::CloseModal),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        }) => Some(Action::BackspaceName),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        }) => {
             if let ActiveView::CreateModal(CreateStep::NameInput { current, .. }) =
                 &state.active_view
             {
@@ -575,11 +686,11 @@ fn map_name_input_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             }
             None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char(c), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
-            Some(Action::TypeName(c))
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::TypeName(c)),
         // Bracketed-paste payload (08.1-04 / GAP-8-C): the terminal delivers
         // pasted text as a single `Event::Paste(String)` when bracketed paste
         // is enabled at terminal init. Route the whole payload through one
@@ -591,16 +702,27 @@ fn map_name_input_event(ev: CtEvent, state: &AppState) -> Option<Action> {
 
 fn map_version_picker_event(ev: CtEvent, state: &AppState) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CloseModal),
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('t'), .. }) => {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::CloseModal),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('t'),
+            ..
+        }) => {
             let new_filter = match state.versions_filter {
                 VersionFilter::Releases => VersionFilter::All,
                 VersionFilter::All => VersionFilter::Releases,
             };
             Some(Action::SetVersionFilter(new_filter))
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Backspace, .. }) => Some(Action::BackspaceSearch),
-        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        }) => Some(Action::BackspaceSearch),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        }) => {
             // Select the first visible version.
             if let ActiveView::CreateModal(CreateStep::VersionPicker { filter, search, .. }) =
                 &state.active_view
@@ -612,19 +734,25 @@ fn map_version_picker_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             }
             None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char(c), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
-            Some(Action::TypeSearch(c))
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::TypeSearch(c)),
         _ => None,
     }
 }
 
 fn map_delete_confirm_event(ev: CtEvent) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('y'), .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('Y'), .. }) => Some(Action::ConfirmDelete),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('y'),
+            ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('Y'),
+            ..
+        }) => Some(Action::ConfirmDelete),
         CtEvent::Key(_) => Some(Action::CancelDelete),
         _ => None,
     }
@@ -632,38 +760,54 @@ fn map_delete_confirm_event(ev: CtEvent) -> Option<Action> {
 
 fn map_rename_inline_event(ev: CtEvent, state: &AppState) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CloseModal),
-        CtEvent::Key(KeyEvent { code: KeyCode::Backspace, .. }) => Some(Action::BackspaceRename),
-        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::CloseModal),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        }) => Some(Action::BackspaceRename),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        }) => {
             if let ActiveView::RenameInline { current, .. } = &state.active_view {
                 return Some(Action::SubmitRename(current.clone()));
             }
             None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char(c), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
-            Some(Action::TypeRename(c))
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::TypeRename(c)),
         _ => None,
     }
 }
 
 fn map_group_inline_event(ev: CtEvent, state: &AppState) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CancelGroupInput),
-        CtEvent::Key(KeyEvent { code: KeyCode::Backspace, .. }) => Some(Action::BackspaceGroup),
-        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::CancelGroupInput),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        }) => Some(Action::BackspaceGroup),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        }) => {
             if matches!(state.active_view, ActiveView::GroupInline { .. }) {
                 return Some(Action::SubmitGroup);
             }
             None
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char(c), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
-            Some(Action::TypeGroup(c))
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::TypeGroup(c)),
         _ => None,
     }
 }
@@ -727,7 +871,12 @@ async fn execute_effects(
                 });
             }
 
-            Effect::CreateInstance { display_name, mc_version_id, version_url, version_sha1 } => {
+            Effect::CreateInstance {
+                display_name,
+                mc_version_id,
+                version_url,
+                version_sha1,
+            } => {
                 // Step 1: create the instance record (fast, no network).
                 // Done synchronously in an async block so the compiler doesn't
                 // need 'static on task_manager.
@@ -757,24 +906,21 @@ async fn execute_effects(
                         // the TUI stays responsive during the download.
                         let job_id = task_manager.next_job_id();
                         let tx2 = tx.clone();
-                        task_manager.spawn_task(
-                            job_id,
-                            move |task_tx, token| async move {
-                                let res = install_version(
-                                    job_id, &paths2, &mojang2, task_tx, token, &slug, &entry,
-                                )
-                                .await;
-                                let action = match &res {
-                                    Ok(()) => Action::VersionInstalled { slug: slug.clone() },
-                                    Err(e) => Action::VersionInstallFailed {
-                                        slug: slug.clone(),
-                                        error: e.to_string(),
-                                    },
-                                };
-                                let _ = tx2.send(action).await;
-                                res.map_err(|e| anyhow::anyhow!("{e}"))
-                            },
-                        );
+                        task_manager.spawn_task(job_id, move |task_tx, token| async move {
+                            let res = install_version(
+                                job_id, &paths2, &mojang2, task_tx, token, &slug, &entry,
+                            )
+                            .await;
+                            let action = match &res {
+                                Ok(()) => Action::VersionInstalled { slug: slug.clone() },
+                                Err(e) => Action::VersionInstallFailed {
+                                    slug: slug.clone(),
+                                    error: e.to_string(),
+                                },
+                            };
+                            let _ = tx2.send(action).await;
+                            res.map_err(|e| anyhow::anyhow!("{e}"))
+                        });
                     }
                 }
             }
@@ -814,7 +960,10 @@ async fn execute_effects(
                 });
             }
 
-            Effect::CloneInstance { source_slug, new_name } => {
+            Effect::CloneInstance {
+                source_slug,
+                new_name,
+            } => {
                 let paths = paths.clone();
                 let tx = action_tx.clone();
                 tokio::spawn(async move {
@@ -839,16 +988,14 @@ async fn execute_effects(
                 let tx = action_tx.clone();
                 tokio::spawn(async move {
                     match set_group(&paths, &slug, group).await {
-                        Ok(_m) => {
-                            match list_instances(&paths).await {
-                                Ok(list) => {
-                                    let _ = tx.send(Action::InstancesLoaded(list)).await;
-                                }
-                                Err(e) => {
-                                    let _ = tx.send(Action::ServiceErrored(e.to_string())).await;
-                                }
+                        Ok(_m) => match list_instances(&paths).await {
+                            Ok(list) => {
+                                let _ = tx.send(Action::InstancesLoaded(list)).await;
                             }
-                        }
+                            Err(e) => {
+                                let _ = tx.send(Action::ServiceErrored(e.to_string())).await;
+                            }
+                        },
                         Err(e) => {
                             let _ = tx.send(Action::ServiceErrored(e.to_string())).await;
                         }
@@ -867,9 +1014,14 @@ async fn execute_effects(
                     let slug = slug_for_task;
                     // Store the token in state via LaunchJobStarted BEFORE blocking on launch.
                     let _ = tx
-                        .send(Action::LaunchJobStarted { slug: slug.clone(), token: token.clone() })
+                        .send(Action::LaunchJobStarted {
+                            slug: slug.clone(),
+                            token: token.clone(),
+                        })
                         .await;
-                    let _ = tx.send(Action::InstanceLaunched { slug: slug.clone() }).await;
+                    let _ = tx
+                        .send(Action::InstanceLaunched { slug: slug.clone() })
+                        .await;
                     let res = launcher::service::launch_instance(
                         &paths2,
                         &slug,
@@ -887,7 +1039,10 @@ async fn execute_effects(
                         }
                         Err(crate::error::AppError::Cancelled) => {
                             let _ = tx
-                                .send(Action::InstanceExited { slug, duration_ms: 0 })
+                                .send(Action::InstanceExited {
+                                    slug,
+                                    duration_ms: 0,
+                                })
                                 .await;
                         }
                         Err(crate::error::AppError::LaunchFailed { code, message }) => {
@@ -932,14 +1087,16 @@ async fn execute_effects(
                 tokio::spawn(async move {
                     while let Some(ev) = event_rx.recv().await {
                         let action = match ev {
-                            AccountAuthEvent::Started { user_code, verification_uri, expires_in } => {
-                                Action::AccountAuthStarted {
-                                    user_code,
-                                    verification_uri,
-                                    expires_at: std::time::Instant::now()
-                                        + std::time::Duration::from_secs(expires_in),
-                                }
-                            }
+                            AccountAuthEvent::Started {
+                                user_code,
+                                verification_uri,
+                                expires_in,
+                            } => Action::AccountAuthStarted {
+                                user_code,
+                                verification_uri,
+                                expires_at: std::time::Instant::now()
+                                    + std::time::Duration::from_secs(expires_in),
+                            },
                             AccountAuthEvent::Progress { stage } => {
                                 Action::AccountAuthProgress { stage }
                             }
@@ -952,7 +1109,11 @@ async fn execute_effects(
                 tokio::spawn(async move {
                     match svc.start_device_code_auth(token, event_tx).await {
                         Ok(out) => {
-                            let _ = tx.send(Action::AccountAdded { account: out.account }).await;
+                            let _ = tx
+                                .send(Action::AccountAdded {
+                                    account: out.account,
+                                })
+                                .await;
                         }
                         Err(crate::auth::AuthError::UserCancelled) => {
                             // Cancellation is expected — silently return to AccountsList.
@@ -960,7 +1121,9 @@ async fn execute_effects(
                         }
                         Err(e) => {
                             let _ = tx
-                                .send(Action::AccountAuthFailed { reason: e.to_string() })
+                                .send(Action::AccountAuthFailed {
+                                    reason: e.to_string(),
+                                })
                                 .await;
                         }
                     }
@@ -1018,7 +1181,9 @@ async fn execute_effects(
                         options.push(JavaPickerRow::Detected(sj));
                     }
                     options.push(JavaPickerRow::Manual);
-                    let _ = tx.send(Action::JavaPickerOptionsLoaded { slug, options }).await;
+                    let _ = tx
+                        .send(Action::JavaPickerOptionsLoaded { slug, options })
+                        .await;
                 });
             }
 
@@ -1027,7 +1192,10 @@ async fn execute_effects(
                 let paths = paths.clone();
                 let tx = action_tx.clone();
                 tokio::spawn(async move {
-                    match svc.set_override_for_instance(&paths, &slug, override_id).await {
+                    match svc
+                        .set_override_for_instance(&paths, &slug, override_id)
+                        .await
+                    {
                         Ok(()) => {
                             let _ = tx.send(Action::JavaOverrideSet { slug }).await;
                         }
@@ -1056,7 +1224,11 @@ async fn execute_effects(
                     match svc.list_loader_versions(loader_type, &mc_version).await {
                         Ok(versions) => {
                             let _ = tx
-                                .send(Action::LoaderVersionsLoaded { slug, loader: loader_type, versions })
+                                .send(Action::LoaderVersionsLoaded {
+                                    slug,
+                                    loader: loader_type,
+                                    versions,
+                                })
                                 .await;
                         }
                         Err(e) => {
@@ -1074,7 +1246,12 @@ async fn execute_effects(
                 });
             }
 
-            Effect::InstallLoader { slug, loader_type, mc_version, loader_version } => {
+            Effect::InstallLoader {
+                slug,
+                loader_type,
+                mc_version,
+                loader_version,
+            } => {
                 let svc = Arc::clone(&loader_service);
                 let java = Arc::clone(&java_service);
                 let paths2 = paths.clone();
@@ -1120,13 +1297,19 @@ async fn execute_effects(
                 task_manager.spawn_task(job_id, move |_task_tx, token| async move {
                     let slug = slug_for_task;
                     let _ = tx
-                        .send(Action::LoaderInstallStarted { slug: slug.clone(), token: token.clone() })
+                        .send(Action::LoaderInstallStarted {
+                            slug: slug.clone(),
+                            token: token.clone(),
+                        })
                         .await;
 
                     // Phase 7 (D-06): resolve the JRE for the installer subprocess BEFORE
                     // calling install_loader. The vanilla version JSON must already be on
                     // disk (Phase 2/3 install_version) — if not, surface a typed error.
-                    let jre_path = match java.resolve_jre_for_mc_version_install(&paths2, &mc_version).await {
+                    let jre_path = match java
+                        .resolve_jre_for_mc_version_install(&paths2, &mc_version)
+                        .await
+                    {
                         Ok(p) => p,
                         Err(e) => {
                             let _ = tx
@@ -1170,7 +1353,9 @@ async fn execute_effects(
                             // Phase 7 (LOAD-06): extract subprocess stderr from
                             // LoaderError::SubprocessExit to surface in the failure modal.
                             let log_tail = match &e {
-                                crate::loader::error::LoaderError::SubprocessExit { tail, .. } => tail.clone(),
+                                crate::loader::error::LoaderError::SubprocessExit {
+                                    tail, ..
+                                } => tail.clone(),
                                 _ => String::new(),
                             };
                             let _ = tx
@@ -1222,19 +1407,28 @@ async fn execute_effects(
             // Install progress (`Effect::InstallModWithDeps`) flows through the
             // existing `download_pane` via `Action::Task(TaskEvent::Progress)`,
             // NOT a blocking install modal — UI-SPEC §11 invariant.
-            Effect::SearchModrinth { slug, query, mc, loader } => {
+            Effect::SearchModrinth {
+                slug,
+                query,
+                mc,
+                loader,
+            } => {
                 let svc = Arc::clone(&modrinth_service);
                 let paths2 = paths.clone();
                 let tx = action_tx.clone();
                 tokio::spawn(async move {
                     match svc
-                        .search(&query, mc.as_deref(), loader.as_ref(), Some(&paths2), Some(&slug))
+                        .search(
+                            &query,
+                            mc.as_deref(),
+                            loader.as_ref(),
+                            Some(&paths2),
+                            Some(&slug),
+                        )
                         .await
                     {
                         Ok(hits) => {
-                            let _ = tx
-                                .send(Action::ModBrowserSearchLoaded { slug, hits })
-                                .await;
+                            let _ = tx.send(Action::ModBrowserSearchLoaded { slug, hits }).await;
                         }
                         Err(e) => {
                             tracing::warn!(error = %e, slug = %slug, "Modrinth search failed");
@@ -1269,7 +1463,13 @@ async fn execute_effects(
                 });
             }
 
-            Effect::ListModVersions { slug, project_id, project_title: _, mc, loader } => {
+            Effect::ListModVersions {
+                slug,
+                project_id,
+                project_title: _,
+                mc,
+                loader,
+            } => {
                 let svc = Arc::clone(&modrinth_service);
                 let tx = action_tx.clone();
                 tokio::spawn(async move {
@@ -1278,9 +1478,7 @@ async fn execute_effects(
                         .await
                     {
                         Ok(versions) => {
-                            let _ = tx
-                                .send(Action::ModVersionsLoaded { slug, versions })
-                                .await;
+                            let _ = tx.send(Action::ModVersionsLoaded { slug, versions }).await;
                         }
                         Err(e) => {
                             tracing::warn!(
@@ -1292,7 +1490,10 @@ async fn execute_effects(
                             // Surface as empty list — the version-picker empty-state
                             // copy ("No versions match...") will render.
                             let _ = tx
-                                .send(Action::ModVersionsLoaded { slug, versions: Vec::new() })
+                                .send(Action::ModVersionsLoaded {
+                                    slug,
+                                    versions: Vec::new(),
+                                })
                                 .await;
                         }
                     }
@@ -1443,7 +1644,11 @@ async fn execute_effects(
                 });
             }
 
-            Effect::ToggleModEnabledEff { slug, mod_id, want_enabled } => {
+            Effect::ToggleModEnabledEff {
+                slug,
+                mod_id,
+                want_enabled,
+            } => {
                 let svc = Arc::clone(&modrinth_service);
                 let paths2 = paths.clone();
                 let tx = action_tx.clone();
@@ -1456,7 +1661,11 @@ async fn execute_effects(
                     match res {
                         Ok(()) => {
                             let _ = tx
-                                .send(Action::ModToggled { slug, mod_id, enabled: want_enabled })
+                                .send(Action::ModToggled {
+                                    slug,
+                                    mod_id,
+                                    enabled: want_enabled,
+                                })
                                 .await;
                         }
                         Err(e) => {
@@ -1499,9 +1708,7 @@ async fn execute_effects(
                 tokio::spawn(async move {
                     match svc.list_installed_mods(&paths2, &slug).await {
                         Ok(mods) => {
-                            let _ = tx
-                                .send(Action::InstalledModsLoaded { slug, mods })
-                                .await;
+                            let _ = tx.send(Action::InstalledModsLoaded { slug, mods }).await;
                         }
                         Err(e) => {
                             tracing::warn!(
@@ -1510,7 +1717,10 @@ async fn execute_effects(
                                 "Modrinth list_installed_mods failed",
                             );
                             let _ = tx
-                                .send(Action::InstalledModsLoaded { slug, mods: Vec::new() })
+                                .send(Action::InstalledModsLoaded {
+                                    slug,
+                                    mods: Vec::new(),
+                                })
                                 .await;
                         }
                     }
@@ -1529,7 +1739,12 @@ async fn execute_effects(
             // existing `download_pane` via `Action::Task(TaskEvent::Progress)`,
             // NOT a blocking install modal — UI-SPEC §11 invariant inherited
             // from Phase 8.
-            Effect::SearchCurseForge { slug, query, mc, loader } => {
+            Effect::SearchCurseForge {
+                slug,
+                query,
+                mc,
+                loader,
+            } => {
                 let svc = Arc::clone(&cf_service);
                 let paths2 = paths.clone();
                 let tx = action_tx.clone();
@@ -1546,9 +1761,7 @@ async fn execute_effects(
                         .await
                     {
                         Ok(hits) => {
-                            let _ = tx
-                                .send(Action::CfBrowserSearchLoaded { slug, hits })
-                                .await;
+                            let _ = tx.send(Action::CfBrowserSearchLoaded { slug, hits }).await;
                         }
                         Err(e) => {
                             tracing::warn!(error = %e, slug = %slug, "CurseForge search failed");
@@ -1588,7 +1801,12 @@ async fn execute_effects(
                 });
             }
 
-            Effect::ListCfFiles { slug, mod_id, mc, loader } => {
+            Effect::ListCfFiles {
+                slug,
+                mod_id,
+                mc,
+                loader,
+            } => {
                 // Mirrors Phase 8 ListModVersions: the spawned task fetches BOTH
                 // the project detail (needed for CfFilePickerLoaded.mod_detail)
                 // AND the file list. One extra get_mod round-trip per file-picker
@@ -1630,7 +1848,11 @@ async fn execute_effects(
                 });
             }
 
-            Effect::InstallCfMod { slug, mod_detail, file } => {
+            Effect::InstallCfMod {
+                slug,
+                mod_detail,
+                file,
+            } => {
                 // Verbatim per 09-RESEARCH.md §"Effect arm template" lines
                 // 1163-1216. Mirrors Phase 8 InstallModWithDeps mpsc-forwarder
                 // pattern, plus the FileNotDownloadable → CfModInstallFailed
@@ -1687,21 +1909,19 @@ async fn execute_effects(
 
                     match res {
                         Ok(()) => {
-                            let _ = tx
-                                .send(Action::CfModInstalled { slug, mod_id })
-                                .await;
+                            let _ = tx.send(Action::CfModInstalled { slug, mod_id }).await;
                         }
                         Err(crate::mods::curseforge::error::CurseForgeError::Cancelled) => {
                             // Silent — the cancel path already pruned
                             // running_mod_jobs (if applicable). Phase 6/8 precedent.
-                            let _ = tx
-                                .send(Action::CfModInstalled { slug, mod_id })
-                                .await;
+                            let _ = tx.send(Action::CfModInstalled { slug, mod_id }).await;
                         }
-                        Err(crate::mods::curseforge::error::CurseForgeError::FileNotDownloadable {
-                            web_url,
-                            ..
-                        }) => {
+                        Err(
+                            crate::mods::curseforge::error::CurseForgeError::FileNotDownloadable {
+                                web_url,
+                                ..
+                            },
+                        ) => {
                             let _ = tx
                                 .send(Action::CfModInstallFailed {
                                     slug,
@@ -1729,7 +1949,6 @@ async fn execute_effects(
             }
 
             // ── Phase 10 (10-06): Modpack import effect arms ──
-
             Effect::ImportModpack { mrpack_path } => {
                 let svc = Arc::clone(&modpack_service);
                 let mojang_arc = Arc::clone(&mojang);
@@ -1804,7 +2023,9 @@ async fn execute_effects(
                     match res {
                         Ok(manifest) => {
                             let _ = tx
-                                .send(Action::ModpackImported { slug: manifest.slug })
+                                .send(Action::ModpackImported {
+                                    slug: manifest.slug,
+                                })
                                 .await;
                         }
                         Err(crate::modpack::error::ModpackError::Cancelled) => {
@@ -1838,18 +2059,34 @@ async fn execute_effects(
             }
 
             // ── Phase 11 (11-04): Pack browser + install effect arms ─────────
-            Effect::SearchPacks { slug, kind, query, mc } => {
+            Effect::SearchPacks {
+                slug,
+                kind,
+                query,
+                mc,
+            } => {
                 let svc = Arc::clone(&pack_service);
                 let paths2 = paths.clone();
                 let tx = action_tx.clone();
                 tokio::spawn(async move {
-                    match svc.search(&query, kind, mc.as_deref(), Some(&paths2), Some(&slug)).await {
+                    match svc
+                        .search(&query, kind, mc.as_deref(), Some(&paths2), Some(&slug))
+                        .await
+                    {
                         Ok(hits) => {
-                            let _ = tx.send(Action::PackBrowserSearchLoaded { slug, kind, hits }).await;
+                            let _ = tx
+                                .send(Action::PackBrowserSearchLoaded { slug, kind, hits })
+                                .await;
                         }
                         Err(e) => {
                             tracing::warn!(error = %e, %slug, ?kind, "PackService search failed");
-                            let _ = tx.send(Action::PackBrowserSearchFailed { slug, kind, message: e.to_string() }).await;
+                            let _ = tx
+                                .send(Action::PackBrowserSearchFailed {
+                                    slug,
+                                    kind,
+                                    message: e.to_string(),
+                                })
+                                .await;
                         }
                     }
                 });
@@ -1862,7 +2099,9 @@ async fn execute_effects(
                 tokio::spawn(async move {
                     match svc.list_installed(&paths2, &slug, kind).await {
                         Ok(packs) => {
-                            let _ = tx.send(Action::InstalledPacksLoaded { slug, kind, packs }).await;
+                            let _ = tx
+                                .send(Action::InstalledPacksLoaded { slug, kind, packs })
+                                .await;
                         }
                         Err(e) => tracing::warn!(error = %e, %slug, ?kind, "list_installed failed"),
                     }
@@ -1875,12 +2114,22 @@ async fn execute_effects(
                 let token = tokio_util::sync::CancellationToken::new();
                 let token2 = token.clone();
                 tokio::spawn(async move {
-                    match crate::packs::install::drop_pack_from_path(&paths2, &slug, kind, &path, &token2).await {
+                    match crate::packs::install::drop_pack_from_path(
+                        &paths2, &slug, kind, &path, &token2,
+                    )
+                    .await
+                    {
                         Ok(_outcome) => {
                             let _ = tx.send(Action::PackInstalled { slug, kind }).await;
                         }
                         Err(e) => {
-                            let _ = tx.send(Action::PackDropFailed { slug, kind, error: e.to_string() }).await;
+                            let _ = tx
+                                .send(Action::PackDropFailed {
+                                    slug,
+                                    kind,
+                                    error: e.to_string(),
+                                })
+                                .await;
                         }
                     }
                 });
@@ -1888,7 +2137,14 @@ async fn execute_effects(
                 let _ = token;
             }
 
-            Effect::InstallPackFromModrinth { slug, kind, project_id, project_slug, project_title, version } => {
+            Effect::InstallPackFromModrinth {
+                slug,
+                kind,
+                project_id,
+                project_slug,
+                project_title,
+                version,
+            } => {
                 let svc = Arc::clone(&pack_service);
                 let paths2 = paths.clone();
                 let tx = action_tx.clone();
@@ -1902,7 +2158,11 @@ async fn execute_effects(
                         while let Some(evt) = lt_rx.recv().await {
                             if let crate::tasks::TaskEvent::Progress { id, pct, msg } = evt {
                                 let _ = tx_fwd
-                                    .send(Action::Task(crate::tasks::TaskEvent::Progress { id, pct, msg }))
+                                    .send(Action::Task(crate::tasks::TaskEvent::Progress {
+                                        id,
+                                        pct,
+                                        msg,
+                                    }))
                                     .await;
                             }
                         }
@@ -1942,7 +2202,14 @@ async fn execute_effects(
                 });
             }
 
-            Effect::FetchPackVersions { slug, kind, project_id, project_slug, project_title, mc } => {
+            Effect::FetchPackVersions {
+                slug,
+                kind,
+                project_id,
+                project_slug,
+                project_title,
+                mc,
+            } => {
                 // GAP-11-A: browser Enter-key auto-pick install chain.
                 // 1. list_versions for the picked project (kind-aware, MC-filtered).
                 // 2. pick first `is_latest_stable=true`; fallback `versions.first()`.
@@ -1960,42 +2227,50 @@ async fn execute_effects(
                                 .cloned()
                                 .or_else(|| entries.first().cloned());
                             let Some(entry) = entry_opt else {
-                                let _ = tx.send(Action::PackVersionsFailed {
-                                    slug,
-                                    kind,
-                                    project_id,
-                                    message: "no compatible versions found".to_string(),
-                                }).await;
+                                let _ = tx
+                                    .send(Action::PackVersionsFailed {
+                                        slug,
+                                        kind,
+                                        project_id,
+                                        message: "no compatible versions found".to_string(),
+                                    })
+                                    .await;
                                 return;
                             };
                             match svc.get_version(&entry.version_id).await {
                                 Ok(version) => {
-                                    let _ = tx.send(Action::AutoStartPackInstall {
-                                        slug,
-                                        kind,
-                                        project_id,
-                                        project_slug,
-                                        project_title,
-                                        version,
-                                    }).await;
+                                    let _ = tx
+                                        .send(Action::AutoStartPackInstall {
+                                            slug,
+                                            kind,
+                                            project_id,
+                                            project_slug,
+                                            project_title,
+                                            version,
+                                        })
+                                        .await;
                                 }
                                 Err(e) => {
-                                    let _ = tx.send(Action::PackVersionsFailed {
-                                        slug,
-                                        kind,
-                                        project_id,
-                                        message: e.to_string(),
-                                    }).await;
+                                    let _ = tx
+                                        .send(Action::PackVersionsFailed {
+                                            slug,
+                                            kind,
+                                            project_id,
+                                            message: e.to_string(),
+                                        })
+                                        .await;
                                 }
                             }
                         }
                         Err(e) => {
-                            let _ = tx.send(Action::PackVersionsFailed {
-                                slug,
-                                kind,
-                                project_id,
-                                message: e.to_string(),
-                            }).await;
+                            let _ = tx
+                                .send(Action::PackVersionsFailed {
+                                    slug,
+                                    kind,
+                                    project_id,
+                                    message: e.to_string(),
+                                })
+                                .await;
                         }
                     }
                 });
@@ -2008,12 +2283,23 @@ async fn execute_effects(
                 tokio::spawn(async move {
                     match svc.toggle_pack_enabled(&paths2, &slug, &mod_id, kind).await {
                         Ok(new_enabled) => {
-                            let _ = tx.send(Action::PackToggled { slug, kind, mod_id, new_enabled }).await;
+                            let _ = tx
+                                .send(Action::PackToggled {
+                                    slug,
+                                    kind,
+                                    mod_id,
+                                    new_enabled,
+                                })
+                                .await;
                         }
                         Err(e) => {
                             tracing::warn!(error = %e, %slug, ?kind, "toggle_pack_enabled failed");
                             let _ = tx
-                                .send(Action::PackToggleFailed { slug, kind, error: e.to_string() })
+                                .send(Action::PackToggleFailed {
+                                    slug,
+                                    kind,
+                                    error: e.to_string(),
+                                })
                                 .await;
                         }
                     }
@@ -2027,7 +2313,9 @@ async fn execute_effects(
                 tokio::spawn(async move {
                     match svc.uninstall_pack(&paths2, &slug, &mod_id, kind).await {
                         Ok(()) => {
-                            let _ = tx.send(Action::PackUninstalled { slug, kind, mod_id }).await;
+                            let _ = tx
+                                .send(Action::PackUninstalled { slug, kind, mod_id })
+                                .await;
                         }
                         Err(e) => tracing::warn!(error = %e, %slug, ?kind, "uninstall_pack failed"),
                     }

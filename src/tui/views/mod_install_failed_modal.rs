@@ -30,7 +30,12 @@ pub fn render_mod_install_failed_modal(f: &mut Frame, area: Rect, state: &AppSta
     let h = area.height.min(20);
     let x = area.x + (area.width.saturating_sub(w)) / 2;
     let y = area.y + (area.height.saturating_sub(h)) / 2;
-    let rect = Rect { x, y, width: w, height: h };
+    let rect = Rect {
+        x,
+        y,
+        width: w,
+        height: h,
+    };
 
     f.render_widget(Clear, rect);
     let outer = Block::default()
@@ -62,7 +67,9 @@ pub fn render_mod_install_failed_modal(f: &mut Frame, area: Rect, state: &AppSta
 
 pub fn map_mod_install_failed_event(ev: CtEvent) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::DismissModInstallFailed),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::DismissModInstallFailed),
         _ => None,
     }
 }

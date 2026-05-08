@@ -37,8 +37,7 @@ const MAIN_NAME_BYTES: &[u8] = b"main";
 /// Read a class entry's bytes out of the embedded ForgeWrapper JAR.
 fn read_class_bytes(name: &str) -> Vec<u8> {
     let cursor = Cursor::new(FORGE_WRAPPER_JAR);
-    let mut zip =
-        ZipArchive::new(cursor).expect("ZipArchive::new on embedded ForgeWrapper jar");
+    let mut zip = ZipArchive::new(cursor).expect("ZipArchive::new on embedded ForgeWrapper jar");
     let mut entry = zip
         .by_name(name)
         .unwrap_or_else(|e| panic!("class entry {name} missing from JAR: {e}"));
@@ -66,10 +65,7 @@ fn forgewrapper_main_class_has_main_string_method_signature() {
 
     // Map our Rust-level fully-qualified class name to the JAR-internal
     // ZIP entry path: replace `.` with `/` and append `.class`.
-    let zip_path = format!(
-        "{}.class",
-        FORGE_WRAPPER_MAIN_CLASS.replace('.', "/")
-    );
+    let zip_path = format!("{}.class", FORGE_WRAPPER_MAIN_CLASS.replace('.', "/"));
     assert_eq!(
         zip_path, "io/github/zekerzhayard/forgewrapper/installer/Main.class",
         "FORGE_WRAPPER_MAIN_CLASS does not map to the expected ZIP entry path"
@@ -112,9 +108,8 @@ fn forgewrapper_installer_class_lacks_main_string_method_signature() {
     // re-vendoring adds a main() to Installer.class, this test will fail
     // (loud signal) and the developer can decide whether to widen the
     // entry-point class set.
-    let installer_bytes = read_class_bytes(
-        "io/github/zekerzhayard/forgewrapper/installer/Installer.class",
-    );
+    let installer_bytes =
+        read_class_bytes("io/github/zekerzhayard/forgewrapper/installer/Installer.class");
     assert_eq!(
         &installer_bytes[..4],
         &[0xCA, 0xFE, 0xBA, 0xBE],
@@ -166,9 +161,7 @@ fn forgewrapper_main_class_constant_ends_with_dot_main() {
 /// argument template.
 #[test]
 fn forgewrapper_main_class_is_launch_time_entry_point() {
-    let main_bytes = read_class_bytes(
-        "io/github/zekerzhayard/forgewrapper/installer/Main.class",
-    );
+    let main_bytes = read_class_bytes("io/github/zekerzhayard/forgewrapper/installer/Main.class");
     assert_eq!(
         &main_bytes[..4],
         &[0xCA, 0xFE, 0xBA, 0xBE],

@@ -71,8 +71,8 @@ pub struct LoaderInfo {
 /// Uses string-prefix matching — Mojang version IDs are not strict semver.
 pub fn forge_supported_for_mc(mc: &str) -> bool {
     const SUPPORTED_PREFIXES: &[&str] = &[
-        "1.13", "1.14", "1.15", "1.16", "1.17", "1.18", "1.19",
-        "1.20", "1.21", "1.22", "1.23", "1.24", "1.25",
+        "1.13", "1.14", "1.15", "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22", "1.23",
+        "1.24", "1.25",
     ];
     SUPPORTED_PREFIXES.iter().any(|p| mc.starts_with(p))
 }
@@ -85,8 +85,8 @@ pub fn neoforge_supported_for_mc(mc: &str) -> bool {
     // Explicit prefix list from 1.20.1 onward. Uses prefix matches to handle
     // patches and pre-releases (e.g., "1.21-pre3" matches "1.21").
     const SUPPORTED_PREFIXES: &[&str] = &[
-        "1.20.1", "1.20.2", "1.20.3", "1.20.4", "1.20.5", "1.20.6",
-        "1.21", "1.22", "1.23", "1.24", "1.25",
+        "1.20.1", "1.20.2", "1.20.3", "1.20.4", "1.20.5", "1.20.6", "1.21", "1.22", "1.23", "1.24",
+        "1.25",
     ];
     SUPPORTED_PREFIXES.iter().any(|p| mc.starts_with(p))
 }
@@ -130,7 +130,10 @@ mod tests {
             build: None,
         };
         let json = serde_json::to_string(&e).unwrap();
-        assert!(!json.contains("build"), "None build should be omitted: {json}");
+        assert!(
+            !json.contains("build"),
+            "None build should be omitted: {json}"
+        );
     }
 
     #[test]
@@ -143,7 +146,10 @@ mod tests {
         let json = serde_json::to_string(&li).unwrap();
         let parsed: LoaderInfo = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, li);
-        assert!(json.contains("\"kind\":\"fabric\""), "kind should serialize snake_case: {json}");
+        assert!(
+            json.contains("\"kind\":\"fabric\""),
+            "kind should serialize snake_case: {json}"
+        );
     }
 
     #[test]
@@ -180,7 +186,12 @@ mod tests {
     fn test_loader_library_omits_none_fields() {
         let lib = LoaderLibrary {
             name: "g:a:1".into(),
-            url: None, sha1: None, sha256: None, sha512: None, md5: None, size: None,
+            url: None,
+            sha1: None,
+            sha256: None,
+            sha512: None,
+            md5: None,
+            size: None,
         };
         let json = serde_json::to_string(&lib).unwrap();
         assert!(!json.contains("url"), "None url omitted: {json}");
@@ -200,7 +211,10 @@ mod tests {
     fn test_loader_type_serde_roundtrip_neoforge_uses_neoforge_not_neo_underscore_forge() {
         let nf = LoaderType::NeoForge;
         let json = serde_json::to_string(&nf).unwrap();
-        assert_eq!(json, "\"neoforge\"", "must serialize as 'neoforge', NOT 'neo_forge'");
+        assert_eq!(
+            json, "\"neoforge\"",
+            "must serialize as 'neoforge', NOT 'neo_forge'"
+        );
         let parsed: LoaderType = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, LoaderType::NeoForge);
     }

@@ -221,13 +221,15 @@ pub async fn toggle_enabled(
         )
     };
 
-    tokio::fs::rename(&current_path, &new_path).await.map_err(|e| {
-        io_err(format!(
-            "rename {} -> {}: {e}",
-            current_path.display(),
-            new_path.display()
-        ))
-    })?;
+    tokio::fs::rename(&current_path, &new_path)
+        .await
+        .map_err(|e| {
+            io_err(format!(
+                "rename {} -> {}: {e}",
+                current_path.display(),
+                new_path.display()
+            ))
+        })?;
 
     row.enabled = !row.enabled;
     let new_state = row.enabled;
@@ -295,9 +297,9 @@ pub async fn uninstall(paths: &AppPaths, slug: &str, mod_id: &str) -> Result<(),
 // ============================================================================
 #[cfg(test)]
 mod tests {
+    use super::upsert_pack;
     use super::*;
     use crate::mods::types::{HashAlgo, InstalledItemKind, InstalledModRow, ModSource};
-    use super::upsert_pack;
     use tempfile::TempDir;
 
     fn test_paths(td: &TempDir) -> AppPaths {
@@ -355,7 +357,9 @@ mod tests {
         let td = TempDir::new().unwrap();
         let paths = test_paths(&td);
         let p = paths.instance_mod_ledger("fresh");
-        tokio::fs::create_dir_all(p.parent().unwrap()).await.unwrap();
+        tokio::fs::create_dir_all(p.parent().unwrap())
+            .await
+            .unwrap();
         tokio::fs::write(&p, b"").await.unwrap();
         let l = read_ledger(&paths, "fresh").await.unwrap();
         assert!(l.mods.is_empty());
@@ -379,7 +383,9 @@ mod tests {
         let td = TempDir::new().unwrap();
         let paths = test_paths(&td);
         let p = paths.instance_mod_ledger("bad");
-        tokio::fs::create_dir_all(p.parent().unwrap()).await.unwrap();
+        tokio::fs::create_dir_all(p.parent().unwrap())
+            .await
+            .unwrap();
         tokio::fs::write(&p, b"this is { not toml").await.unwrap();
         let r = read_ledger(&paths, "bad").await;
         assert!(matches!(r, Err(ModrinthError::LedgerParse(_))), "got {r:?}");
@@ -598,7 +604,11 @@ mod tests {
     async fn test_upsert_pack_writes_zip_filename_row() {
         let td = TempDir::new().unwrap();
         let paths = test_paths(&td);
-        let row = mk_pack_row("pack:abc", "Faithful 32x.zip", InstalledItemKind::ResourcePack);
+        let row = mk_pack_row(
+            "pack:abc",
+            "Faithful 32x.zip",
+            InstalledItemKind::ResourcePack,
+        );
         upsert_pack(&paths, "x", row).await.unwrap();
         let l = read_ledger(&paths, "x").await.unwrap();
         assert_eq!(l.mods.len(), 1);
@@ -659,8 +669,11 @@ mod tests {
             .unwrap();
 
         // Insert a pack row via upsert_pack.
-        let pack =
-            mk_pack_row("pack:p1", "Faithful 32x.zip", InstalledItemKind::ResourcePack);
+        let pack = mk_pack_row(
+            "pack:p1",
+            "Faithful 32x.zip",
+            InstalledItemKind::ResourcePack,
+        );
         upsert_pack(&paths, "x", pack).await.unwrap();
 
         let l = read_ledger(&paths, "x").await.unwrap();
@@ -670,13 +683,7 @@ mod tests {
         let pack_row = l.mods.iter().find(|m| m.mod_id == "pack:p1").unwrap();
         assert_eq!(mod_row.kind, InstalledItemKind::Mod);
         assert_eq!(pack_row.kind, InstalledItemKind::ResourcePack);
-        assert!(
-            mod_row.file_name.ends_with(".jar"),
-            "mod row still .jar"
-        );
-        assert!(
-            pack_row.file_name.ends_with(".zip"),
-            "pack row is .zip"
-        );
+        assert!(mod_row.file_name.ends_with(".jar"), "mod row still .jar");
+        assert!(pack_row.file_name.ends_with(".zip"), "pack row is .zip");
     }
 }

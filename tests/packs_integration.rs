@@ -45,7 +45,10 @@ fn make_service_with_mock(server: &MockServer) -> PackService {
     PackService::with_client(client)
 }
 
-fn make_progress() -> (mpsc::Sender<mineltui::tasks::TaskEvent>, mpsc::Receiver<mineltui::tasks::TaskEvent>) {
+fn make_progress() -> (
+    mpsc::Sender<mineltui::tasks::TaskEvent>,
+    mpsc::Receiver<mineltui::tasks::TaskEvent>,
+) {
     mpsc::channel(64)
 }
 
@@ -289,8 +292,7 @@ async fn test_modrinth_install_resource_pack_end_to_end() {
     // Mock: GET /v2/project/w0TnApzs/version → 1 version with download URL
     let download_url = server.url("/faithful-32x.zip");
     let _version_mock = server.mock(|when, then| {
-        when.method(GET)
-            .path("/v2/project/w0TnApzs/version");
+        when.method(GET).path("/v2/project/w0TnApzs/version");
         then.status(200).json_body(json!([{
             "id": "kIpbQNcv",
             "project_id": "w0TnApzs",
@@ -419,14 +421,20 @@ async fn test_modrinth_install_resource_pack_end_to_end() {
         .expect("read_ledger");
     assert_eq!(ledger.mods.len(), 1);
     let r = &ledger.mods[0];
-    assert_eq!(r.kind, mineltui::mods::types::InstalledItemKind::ResourcePack);
+    assert_eq!(
+        r.kind,
+        mineltui::mods::types::InstalledItemKind::ResourcePack
+    );
     assert_eq!(r.source, mineltui::mods::types::ModSource::Modrinth);
     assert_eq!(
         r.hash_algo,
         mineltui::mods::types::HashAlgo::Sha1,
         "pack install uses SHA-1"
     );
-    assert!(!r.sha512.is_empty(), "sha512 field (storing SHA-1) must be non-empty");
+    assert!(
+        !r.sha512.is_empty(),
+        "sha512 field (storing SHA-1) must be non-empty"
+    );
 }
 
 // ─── Test 6: Modrinth install shader pack end-to-end ─────────────────────────
@@ -508,7 +516,11 @@ async fn test_modrinth_install_shader_pack_end_to_end() {
 
     // Dest must be in shaderpacks/.
     let dest = paths.instance_pack_file("test-instance", PackKind::Shader, &row.file_name);
-    assert!(dest.exists(), "shader pack must exist at: {}", dest.display());
+    assert!(
+        dest.exists(),
+        "shader pack must exist at: {}",
+        dest.display()
+    );
 
     let ledger = mineltui::mods::ledger::read_ledger(&paths, "test-instance")
         .await
@@ -518,7 +530,10 @@ async fn test_modrinth_install_shader_pack_end_to_end() {
         ledger.mods[0].kind,
         mineltui::mods::types::InstalledItemKind::Shader
     );
-    assert_eq!(ledger.mods[0].source, mineltui::mods::types::ModSource::Modrinth);
+    assert_eq!(
+        ledger.mods[0].source,
+        mineltui::mods::types::ModSource::Modrinth
+    );
 }
 
 // ─── Test 7: Toggle resource pack enabled — extension rename round-trip ───────
@@ -651,7 +666,10 @@ async fn test_uninstall_pack_removes_file_and_ledger() {
     let ledger = mineltui::mods::ledger::read_ledger(&paths, "test-instance")
         .await
         .unwrap();
-    assert!(ledger.mods.is_empty(), "ledger must be empty after uninstall");
+    assert!(
+        ledger.mods.is_empty(),
+        "ledger must be empty after uninstall"
+    );
 }
 
 // ─── Test 9 (bonus): Toggle shader pack returns ShaderToggleNotSupported ─────
@@ -715,9 +733,15 @@ async fn test_list_installed_filters_by_kind_in_mixed_ledger() {
     let rp_path = tmp.path().join("faithful.zip");
     build_minimal_resource_pack(&rp_path, 22);
     let token = CancellationToken::new();
-    drop_pack_from_path(&paths, "test-instance", PackKind::Resource, &rp_path, &token)
-        .await
-        .expect("resource pack drop must succeed");
+    drop_pack_from_path(
+        &paths,
+        "test-instance",
+        PackKind::Resource,
+        &rp_path,
+        &token,
+    )
+    .await
+    .expect("resource pack drop must succeed");
 
     // Install one shader pack.
     let sp_path = tmp.path().join("complementary.zip");
@@ -747,7 +771,10 @@ async fn test_list_installed_filters_by_kind_in_mixed_ledger() {
         .await
         .expect("list_installed Shader");
     assert_eq!(sp_rows.len(), 1, "must have exactly 1 shader pack row");
-    assert_eq!(sp_rows[0].kind, mineltui::mods::types::InstalledItemKind::Shader);
+    assert_eq!(
+        sp_rows[0].kind,
+        mineltui::mods::types::InstalledItemKind::Shader
+    );
 }
 
 // ─── Test 11 (bonus): Modrinth install oversized file is rejected ─────────────
@@ -833,7 +860,10 @@ async fn test_modrinth_install_oversized_file_rejected() {
     let ledger = mineltui::mods::ledger::read_ledger(&paths, "test-instance")
         .await
         .unwrap();
-    assert!(ledger.mods.is_empty(), "ledger must be empty after rejection");
+    assert!(
+        ledger.mods.is_empty(),
+        "ledger must be empty after rejection"
+    );
 
     // Download endpoint must NOT have been hit.
     _download_mock.assert_calls(0);
@@ -972,11 +1002,13 @@ async fn test_browser_enter_install_chain_picks_latest_stable() {
     // Negative-assert mocks: if the chain wrongly picks a loser, these will fire.
     let loser_get_older = server.mock(|when, then| {
         when.method(GET).path("/v2/version/older_release");
-        then.status(500).body(b"loser_older fetched -- chain picked wrong");
+        then.status(500)
+            .body(b"loser_older fetched -- chain picked wrong");
     });
     let loser_get_beta = server.mock(|when, then| {
         when.method(GET).path("/v2/version/unstable_beta");
-        then.status(500).body(b"loser_beta fetched -- chain picked wrong");
+        then.status(500)
+            .body(b"loser_beta fetched -- chain picked wrong");
     });
 
     // Download endpoint for the winner.
@@ -1042,14 +1074,21 @@ async fn test_browser_enter_install_chain_picks_latest_stable() {
     // The installed filename must match the *winner's* file, not a loser.
     assert_eq!(row.file_name, "newer-release.zip");
     let dest = paths.instance_pack_file("test-instance", PackKind::Resource, &row.file_name);
-    assert!(dest.exists(), "winner file must exist on disk: {}", dest.display());
+    assert!(
+        dest.exists(),
+        "winner file must exist on disk: {}",
+        dest.display()
+    );
 
     // Ledger has exactly one row, sourced from Modrinth.
     let ledger = mineltui::mods::ledger::read_ledger(&paths, "test-instance")
         .await
         .expect("read_ledger");
     assert_eq!(ledger.mods.len(), 1);
-    assert_eq!(ledger.mods[0].source, mineltui::mods::types::ModSource::Modrinth);
+    assert_eq!(
+        ledger.mods[0].source,
+        mineltui::mods::types::ModSource::Modrinth
+    );
     assert_eq!(
         ledger.mods[0].mod_id, "PIDxxxx",
         "ledger row must be keyed on the winner's project_id"

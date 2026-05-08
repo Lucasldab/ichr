@@ -41,23 +41,50 @@ pub enum VersionFilter {
 
 #[derive(Debug, Clone)]
 pub enum CreateStep {
-    NameInput { current: String, error: Option<String> },
-    VersionPicker { name: String, filter: VersionFilter, search: String, error: Option<String> },
+    NameInput {
+        current: String,
+        error: Option<String>,
+    },
+    VersionPicker {
+        name: String,
+        filter: VersionFilter,
+        search: String,
+        error: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone)]
 pub enum ActiveView {
-    InstanceList { selected: usize },
+    InstanceList {
+        selected: usize,
+    },
     CreateModal(CreateStep),
-    DeleteConfirm { slug: String, display_name: String },
-    RenameInline { slug: String, current: String, original: String },
+    DeleteConfirm {
+        slug: String,
+        display_name: String,
+    },
+    RenameInline {
+        slug: String,
+        current: String,
+        original: String,
+    },
     /// Inline group editor (INST-06 — mirrors RenameInline).
-    GroupInline { slug: String, buffer: String, original: Option<String> },
+    GroupInline {
+        slug: String,
+        buffer: String,
+        original: Option<String>,
+    },
     /// Launch-failed modal — shown when Action::LaunchFailed is dispatched.
     /// Esc dismisses and returns to InstanceList.
-    LaunchFailedModal { slug: String, error: String, log_tail: String },
+    LaunchFailedModal {
+        slug: String,
+        error: String,
+        log_tail: String,
+    },
     /// AUTH-06 account list view. Entered via `A` from InstanceList.
-    AccountsList { selected: usize },
+    AccountsList {
+        selected: usize,
+    },
     /// AUTH-01 device-code modal. `expires_at` drives the countdown;
     /// the render loop recomputes "seconds remaining" each frame.
     AddAccountDeviceCode {
@@ -67,7 +94,9 @@ pub enum ActiveView {
         stage: String,
     },
     /// AUTH-02 error modal (e.g., "No Xbox profile — visit xbox.com/profile").
-    AccountAuthFailed { reason: String },
+    AccountAuthFailed {
+        reason: String,
+    },
     /// Java picker modal. `options` is populated after FetchSystemJavas completes.
     /// `selected` is the highlighted row index (0 = Auto).
     JavaPickerModal {
@@ -385,7 +414,6 @@ pub struct AppState {
     pub running_pack_jobs: HashMap<(String, PackKind), CancellationToken>,
 }
 
-
 #[derive(Debug, Clone)]
 pub enum Action {
     // Phase 1
@@ -396,8 +424,14 @@ pub enum Action {
     // Navigation
     OpenCreateModal,
     CloseModal,
-    OpenDeleteConfirm { slug: String, display_name: String },
-    OpenRenameInline { slug: String, current: String },
+    OpenDeleteConfirm {
+        slug: String,
+        display_name: String,
+    },
+    OpenRenameInline {
+        slug: String,
+        current: String,
+    },
     MoveSelection(isize),
 
     // Create flow
@@ -424,7 +458,10 @@ pub enum Action {
     CancelDelete,
 
     // Group editor (INST-06 — mirrors rename pattern)
-    OpenGroupInput { slug: String, current: String },
+    OpenGroupInput {
+        slug: String,
+        current: String,
+    },
     TypeGroup(char),
     BackspaceGroup,
     SubmitGroup,
@@ -435,12 +472,26 @@ pub enum Action {
     CloseAccounts,
     AccountsLoaded(Vec<Account>),
     AddAccount,
-    AccountAuthStarted { user_code: String, verification_uri: String, expires_at: Instant },
-    AccountAuthProgress { stage: String },
-    AccountAdded { account: Account },
-    AccountAuthFailed { reason: String },
-    RemoveAccount { id: String },
-    ActivateAccount { id: String },
+    AccountAuthStarted {
+        user_code: String,
+        verification_uri: String,
+        expires_at: Instant,
+    },
+    AccountAuthProgress {
+        stage: String,
+    },
+    AccountAdded {
+        account: Account,
+    },
+    AccountAuthFailed {
+        reason: String,
+    },
+    RemoveAccount {
+        id: String,
+    },
+    ActivateAccount {
+        id: String,
+    },
     CancelAddAccount,
     /// Internal — stores the CancellationToken created by execute_effects for
     /// the device-code auth task into state.add_account_cancel.
@@ -448,9 +499,14 @@ pub enum Action {
 
     // Phase 5: Java picker
     /// Open the Java picker for a specific instance (dispatched by `j` keybind).
-    OpenJavaPicker { slug: String },
+    OpenJavaPicker {
+        slug: String,
+    },
     /// Async result: detected system Javas are ready to populate the modal.
-    JavaPickerOptionsLoaded { slug: String, options: Vec<JavaPickerRow> },
+    JavaPickerOptionsLoaded {
+        slug: String,
+        options: Vec<JavaPickerRow>,
+    },
     /// Move the picker selection up/down (wrapping).
     JavaPickerMove(isize),
     /// Confirm the highlighted picker row.
@@ -458,13 +514,20 @@ pub enum Action {
     /// Dismiss the picker without mutating anything.
     JavaPickerCancel,
     /// Effect completed: java_override was written successfully.
-    JavaOverrideSet { slug: String },
+    JavaOverrideSet {
+        slug: String,
+    },
     /// Effect failed: java_override write returned an error.
-    JavaOverrideFailed { slug: String, reason: String },
+    JavaOverrideFailed {
+        slug: String,
+        reason: String,
+    },
 
     // Phase 6: Loader picker
     /// Open the loader type picker for a specific instance (dispatched by `L` keybind).
-    OpenLoaderPicker { slug: String },
+    OpenLoaderPicker {
+        slug: String,
+    },
     /// Move the loader picker selection up/down (wrapping over 3 rows: None/Fabric/Quilt).
     LoaderPickerMove(isize),
     /// Confirm the highlighted loader picker row.
@@ -472,7 +535,11 @@ pub enum Action {
     /// Dismiss the loader picker without mutating anything.
     LoaderPickerCancel,
     /// Async result: loader versions list fetched and ready to display.
-    LoaderVersionsLoaded { slug: String, loader: LoaderType, versions: Vec<LoaderVersionEntry> },
+    LoaderVersionsLoaded {
+        slug: String,
+        loader: LoaderType,
+        versions: Vec<LoaderVersionEntry>,
+    },
     /// Move the loader version picker selection up/down (wrapping over filtered list).
     LoaderVersionPickerMove(isize),
     /// Toggle stable-only filter in the loader version picker.
@@ -487,18 +554,40 @@ pub enum Action {
     LoaderVersionPickerCancel,
     /// Internal — emitted by execute_effects inside the spawned task body BEFORE
     /// calling install_loader. Inserts the CancellationToken into running_loader_installs.
-    LoaderInstallStarted { slug: String, token: CancellationToken },
+    LoaderInstallStarted {
+        slug: String,
+        token: CancellationToken,
+    },
     /// Progress update from the install task — updates the progress modal fields.
-    LoaderInstallProgress { slug: String, pct: u8, step_label: String, bytes_done: u64, bytes_total: u64 },
+    LoaderInstallProgress {
+        slug: String,
+        pct: u8,
+        step_label: String,
+        bytes_done: u64,
+        bytes_total: u64,
+    },
     /// Phase 7 (D-02): live log-tail line from the installer subprocess — updates
     /// `LoaderInstallProgressModal.log_tail` without touching the gauge percentage.
-    LoaderInstallLogTail { slug: String, tail: String },
+    LoaderInstallLogTail {
+        slug: String,
+        tail: String,
+    },
     /// Install completed successfully — clears running token, refreshes instances.
-    LoaderInstalled { slug: String },
+    LoaderInstalled {
+        slug: String,
+    },
     /// Install failed — clears running token, transitions to failed modal.
-    LoaderInstallFailed { slug: String, loader: LoaderType, version: String, error: String, log_tail: String },
+    LoaderInstallFailed {
+        slug: String,
+        loader: LoaderType,
+        version: String,
+        error: String,
+        log_tail: String,
+    },
     /// Cancel a running loader install (Esc on progress modal).
-    CancelLoaderInstall { slug: String },
+    CancelLoaderInstall {
+        slug: String,
+    },
     /// Dismiss the loader install failed modal (Esc).
     DismissLoaderInstallFailed,
     /// Confirm the loader switch (y/Y in switch confirm modal).
@@ -508,27 +597,54 @@ pub enum Action {
 
     // Phase 3: launch lifecycle
     /// Dispatch when Enter is pressed on a non-running instance row.
-    LaunchInstance { slug: String },
+    LaunchInstance {
+        slug: String,
+    },
     /// Internal — emitted by execute_effects inside the spawned task body BEFORE
     /// calling launch_instance. Inserts the CancellationToken into running_instances.
-    LaunchJobStarted { slug: String, token: CancellationToken },
+    LaunchJobStarted {
+        slug: String,
+        token: CancellationToken,
+    },
     /// Tracing signal: launch_instance has started executing (after token is stored).
-    InstanceLaunched { slug: String },
+    InstanceLaunched {
+        slug: String,
+    },
     /// Emitted when the game process exits (cleanly or via cancellation).
-    InstanceExited { slug: String, duration_ms: u64 },
+    InstanceExited {
+        slug: String,
+        duration_ms: u64,
+    },
     /// Emitted when launch_instance returns a non-cancellation error.
-    LaunchFailed { slug: String, error: String, log_tail: String },
+    LaunchFailed {
+        slug: String,
+        error: String,
+        log_tail: String,
+    },
     /// Dispatch when `s` is pressed on a running instance row.
-    StopInstance { slug: String },
+    StopInstance {
+        slug: String,
+    },
 
     // Background completions
     ManifestLoaded(Vec<VersionEntry>),
     InstancesLoaded(Vec<InstanceManifest>),
-    VersionInstalled { slug: String },
-    VersionInstallFailed { slug: String, error: String },
+    VersionInstalled {
+        slug: String,
+    },
+    VersionInstallFailed {
+        slug: String,
+        error: String,
+    },
     InstanceDeleted(String),
-    InstanceRenamed { slug: String, new_name: String },
-    InstanceCloned { source_slug: String, new_slug: String },
+    InstanceRenamed {
+        slug: String,
+        new_name: String,
+    },
+    InstanceCloned {
+        source_slug: String,
+        new_slug: String,
+    },
     ServiceErrored(String),
 
     // ── Phase 8 (Modrinth Integration) — see UI-SPEC §Keybind Contract ──
@@ -536,14 +652,22 @@ pub enum Action {
     /// `M` keybind on InstanceList — opens the Modrinth mod browser for the
     /// given instance. Pitfall 8 guard: silent no-op if a previous mod install
     /// for this slug is still in flight (`state.running_mod_jobs.contains_key`).
-    OpenModBrowser { slug: String },
+    OpenModBrowser {
+        slug: String,
+    },
     /// Async result: search results loaded for the open ModBrowser.
-    ModBrowserSearchLoaded { slug: String, hits: Vec<ModrinthSearchHit> },
+    ModBrowserSearchLoaded {
+        slug: String,
+        hits: Vec<ModrinthSearchHit>,
+    },
     /// Async result: Modrinth search failed -- drives `fetch_state = Error(message)`.
     /// Mirrors `Action::CfBrowserSearchFailed`. Closes GAP-8-F (Phase 8.1 gap closure):
     /// previously the network-error path dispatched `ModBrowserSearchLoaded { hits: [] }`
     /// which the view rendered as "No mods found", conflating reachability with empty results.
-    ModBrowserSearchFailed { slug: String, message: String },
+    ModBrowserSearchFailed {
+        slug: String,
+        message: String,
+    },
     /// Move the highlighted row in the ModBrowser results list (saturating).
     ModBrowserMove(isize),
     /// Enter on a ModBrowser row — opens the version picker for the selected mod.
@@ -565,11 +689,17 @@ pub enum Action {
     /// the full pasted string and re-emits the search effect once.
     ModBrowserPasteSearch(String),
     /// Async result: project detail (right-pane preview) loaded.
-    ModDetailLoaded { slug: String, detail: ModrinthProjectDetail },
+    ModDetailLoaded {
+        slug: String,
+        detail: ModrinthProjectDetail,
+    },
 
     // Version picker
     /// Async result: per-project version list loaded for the open version picker.
-    ModVersionsLoaded { slug: String, versions: Vec<ModrinthVersionEntry> },
+    ModVersionsLoaded {
+        slug: String,
+        versions: Vec<ModrinthVersionEntry>,
+    },
     /// Move the highlighted version row (saturating).
     ModVersionPickerMove(isize),
     /// Enter on a version row — fires `Effect::ResolveModDependencies`.
@@ -606,7 +736,10 @@ pub enum Action {
     /// Install completed successfully — clears running_mod_jobs row AND walks the
     /// open ModBrowser results (if any) to stamp `already_installed = true` for
     /// the matching `project_id` (Pitfall 10 fix).
-    ModInstalled { slug: String, project_id: String },
+    ModInstalled {
+        slug: String,
+        project_id: String,
+    },
     /// Install failed — clears running_mod_jobs row, transitions to the failed modal.
     ModInstallFailed {
         slug: String,
@@ -622,16 +755,25 @@ pub enum Action {
     // Installed mods list
     /// `m` keybind on InstanceList — opens the per-instance Installed Mods List.
     /// Also emits `Effect::FetchInstalledMods` to populate the rows.
-    OpenInstalledMods { slug: String },
+    OpenInstalledMods {
+        slug: String,
+    },
     /// Async result: installed-mods ledger rows loaded for the open list.
-    InstalledModsLoaded { slug: String, mods: Vec<InstalledModRow> },
+    InstalledModsLoaded {
+        slug: String,
+        mods: Vec<InstalledModRow>,
+    },
     /// Move the highlighted row in the InstalledModsList (saturating).
     InstalledModsMove(isize),
     /// `e` keybind on InstalledModsList — fires `Effect::ToggleModEnabledEff`
     /// for the highlighted row (renames `.jar` ↔ `.jar.disabled`).
     ToggleModEnabled,
     /// Async result: toggle finished — flip the `enabled` field on the matching row.
-    ModToggled { slug: String, mod_id: String, enabled: bool },
+    ModToggled {
+        slug: String,
+        mod_id: String,
+        enabled: bool,
+    },
     /// `x` keybind on InstalledModsList — opens the uninstall confirm overlay.
     OpenUninstallModConfirm,
     /// `y`/`Y` on UninstallModConfirm — fires `Effect::UninstallMod` and returns
@@ -640,7 +782,10 @@ pub enum Action {
     /// `n`/`Esc` on UninstallModConfirm — returns to InstalledModsList.
     CancelUninstallMod,
     /// Async result: uninstall finished — remove the matching row from the list.
-    ModUninstalled { slug: String, mod_id: String },
+    ModUninstalled {
+        slug: String,
+        mod_id: String,
+    },
     /// Esc on InstalledModsList — returns to InstanceList.
     CloseInstalledMods,
 
@@ -648,7 +793,9 @@ pub enum Action {
     /// `F` keybind on InstanceList — opens the CurseForge mod browser for the
     /// given instance. Pitfall 1 guard: silent no-op when `cf_api_key_present == false`.
     /// Pitfall 8 guard: silent no-op when `running_mod_jobs.contains_key(&slug)`.
-    OpenCfBrowser { slug: String },
+    OpenCfBrowser {
+        slug: String,
+    },
     /// Spawn a CurseForge search effect for the open CfBrowser.
     CfBrowserSearchStart {
         slug: String,
@@ -662,7 +809,10 @@ pub enum Action {
         hits: Vec<crate::mods::curseforge::types::CurseForgeSearchHit>,
     },
     /// Async result: search failed — drives `fetch_state = Error(_)`.
-    CfBrowserSearchFailed { slug: String, error: String },
+    CfBrowserSearchFailed {
+        slug: String,
+        error: String,
+    },
     /// Move the highlighted row in the CfBrowser results list (saturating).
     CfBrowserMoveSelection(i32),
     /// `v` in CfBrowser — cycles MC filter (None ↔ Some("any")) and re-emits search.
@@ -670,7 +820,10 @@ pub enum Action {
     /// `l` in CfBrowser — cycles loader filter (None ↔ Some(<instance loader>)) and re-emits search.
     CfBrowserToggleLoaderFilter,
     /// Enter on a CfBrowser row — Action ping-pong half 1: emits `Effect::FetchCfMod`.
-    CfBrowserOpenDetail { slug: String, mod_id: u64 },
+    CfBrowserOpenDetail {
+        slug: String,
+        mod_id: u64,
+    },
     /// Async result: project detail loaded — Action ping-pong half 2: emits `Effect::ListCfFiles`.
     /// Mirrors Phase 8's `ModDetailLoaded → ModVersionsLoaded` chain.
     CfBrowserDetailLoaded {
@@ -707,7 +860,10 @@ pub enum Action {
         token: CancellationToken,
     },
     /// Install completed successfully — clears `running_mod_jobs[&slug]`.
-    CfModInstalled { slug: String, mod_id: u64 },
+    CfModInstalled {
+        slug: String,
+        mod_id: u64,
+    },
     /// Install failed — clears `running_mod_jobs[&slug]`, transitions to
     /// `CfInstallFailedModal`. `web_url` is `Some(url)` for FileNotDownloadable
     /// (the load-bearing UX path per MOD-04).
@@ -738,19 +894,35 @@ pub enum Action {
     /// Internal — emitted by the spawned task BEFORE calling import_mrpack.
     /// Inserts the CancellationToken into running_modpack_imports and transitions
     /// ActiveView to ModpackImportProgressModal.
-    ModpackImportStarted { slug: String, modpack_name: String, token: CancellationToken },
+    ModpackImportStarted {
+        slug: String,
+        modpack_name: String,
+        token: CancellationToken,
+    },
     /// Progress update from the import task — updates the progress modal fields.
-    ModpackImportProgress { slug: String, pct: u8, step_label: String, bytes_done: u64, bytes_total: u64 },
+    ModpackImportProgress {
+        slug: String,
+        pct: u8,
+        step_label: String,
+        bytes_done: u64,
+        bytes_total: u64,
+    },
     /// Import completed successfully — clears running_modpack_imports[slug],
     /// transitions to InstanceList, emits Effect::FetchInstances.
-    ModpackImported { slug: String },
+    ModpackImported {
+        slug: String,
+    },
     /// Dispatched by the Effect-spawned task when ModpackError::Cancelled bubbles up.
     /// Distinct from ModpackImported so the update arm can `clear()` the
     /// running_modpack_imports map without needing to know the resolved slug (which
     /// the spawned task may not have if cancel preceded create_instance).
     ModpackImportCancelled,
     /// Import failed — clears running_modpack_imports, transitions to ModpackImportFailedModal.
-    ModpackImportFailed { modpack_name: String, error: String, log_tail: String },
+    ModpackImportFailed {
+        modpack_name: String,
+        error: String,
+        log_tail: String,
+    },
     /// User-keystroke action: Esc on progress modal.
     /// No slug arg — uses the unique current modpack import (HashMap is single-entry in v1).
     CancelModpackImport,
@@ -759,7 +931,10 @@ pub enum Action {
 
     // ── Phase 11 (11-04): Pack browser + installed list + drop-path ──────────
     /// Open the Modrinth pack browser for a given slug + kind.
-    OpenPackBrowser { slug: String, kind: PackKind },
+    OpenPackBrowser {
+        slug: String,
+        kind: PackKind,
+    },
     /// Navigate in the pack browser results list.
     PackBrowserMove(i32),
     /// Append a character to the pack browser search buffer.
@@ -769,13 +944,24 @@ pub enum Action {
     /// Paste a string into the pack browser search buffer.
     PackBrowserPasteSearch(String),
     /// Pack browser search results arrived — slug+kind match guard applied in update().
-    PackBrowserSearchLoaded { slug: String, kind: PackKind, hits: Vec<ModrinthSearchHit> },
+    PackBrowserSearchLoaded {
+        slug: String,
+        kind: PackKind,
+        hits: Vec<ModrinthSearchHit>,
+    },
     /// Pack browser search failed.
-    PackBrowserSearchFailed { slug: String, kind: PackKind, message: String },
+    PackBrowserSearchFailed {
+        slug: String,
+        kind: PackKind,
+        message: String,
+    },
     /// Esc on pack browser — return to InstanceList.
     PackBrowserClose,
     /// `D` inside a pack browser — open the drop-from-path modal.
-    PackDropPathOpen { slug: String, kind: PackKind },
+    PackDropPathOpen {
+        slug: String,
+        kind: PackKind,
+    },
     /// Append a character to the pack drop path buffer.
     PackDropPathType(char),
     /// Delete the last character from the pack drop path buffer.
@@ -787,7 +973,11 @@ pub enum Action {
     /// Esc — cancel the drop path modal, return to pack browser.
     PackDropPathCancel,
     /// Installed packs list loaded (async).
-    InstalledPacksLoaded { slug: String, kind: PackKind, packs: Vec<InstalledModRow> },
+    InstalledPacksLoaded {
+        slug: String,
+        kind: PackKind,
+        packs: Vec<InstalledModRow>,
+    },
     /// Navigate in the installed packs list.
     InstalledPacksMove(i32),
     /// Tab key on InstalledModsList or InstalledPacksList — cycle Mod→Resource→Shader→Mod.
@@ -803,20 +993,47 @@ pub enum Action {
     /// `n`/Esc on UninstallPackConfirm.
     CancelUninstallPack,
     /// Pack installed successfully (drop or Modrinth).
-    PackInstalled { slug: String, kind: PackKind },
+    PackInstalled {
+        slug: String,
+        kind: PackKind,
+    },
     /// Pack install failed (Modrinth path).
-    PackInstallFailed { slug: String, kind: PackKind, error: String },
+    PackInstallFailed {
+        slug: String,
+        kind: PackKind,
+        error: String,
+    },
     /// Pack drop-from-path install failed.
-    PackDropFailed { slug: String, kind: PackKind, error: String },
+    PackDropFailed {
+        slug: String,
+        kind: PackKind,
+        error: String,
+    },
     /// Pack uninstalled successfully.
-    PackUninstalled { slug: String, kind: PackKind, mod_id: String },
+    PackUninstalled {
+        slug: String,
+        kind: PackKind,
+        mod_id: String,
+    },
     /// Pack enabled/disabled state toggled.
-    PackToggled { slug: String, kind: PackKind, mod_id: String, new_enabled: bool },
+    PackToggled {
+        slug: String,
+        kind: PackKind,
+        mod_id: String,
+        new_enabled: bool,
+    },
     /// Pack toggle failed (rename failed, file missing, shader rejected, etc.).
     /// Surfaced as `transient_status` on `InstalledPacksList`. (GAP-11-B)
-    PackToggleFailed { slug: String, kind: PackKind, error: String },
+    PackToggleFailed {
+        slug: String,
+        kind: PackKind,
+        error: String,
+    },
     /// Install a pack from a Modrinth version (Enter in pack browser).
-    InstallPackFromBrowser { slug: String, kind: PackKind },
+    InstallPackFromBrowser {
+        slug: String,
+        kind: PackKind,
+    },
     /// Browser auto-pick stage: full `ModrinthVersion` resolved by the
     /// `Effect::FetchPackVersions` task; `update()` arm dispatches the
     /// existing `Effect::InstallPackFromModrinth` (GAP-11-A wiring).
@@ -850,34 +1067,60 @@ pub enum Effect {
     FetchManifest,
     FetchInstances,
     DeleteInstance(String),
-    RenameInstance { slug: String, new_name: String },
-    CloneInstance { source_slug: String, new_name: String },
+    RenameInstance {
+        slug: String,
+        new_name: String,
+    },
+    CloneInstance {
+        source_slug: String,
+        new_name: String,
+    },
     CreateInstance {
         display_name: String,
         mc_version_id: String,
         version_url: String,
         version_sha1: String,
     },
-    SetGroup { slug: String, group: Option<String> },
+    SetGroup {
+        slug: String,
+        group: Option<String>,
+    },
     /// Spawn a launch_instance task. auth_ctx built by update() from
     /// state.active_account_id + instance display_name.
-    LaunchInstance { slug: String, auth_ctx: AuthContext },
+    LaunchInstance {
+        slug: String,
+        auth_ctx: AuthContext,
+    },
     /// Cancel the running launch task for the given slug.
-    KillProcess { slug: String },
+    KillProcess {
+        slug: String,
+    },
     /// Spawn the device-code auth task (AccountService::start_device_code_auth).
     StartDeviceCodeAuth,
     /// Remove account via AccountService::remove_account, then reload list.
-    RemoveAccount { id: String },
+    RemoveAccount {
+        id: String,
+    },
     /// Activate account via AccountService::activate_account, then reload list.
-    ActivateAccount { id: String },
+    ActivateAccount {
+        id: String,
+    },
     /// Reload the account list from store (AccountService::list_accounts).
     FetchAccounts,
     /// Fetch detected system Javas then dispatch JavaPickerOptionsLoaded.
-    FetchSystemJavas { slug: String },
+    FetchSystemJavas {
+        slug: String,
+    },
     /// Atomically write (or clear) java_override on the instance manifest.
-    SetJavaOverride { slug: String, override_id: Option<JavaRuntimeId> },
+    SetJavaOverride {
+        slug: String,
+        override_id: Option<JavaRuntimeId>,
+    },
     /// Phase 6: fetch the list of loader versions for a given LoaderType.
-    FetchLoaderVersions { slug: String, loader_type: LoaderType },
+    FetchLoaderVersions {
+        slug: String,
+        loader_type: LoaderType,
+    },
     /// Phase 6: spawn the install_loader pipeline.
     InstallLoader {
         slug: String,
@@ -886,9 +1129,13 @@ pub enum Effect {
         loader_version: String,
     },
     /// Phase 6: cancel the running install for the given slug.
-    CancelLoaderInstall { slug: String },
+    CancelLoaderInstall {
+        slug: String,
+    },
     /// Phase 6: remove the active loader from an instance.
-    RemoveLoader { slug: String },
+    RemoveLoader {
+        slug: String,
+    },
 
     // ── Phase 8 (Modrinth Integration) — wired by 08-08 run.rs effect arms ──
     /// MOD-01: search Modrinth for mods matching the query, filtered by the
@@ -900,7 +1147,10 @@ pub enum Effect {
         loader: Option<LoaderInfo>,
     },
     /// MOD-01: fetch the project detail (right pane) for the highlighted mod.
-    FetchModDetail { slug: String, project_id: String },
+    FetchModDetail {
+        slug: String,
+        project_id: String,
+    },
     /// MOD-01: list all versions of a project compatible with the instance's MC + loader.
     ListModVersions {
         slug: String,
@@ -935,9 +1185,14 @@ pub enum Effect {
         want_enabled: bool,
     },
     /// MOD-07: delete the mod file and remove its row from the ledger.
-    UninstallMod { slug: String, mod_id: String },
+    UninstallMod {
+        slug: String,
+        mod_id: String,
+    },
     /// MOD-05: read the per-instance ledger and dispatch `InstalledModsLoaded`.
-    FetchInstalledMods { slug: String },
+    FetchInstalledMods {
+        slug: String,
+    },
 
     // ── Phase 9 (CurseForge Integration) — wired by 09-07 run.rs effect arms ──
     // LOCKED set: `FetchCfMod` + `ListCfFiles` are kept SEPARATE (mirrors
@@ -953,7 +1208,10 @@ pub enum Effect {
         loader: Option<i32>,
     },
     /// MOD-03: fetch a single CurseForge project detail (right pane / file picker prep).
-    FetchCfMod { slug: String, mod_id: u64 },
+    FetchCfMod {
+        slug: String,
+        mod_id: u64,
+    },
     /// MOD-03: list available files for a CurseForge mod, filtered by MC + loader.
     ListCfFiles {
         slug: String,
@@ -973,18 +1231,32 @@ pub enum Effect {
 
     // ── Phase 10 (Modpack Import) ──
     /// PACK-01: spawn the import_mrpack pipeline.
-    ImportModpack { mrpack_path: std::path::PathBuf },
+    ImportModpack {
+        mrpack_path: std::path::PathBuf,
+    },
     /// PACK-01: cancel the running modpack import (no-op hook for symmetry with
     /// CancelLoaderInstall — the actual token.cancel() happened in update()).
     CancelModpackImport,
 
     // ── Phase 11 (11-04): Pack browser + install effects ─────────────────────
     /// Search Modrinth for packs of the given kind. `mc` is the MC version filter.
-    SearchPacks { slug: String, kind: PackKind, query: String, mc: Option<String> },
+    SearchPacks {
+        slug: String,
+        kind: PackKind,
+        query: String,
+        mc: Option<String>,
+    },
     /// Read the per-instance pack ledger for the given kind.
-    FetchInstalledPacks { slug: String, kind: PackKind },
+    FetchInstalledPacks {
+        slug: String,
+        kind: PackKind,
+    },
     /// Copy-install a pack from a local file path.
-    DropInstallPack { slug: String, kind: PackKind, path: std::path::PathBuf },
+    DropInstallPack {
+        slug: String,
+        kind: PackKind,
+        path: std::path::PathBuf,
+    },
     /// Download + install a pack from a Modrinth version record.
     InstallPackFromModrinth {
         slug: String,
@@ -1008,9 +1280,17 @@ pub enum Effect {
         mc: Option<String>,
     },
     /// Toggle a pack's enabled/disabled state (rename .zip ↔ .zip.disabled).
-    TogglePackEnabledEff { slug: String, kind: PackKind, mod_id: String },
+    TogglePackEnabledEff {
+        slug: String,
+        kind: PackKind,
+        mod_id: String,
+    },
     /// Remove a pack file and its ledger row.
-    UninstallPack { slug: String, kind: PackKind, mod_id: String },
+    UninstallPack {
+        slug: String,
+        kind: PackKind,
+        mod_id: String,
+    },
 }
 
 /// Format a loader for the status cell or switch dialog: "fabric:0.16.9".
@@ -1242,7 +1522,10 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 if trimmed.is_empty() {
                     return vec![];
                 }
-                return vec![Effect::RenameInstance { slug, new_name: trimmed }];
+                return vec![Effect::RenameInstance {
+                    slug,
+                    new_name: trimmed,
+                }];
             }
             vec![]
         }
@@ -1274,7 +1557,11 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             state.active_view = ActiveView::GroupInline {
                 slug,
                 buffer: current.clone(),
-                original: if current.is_empty() { None } else { Some(current) },
+                original: if current.is_empty() {
+                    None
+                } else {
+                    Some(current)
+                },
             };
             vec![]
         }
@@ -1294,7 +1581,11 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             if let ActiveView::GroupInline { slug, buffer, .. } = state.active_view.clone() {
                 state.active_view = ActiveView::default();
                 let trimmed = buffer.trim().to_string();
-                let group = if trimmed.is_empty() { None } else { Some(trimmed) };
+                let group = if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed)
+                };
                 return vec![Effect::SetGroup { slug, group }];
             }
             vec![]
@@ -1338,17 +1629,18 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
         Action::AccountsLoaded(list) => {
-            state.active_account_id = list
-                .iter()
-                .find(|a| a.is_active)
-                .map(|a| a.id.clone());
+            state.active_account_id = list.iter().find(|a| a.is_active).map(|a| a.id.clone());
             state.accounts = list;
             vec![]
         }
         Action::AddAccount => {
             vec![Effect::StartDeviceCodeAuth]
         }
-        Action::AccountAuthStarted { user_code, verification_uri, expires_at } => {
+        Action::AccountAuthStarted {
+            user_code,
+            verification_uri,
+            expires_at,
+        } => {
             state.active_view = ActiveView::AddAccountDeviceCode {
                 user_code,
                 verification_uri,
@@ -1422,7 +1714,9 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 let auth_ctx = if let Some(aid) = state.active_account_id.clone() {
                     AuthContext::Msa { account_id: aid }
                 } else {
-                    AuthContext::Offline { username: display_name }
+                    AuthContext::Offline {
+                        username: display_name,
+                    }
                 };
                 vec![Effect::LaunchInstance { slug, auth_ctx }]
             }
@@ -1435,13 +1729,24 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             // Tracing signal only — token already inserted via LaunchJobStarted.
             vec![]
         }
-        Action::InstanceExited { slug, duration_ms: _ } => {
+        Action::InstanceExited {
+            slug,
+            duration_ms: _,
+        } => {
             state.running_instances.remove(&slug);
             vec![Effect::FetchInstances]
         }
-        Action::LaunchFailed { slug, error, log_tail } => {
+        Action::LaunchFailed {
+            slug,
+            error,
+            log_tail,
+        } => {
             state.running_instances.remove(&slug);
-            state.active_view = ActiveView::LaunchFailedModal { slug, error, log_tail };
+            state.active_view = ActiveView::LaunchFailedModal {
+                slug,
+                error,
+                log_tail,
+            };
             vec![]
         }
         // Phase 5: Java picker
@@ -1458,8 +1763,11 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![Effect::FetchSystemJavas { slug }]
         }
         Action::JavaPickerOptionsLoaded { slug, options } => {
-            if let ActiveView::JavaPickerModal { slug: modal_slug, options: ref mut opts, selected } =
-                &mut state.active_view
+            if let ActiveView::JavaPickerModal {
+                slug: modal_slug,
+                options: ref mut opts,
+                selected,
+            } = &mut state.active_view
             {
                 if *modal_slug == slug {
                     *opts = options;
@@ -1469,7 +1777,10 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
         Action::JavaPickerMove(delta) => {
-            if let ActiveView::JavaPickerModal { options, selected, .. } = &mut state.active_view {
+            if let ActiveView::JavaPickerModal {
+                options, selected, ..
+            } = &mut state.active_view
+            {
                 let len = options.len() as isize;
                 if len > 0 {
                     let new_idx = (*selected as isize + delta).rem_euclid(len);
@@ -1479,7 +1790,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
         Action::JavaPickerSelect => {
-            if let ActiveView::JavaPickerModal { slug, options, selected } = state.active_view.clone() {
+            if let ActiveView::JavaPickerModal {
+                slug,
+                options,
+                selected,
+            } = state.active_view.clone()
+            {
                 let override_id = match options.get(selected) {
                     Some(JavaPickerRow::Auto) => None,
                     Some(JavaPickerRow::Detected(sj)) => Some(JavaRuntimeId::System {
@@ -1536,12 +1852,16 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 0 => {
                     // None row: if instance has a loader → open switch confirm to "none".
                     // Otherwise it's already vanilla — no-op.
-                    let has_loader = state.instances.iter()
+                    let has_loader = state
+                        .instances
+                        .iter()
                         .find(|m| m.slug == slug)
                         .and_then(|m| m.loader.as_ref())
                         .is_some();
                     if has_loader {
-                        let from_label = state.instances.iter()
+                        let from_label = state
+                            .instances
+                            .iter()
                             .find(|m| m.slug == slug)
                             .and_then(|m| m.loader.as_ref())
                             .map(|l| loader_label_short(l.kind, &l.version));
@@ -1556,7 +1876,9 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 }
                 1 => {
                     // Fabric row
-                    let current_version = state.instances.iter()
+                    let current_version = state
+                        .instances
+                        .iter()
                         .find(|m| m.slug == slug)
                         .and_then(|m| m.loader.as_ref())
                         .filter(|l| l.kind == crate::domain::instance::ModloaderKind::Fabric)
@@ -1570,11 +1892,16 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                         selected: 0,
                         current_version,
                     };
-                    vec![Effect::FetchLoaderVersions { slug, loader_type: LoaderType::Fabric }]
+                    vec![Effect::FetchLoaderVersions {
+                        slug,
+                        loader_type: LoaderType::Fabric,
+                    }]
                 }
                 2 => {
                     // Quilt row — show all by default (Open Question 3 lock)
-                    let current_version = state.instances.iter()
+                    let current_version = state
+                        .instances
+                        .iter()
                         .find(|m| m.slug == slug)
                         .and_then(|m| m.loader.as_ref())
                         .filter(|l| l.kind == crate::domain::instance::ModloaderKind::Quilt)
@@ -1588,11 +1915,16 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                         selected: 0,
                         current_version,
                     };
-                    vec![Effect::FetchLoaderVersions { slug, loader_type: LoaderType::Quilt }]
+                    vec![Effect::FetchLoaderVersions {
+                        slug,
+                        loader_type: LoaderType::Quilt,
+                    }]
                 }
                 3 => {
                     // Forge row
-                    let current_version = state.instances.iter()
+                    let current_version = state
+                        .instances
+                        .iter()
                         .find(|m| m.slug == slug)
                         .and_then(|m| m.loader.as_ref())
                         .filter(|l| l.kind == crate::domain::instance::ModloaderKind::Forge)
@@ -1606,11 +1938,16 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                         selected: 0,
                         current_version,
                     };
-                    vec![Effect::FetchLoaderVersions { slug, loader_type: LoaderType::Forge }]
+                    vec![Effect::FetchLoaderVersions {
+                        slug,
+                        loader_type: LoaderType::Forge,
+                    }]
                 }
                 4 => {
                     // NeoForge row
-                    let current_version = state.instances.iter()
+                    let current_version = state
+                        .instances
+                        .iter()
                         .find(|m| m.slug == slug)
                         .and_then(|m| m.loader.as_ref())
                         .filter(|l| l.kind == crate::domain::instance::ModloaderKind::NeoForge)
@@ -1624,7 +1961,10 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                         selected: 0,
                         current_version,
                     };
-                    vec![Effect::FetchLoaderVersions { slug, loader_type: LoaderType::NeoForge }]
+                    vec![Effect::FetchLoaderVersions {
+                        slug,
+                        loader_type: LoaderType::NeoForge,
+                    }]
                 }
                 _ => vec![],
             }
@@ -1633,7 +1973,11 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             state.active_view = ActiveView::default();
             vec![]
         }
-        Action::LoaderVersionsLoaded { slug, loader, versions } => {
+        Action::LoaderVersionsLoaded {
+            slug,
+            loader,
+            versions,
+        } => {
             if let ActiveView::LoaderVersionPickerModal {
                 slug: modal_slug,
                 loader: modal_loader,
@@ -1659,12 +2003,8 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 ..
             } = &mut state.active_view
             {
-                let visible = loader_versions_visible_indices(
-                    versions,
-                    *loader,
-                    *filter_stable_only,
-                    search,
-                );
+                let visible =
+                    loader_versions_visible_indices(versions, *loader, *filter_stable_only, search);
                 let len = visible.len() as isize;
                 if len > 0 {
                     let new_idx = (*selected as isize + delta).rem_euclid(len);
@@ -1674,8 +2014,11 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
         Action::ToggleStableFilter => {
-            if let ActiveView::LoaderVersionPickerModal { filter_stable_only, selected, .. } =
-                &mut state.active_view
+            if let ActiveView::LoaderVersionPickerModal {
+                filter_stable_only,
+                selected,
+                ..
+            } = &mut state.active_view
             {
                 *filter_stable_only = !*filter_stable_only;
                 *selected = 0;
@@ -1683,8 +2026,9 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
         Action::LoaderVersionTypeSearch(c) => {
-            if let ActiveView::LoaderVersionPickerModal { search, selected, .. } =
-                &mut state.active_view
+            if let ActiveView::LoaderVersionPickerModal {
+                search, selected, ..
+            } = &mut state.active_view
             {
                 search.push(c);
                 *selected = 0;
@@ -1692,8 +2036,9 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
         Action::LoaderVersionBackspaceSearch => {
-            if let ActiveView::LoaderVersionPickerModal { search, selected, .. } =
-                &mut state.active_view
+            if let ActiveView::LoaderVersionPickerModal {
+                search, selected, ..
+            } = &mut state.active_view
             {
                 search.pop();
                 *selected = 0;
@@ -1701,22 +2046,40 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
         Action::LoaderVersionSelect => {
-            let (slug, loader_type, versions, filter_stable_only, search, selected, current_version) =
-                match &state.active_view {
-                    ActiveView::LoaderVersionPickerModal {
-                        slug, loader, versions, filter_stable_only, search, selected, current_version,
-                    } => (
-                        slug.clone(),
-                        *loader,
-                        versions.clone(),
-                        *filter_stable_only,
-                        search.clone(),
-                        *selected,
-                        current_version.clone(),
-                    ),
-                    _ => return vec![],
-                };
-            let visible = loader_versions_visible_indices(&versions, loader_type, filter_stable_only, &search);
+            let (
+                slug,
+                loader_type,
+                versions,
+                filter_stable_only,
+                search,
+                selected,
+                current_version,
+            ) = match &state.active_view {
+                ActiveView::LoaderVersionPickerModal {
+                    slug,
+                    loader,
+                    versions,
+                    filter_stable_only,
+                    search,
+                    selected,
+                    current_version,
+                } => (
+                    slug.clone(),
+                    *loader,
+                    versions.clone(),
+                    *filter_stable_only,
+                    search.clone(),
+                    *selected,
+                    current_version.clone(),
+                ),
+                _ => return vec![],
+            };
+            let visible = loader_versions_visible_indices(
+                &versions,
+                loader_type,
+                filter_stable_only,
+                &search,
+            );
             let real_idx = match visible.get(selected) {
                 Some(&i) => i,
                 None => return vec![], // empty list — no-op
@@ -1731,11 +2094,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             // and cannot be used to detect that the user is switching loader TYPE.
             // Compute installed_loader fresh here so cross-kind switches still trip
             // the WARNING confirm modal (UAT Check 5 regression — major).
-            let installed_loader: Option<(crate::domain::instance::ModloaderKind, String)> =
-                state.instances.iter()
-                    .find(|m| m.slug == slug)
-                    .and_then(|m| m.loader.as_ref())
-                    .map(|l| (l.kind, l.version.clone()));
+            let installed_loader: Option<(crate::domain::instance::ModloaderKind, String)> = state
+                .instances
+                .iter()
+                .find(|m| m.slug == slug)
+                .and_then(|m| m.loader.as_ref())
+                .map(|l| (l.kind, l.version.clone()));
 
             let target_kind = match loader_type {
                 LoaderType::Fabric => crate::domain::instance::ModloaderKind::Fabric,
@@ -1752,7 +2116,9 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 }
             }
 
-            let mc_version = state.instances.iter()
+            let mc_version = state
+                .instances
+                .iter()
                 .find(|m| m.slug == slug)
                 .map(|m| m.mc_version_id.clone())
                 .unwrap_or_default();
@@ -1814,14 +2180,23 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 LoaderType::Forge => 3,
                 LoaderType::NeoForge => 4,
             };
-            state.active_view = ActiveView::LoaderPickerModal { slug, selected: row };
+            state.active_view = ActiveView::LoaderPickerModal {
+                slug,
+                selected: row,
+            };
             vec![]
         }
         Action::LoaderInstallStarted { slug, token } => {
             state.running_loader_installs.insert(slug, token);
             vec![]
         }
-        Action::LoaderInstallProgress { slug, pct, step_label, bytes_done, bytes_total } => {
+        Action::LoaderInstallProgress {
+            slug,
+            pct,
+            step_label,
+            bytes_done,
+            bytes_total,
+        } => {
             if let ActiveView::LoaderInstallProgressModal {
                 slug: modal_slug,
                 step_label: ref mut sl,
@@ -1867,7 +2242,13 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             state.active_view = ActiveView::default();
             vec![Effect::FetchInstances]
         }
-        Action::LoaderInstallFailed { slug, loader, version, error, log_tail } => {
+        Action::LoaderInstallFailed {
+            slug,
+            loader,
+            version,
+            error,
+            log_tail,
+        } => {
             state.running_loader_installs.remove(&slug);
             state.active_view = ActiveView::LoaderInstallFailedModal {
                 slug,
@@ -1891,9 +2272,9 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
         Action::ConfirmLoaderSwitch => {
             let (slug, to_loader) = match &state.active_view {
-                ActiveView::LoaderSwitchConfirm { slug, to_loader, .. } => {
-                    (slug.clone(), to_loader.clone())
-                }
+                ActiveView::LoaderSwitchConfirm {
+                    slug, to_loader, ..
+                } => (slug.clone(), to_loader.clone()),
                 _ => return vec![],
             };
             state.active_view = ActiveView::default();
@@ -1912,7 +2293,9 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 "neoforge" => LoaderType::NeoForge,
                 _ => return vec![],
             };
-            let mc_version = state.instances.iter()
+            let mc_version = state
+                .instances
+                .iter()
                 .find(|m| m.slug == slug)
                 .map(|m| m.mc_version_id.clone())
                 .unwrap_or_default();
@@ -1929,7 +2312,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 cancel_token_key: slug.clone(),
                 log_tail: String::new(),
             };
-            vec![Effect::InstallLoader { slug, loader_type, mc_version, loader_version }]
+            vec![Effect::InstallLoader {
+                slug,
+                loader_type,
+                mc_version,
+                loader_version,
+            }]
         }
         Action::CancelLoaderSwitch => {
             state.active_view = ActiveView::default();
@@ -1939,7 +2327,6 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         // ── Phase 8 (Modrinth Integration) — pure update() arms ──
         // All arms below mutate AppState and (optionally) emit Effects. NO arm
         // performs HTTP, file I/O, or task spawning — those live in 08-08 run.rs.
-
         Action::OpenModBrowser { slug } => {
             // Pitfall 8 (08-RESEARCH.md §Pitfall 8): silent no-op if a previous
             // mod install for this instance is still in flight. The user is not
@@ -1993,7 +2380,9 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
 
         Action::ModBrowserSearchFailed { slug, message } => {
             if let ActiveView::ModBrowser {
-                slug: cur_slug, fetch_state, ..
+                slug: cur_slug,
+                fetch_state,
+                ..
             } = &mut state.active_view
             {
                 if *cur_slug == slug {
@@ -2004,11 +2393,13 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::ModBrowserMove(delta) => {
-            if let ActiveView::ModBrowser { results, selected, .. } = &mut state.active_view {
+            if let ActiveView::ModBrowser {
+                results, selected, ..
+            } = &mut state.active_view
+            {
                 let len = results.len();
                 if len > 0 {
-                    let new_idx = (*selected as isize + delta)
-                        .clamp(0, len as isize - 1) as usize;
+                    let new_idx = (*selected as isize + delta).clamp(0, len as isize - 1) as usize;
                     *selected = new_idx;
                 }
             }
@@ -2018,11 +2409,14 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         Action::ModBrowserOpenVersions => {
             // Capture (slug, project_id, project_title) from the highlighted row.
             let captured = match &state.active_view {
-                ActiveView::ModBrowser { slug, results, selected, .. } => {
-                    results.get(*selected).map(|hit| {
-                        (slug.clone(), hit.project_id.clone(), hit.title.clone())
-                    })
-                }
+                ActiveView::ModBrowser {
+                    slug,
+                    results,
+                    selected,
+                    ..
+                } => results
+                    .get(*selected)
+                    .map(|hit| (slug.clone(), hit.project_id.clone(), hit.title.clone())),
                 _ => None,
             };
             let Some((slug, project_id, project_title)) = captured else {
@@ -2088,7 +2482,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 Some("any") => None,
                 _ => inst.and_then(|m| m.loader.clone()),
             };
-            vec![Effect::SearchModrinth { slug, query, mc, loader }]
+            vec![Effect::SearchModrinth {
+                slug,
+                query,
+                mc,
+                loader,
+            }]
         }
 
         Action::ToggleModLoaderFilter => {
@@ -2125,7 +2524,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 Some("any") => None,
                 _ => inst.and_then(|m| m.loader.clone()),
             };
-            vec![Effect::SearchModrinth { slug, query, mc, loader }]
+            vec![Effect::SearchModrinth {
+                slug,
+                query,
+                mc,
+                loader,
+            }]
         }
 
         Action::ModBrowserBackspaceSearch => {
@@ -2159,7 +2563,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 Some("any") => None,
                 _ => inst.and_then(|m| m.loader.clone()),
             };
-            vec![Effect::SearchModrinth { slug, query, mc, loader }]
+            vec![Effect::SearchModrinth {
+                slug,
+                query,
+                mc,
+                loader,
+            }]
         }
 
         Action::ModBrowserCancel => {
@@ -2200,7 +2609,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 Some("any") => None,
                 _ => inst.and_then(|m| m.loader.clone()),
             };
-            vec![Effect::SearchModrinth { slug, query, mc, loader }]
+            vec![Effect::SearchModrinth {
+                slug,
+                query,
+                mc,
+                loader,
+            }]
         }
 
         Action::ModBrowserPasteSearch(s) => {
@@ -2237,12 +2651,20 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 Some("any") => None,
                 _ => inst.and_then(|m| m.loader.clone()),
             };
-            vec![Effect::SearchModrinth { slug, query, mc, loader }]
+            vec![Effect::SearchModrinth {
+                slug,
+                query,
+                mc,
+                loader,
+            }]
         }
 
         Action::ModDetailLoaded { slug, detail } => {
-            if let ActiveView::ModBrowser { slug: cur_slug, selected_detail, .. } =
-                &mut state.active_view
+            if let ActiveView::ModBrowser {
+                slug: cur_slug,
+                selected_detail,
+                ..
+            } = &mut state.active_view
             {
                 if *cur_slug == slug {
                     *selected_detail = Some(detail);
@@ -2268,13 +2690,13 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::ModVersionPickerMove(delta) => {
-            if let ActiveView::ModVersionPickerModal { versions, selected, .. } =
-                &mut state.active_view
+            if let ActiveView::ModVersionPickerModal {
+                versions, selected, ..
+            } = &mut state.active_view
             {
                 let len = versions.len();
                 if len > 0 {
-                    let new_idx = (*selected as isize + delta)
-                        .clamp(0, len as isize - 1) as usize;
+                    let new_idx = (*selected as isize + delta).clamp(0, len as isize - 1) as usize;
                     *selected = new_idx;
                 }
             }
@@ -2420,11 +2842,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             // Rebuild the graph from the modal's stored fields. We only need
             // root + deps + totals for the installer; capture those by cloning.
             let (deps, total_new_bytes, total_new_files) = match &state.active_view {
-                ActiveView::DepConfirmModal { deps, total_bytes, total_files, .. } => (
-                    deps.clone(),
-                    *total_bytes,
-                    *total_files,
-                ),
+                ActiveView::DepConfirmModal {
+                    deps,
+                    total_bytes,
+                    total_files,
+                    ..
+                } => (deps.clone(), *total_bytes, *total_files),
                 _ => (Vec::new(), 0u64, 0usize),
             };
             let graph = Box::new(ResolvedDepGraph {
@@ -2487,7 +2910,11 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             }]
         }
 
-        Action::ModInstallStarted { slug, project_id: _, token } => {
+        Action::ModInstallStarted {
+            slug,
+            project_id: _,
+            token,
+        } => {
             state.running_mod_jobs.insert(slug.clone(), token);
             // Transition active_view back to ModBrowser so the user can browse
             // more while the install runs in the background (UI-SPEC §11).
@@ -2538,7 +2965,13 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
 
-        Action::ModInstallFailed { slug, mod_title, version_label, error, log_tail } => {
+        Action::ModInstallFailed {
+            slug,
+            mod_title,
+            version_label,
+            error,
+            log_tail,
+        } => {
             state.running_mod_jobs.remove(&slug);
             // Compute return_to from current active_view (per UI-SPEC line 626).
             let return_to = match &state.active_view {
@@ -2558,9 +2991,9 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
 
         Action::DismissModInstallFailed => {
             let captured = match &state.active_view {
-                ActiveView::ModInstallFailedModal { slug, return_to, .. } => {
-                    Some((slug.clone(), *return_to))
-                }
+                ActiveView::ModInstallFailedModal {
+                    slug, return_to, ..
+                } => Some((slug.clone(), *return_to)),
                 _ => None,
             };
             match captured {
@@ -2632,8 +3065,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             if let ActiveView::InstalledModsList { mods, selected, .. } = &mut state.active_view {
                 let len = mods.len();
                 if len > 0 {
-                    let new_idx = (*selected as isize + delta)
-                        .clamp(0, len as isize - 1) as usize;
+                    let new_idx = (*selected as isize + delta).clamp(0, len as isize - 1) as usize;
                     *selected = new_idx;
                 }
             }
@@ -2642,22 +3074,34 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
 
         Action::ToggleModEnabled => {
             let captured = match &state.active_view {
-                ActiveView::InstalledModsList { slug, mods, selected } => {
-                    mods.get(*selected).map(|row| {
-                        (slug.clone(), row.mod_id.clone(), !row.enabled)
-                    })
-                }
+                ActiveView::InstalledModsList {
+                    slug,
+                    mods,
+                    selected,
+                } => mods
+                    .get(*selected)
+                    .map(|row| (slug.clone(), row.mod_id.clone(), !row.enabled)),
                 _ => None,
             };
             let Some((slug, mod_id, want_enabled)) = captured else {
                 return vec![];
             };
-            vec![Effect::ToggleModEnabledEff { slug, mod_id, want_enabled }]
+            vec![Effect::ToggleModEnabledEff {
+                slug,
+                mod_id,
+                want_enabled,
+            }]
         }
 
-        Action::ModToggled { slug, mod_id, enabled } => {
+        Action::ModToggled {
+            slug,
+            mod_id,
+            enabled,
+        } => {
             if let ActiveView::InstalledModsList {
-                slug: cur_slug, mods, ..
+                slug: cur_slug,
+                mods,
+                ..
             } = &mut state.active_view
             {
                 if *cur_slug == slug {
@@ -2671,11 +3115,13 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
 
         Action::OpenUninstallModConfirm => {
             let captured = match &state.active_view {
-                ActiveView::InstalledModsList { slug, mods, selected } => {
-                    mods.get(*selected).map(|row| {
-                        (slug.clone(), row.mod_id.clone(), row.display_name.clone())
-                    })
-                }
+                ActiveView::InstalledModsList {
+                    slug,
+                    mods,
+                    selected,
+                } => mods
+                    .get(*selected)
+                    .map(|row| (slug.clone(), row.mod_id.clone(), row.display_name.clone())),
                 _ => None,
             };
             let Some((slug, mod_id, display_name)) = captured else {
@@ -2734,7 +3180,9 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
 
         Action::ModUninstalled { slug, mod_id } => {
             if let ActiveView::InstalledModsList {
-                slug: cur_slug, mods, selected,
+                slug: cur_slug,
+                mods,
+                selected,
             } = &mut state.active_view
             {
                 if *cur_slug == slug {
@@ -2766,7 +3214,6 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         // All arms below mutate AppState and (optionally) emit Effects. NO arm
         // performs HTTP, file I/O, or task spawning — those live in 09-07 run.rs.
         // Mirrors Phase 8's modrinth arms 1:1 (CfBrowser ≡ ModBrowser, etc.).
-
         Action::OpenCfBrowser { slug } => {
             // Pitfall 1 (09-RESEARCH.md §"Keybind guard"): F is silently disabled
             // when no CurseForge API key was resolved at startup. Tested by
@@ -2783,10 +3230,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 .instances
                 .iter()
                 .find(|m| m.slug == slug)
-                .map(|m| (
-                    Some(m.mc_version_id.clone()),
-                    crate::mods::curseforge::filter::curseforge_loader_type(m.loader.as_ref()),
-                ))
+                .map(|m| {
+                    (
+                        Some(m.mc_version_id.clone()),
+                        crate::mods::curseforge::filter::curseforge_loader_type(m.loader.as_ref()),
+                    )
+                })
                 .unwrap_or((None, None));
             state.active_view = ActiveView::CfBrowser {
                 slug: slug.clone(),
@@ -2806,21 +3255,37 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             }]
         }
 
-        Action::CfBrowserSearchStart { slug, query, mc, loader } => {
+        Action::CfBrowserSearchStart {
+            slug,
+            query,
+            mc,
+            loader,
+        } => {
             if let ActiveView::CfBrowser {
-                slug: cur_slug, fetch_state, ..
+                slug: cur_slug,
+                fetch_state,
+                ..
             } = &mut state.active_view
             {
                 if *cur_slug == slug {
                     *fetch_state = ModBrowserFetchState::Loading;
                 }
             }
-            vec![Effect::SearchCurseForge { slug, query, mc, loader }]
+            vec![Effect::SearchCurseForge {
+                slug,
+                query,
+                mc,
+                loader,
+            }]
         }
 
         Action::CfBrowserSearchLoaded { slug, hits } => {
             if let ActiveView::CfBrowser {
-                slug: cur_slug, results, selected, fetch_state, ..
+                slug: cur_slug,
+                results,
+                selected,
+                fetch_state,
+                ..
             } = &mut state.active_view
             {
                 if *cur_slug == slug {
@@ -2835,7 +3300,9 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
 
         Action::CfBrowserSearchFailed { slug, error } => {
             if let ActiveView::CfBrowser {
-                slug: cur_slug, fetch_state, ..
+                slug: cur_slug,
+                fetch_state,
+                ..
             } = &mut state.active_view
             {
                 if *cur_slug == slug {
@@ -2846,11 +3313,13 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::CfBrowserMoveSelection(delta) => {
-            if let ActiveView::CfBrowser { results, selected, .. } = &mut state.active_view {
+            if let ActiveView::CfBrowser {
+                results, selected, ..
+            } = &mut state.active_view
+            {
                 let len = results.len();
                 if len > 0 {
-                    let new_idx = (*selected as i32 + delta)
-                        .clamp(0, len as i32 - 1) as usize;
+                    let new_idx = (*selected as i32 + delta).clamp(0, len as i32 - 1) as usize;
                     *selected = new_idx;
                 }
             }
@@ -2861,13 +3330,22 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             // Cycle: None ↔ Some("any"). Re-emit search with the new filter.
             let captured = match &mut state.active_view {
                 ActiveView::CfBrowser {
-                    slug, search_input, mc_filter, loader_filter, ..
+                    slug,
+                    search_input,
+                    mc_filter,
+                    loader_filter,
+                    ..
                 } => {
                     *mc_filter = match mc_filter.as_deref() {
                         None => Some("any".to_string()),
                         Some(_) => None,
                     };
-                    Some((slug.clone(), search_input.clone(), mc_filter.clone(), *loader_filter))
+                    Some((
+                        slug.clone(),
+                        search_input.clone(),
+                        mc_filter.clone(),
+                        *loader_filter,
+                    ))
                 }
                 _ => None,
             };
@@ -2885,30 +3363,45 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 }),
                 Some(v) => Some(v),
             };
-            vec![Effect::SearchCurseForge { slug, query, mc, loader }]
+            vec![Effect::SearchCurseForge {
+                slug,
+                query,
+                mc,
+                loader,
+            }]
         }
 
         Action::CfBrowserToggleLoaderFilter => {
             // Cycle: None ↔ Some(<instance loader>). Re-emit search.
             let captured = match &mut state.active_view {
                 ActiveView::CfBrowser {
-                    slug, search_input, mc_filter, loader_filter, ..
+                    slug,
+                    search_input,
+                    mc_filter,
+                    loader_filter,
+                    ..
                 } => {
                     // Look up the instance loader integer to use as the toggle target.
-                    let inst_loader = state
-                        .instances
-                        .iter()
-                        .find(|m| m.slug == *slug)
-                        .and_then(|m| {
-                            crate::mods::curseforge::filter::curseforge_loader_type(
-                                m.loader.as_ref(),
-                            )
-                        });
+                    let inst_loader =
+                        state
+                            .instances
+                            .iter()
+                            .find(|m| m.slug == *slug)
+                            .and_then(|m| {
+                                crate::mods::curseforge::filter::curseforge_loader_type(
+                                    m.loader.as_ref(),
+                                )
+                            });
                     *loader_filter = match *loader_filter {
                         None => inst_loader,
                         Some(_) => None,
                     };
-                    Some((slug.clone(), search_input.clone(), mc_filter.clone(), *loader_filter))
+                    Some((
+                        slug.clone(),
+                        search_input.clone(),
+                        mc_filter.clone(),
+                        *loader_filter,
+                    ))
                 }
                 _ => None,
             };
@@ -2921,7 +3414,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 _ => inst.map(|m| m.mc_version_id.clone()),
             };
             let loader = loader_override;
-            vec![Effect::SearchCurseForge { slug, query, mc, loader }]
+            vec![Effect::SearchCurseForge {
+                slug,
+                query,
+                mc,
+                loader,
+            }]
         }
 
         Action::CfBrowserOpenDetail { slug, mod_id } => {
@@ -2937,7 +3435,11 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             let mod_id = detail.id;
             // Capture mc/loader from the CfBrowser view BEFORE mutating it.
             let (mc, loader) = match &state.active_view {
-                ActiveView::CfBrowser { mc_filter, loader_filter, .. } => {
+                ActiveView::CfBrowser {
+                    mc_filter,
+                    loader_filter,
+                    ..
+                } => {
                     let inst = state.instances.iter().find(|m| m.slug == slug);
                     let mc = match mc_filter.as_deref() {
                         Some("any") => None,
@@ -2956,23 +3458,39 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 _ => (None, None),
             };
             if let ActiveView::CfBrowser {
-                slug: cur_slug, selected_detail, ..
+                slug: cur_slug,
+                selected_detail,
+                ..
             } = &mut state.active_view
             {
                 if *cur_slug == slug {
                     *selected_detail = Some(detail);
                 }
             }
-            vec![Effect::ListCfFiles { slug, mod_id, mc, loader }]
+            vec![Effect::ListCfFiles {
+                slug,
+                mod_id,
+                mc,
+                loader,
+            }]
         }
 
         Action::CfBrowserTypeSearch(c) => {
             let captured = match &mut state.active_view {
                 ActiveView::CfBrowser {
-                    slug, search_input, mc_filter, loader_filter, ..
+                    slug,
+                    search_input,
+                    mc_filter,
+                    loader_filter,
+                    ..
                 } => {
                     search_input.push(c);
-                    Some((slug.clone(), search_input.clone(), mc_filter.clone(), *loader_filter))
+                    Some((
+                        slug.clone(),
+                        search_input.clone(),
+                        mc_filter.clone(),
+                        *loader_filter,
+                    ))
                 }
                 _ => None,
             };
@@ -2990,7 +3508,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 }),
                 Some(v) => Some(v),
             };
-            vec![Effect::SearchCurseForge { slug, query, mc, loader }]
+            vec![Effect::SearchCurseForge {
+                slug,
+                query,
+                mc,
+                loader,
+            }]
         }
 
         Action::CfBrowserPasteSearch(s) => {
@@ -2999,10 +3522,19 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             // including the search re-fire.
             let captured = match &mut state.active_view {
                 ActiveView::CfBrowser {
-                    slug, search_input, mc_filter, loader_filter, ..
+                    slug,
+                    search_input,
+                    mc_filter,
+                    loader_filter,
+                    ..
                 } => {
                     search_input.push_str(&s);
-                    Some((slug.clone(), search_input.clone(), mc_filter.clone(), *loader_filter))
+                    Some((
+                        slug.clone(),
+                        search_input.clone(),
+                        mc_filter.clone(),
+                        *loader_filter,
+                    ))
                 }
                 _ => None,
             };
@@ -3020,16 +3552,30 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 }),
                 Some(v) => Some(v),
             };
-            vec![Effect::SearchCurseForge { slug, query, mc, loader }]
+            vec![Effect::SearchCurseForge {
+                slug,
+                query,
+                mc,
+                loader,
+            }]
         }
 
         Action::CfBrowserBackspaceSearch => {
             let captured = match &mut state.active_view {
                 ActiveView::CfBrowser {
-                    slug, search_input, mc_filter, loader_filter, ..
+                    slug,
+                    search_input,
+                    mc_filter,
+                    loader_filter,
+                    ..
                 } => {
                     search_input.pop();
-                    Some((slug.clone(), search_input.clone(), mc_filter.clone(), *loader_filter))
+                    Some((
+                        slug.clone(),
+                        search_input.clone(),
+                        mc_filter.clone(),
+                        *loader_filter,
+                    ))
                 }
                 _ => None,
             };
@@ -3047,10 +3593,19 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 }),
                 Some(v) => Some(v),
             };
-            vec![Effect::SearchCurseForge { slug, query, mc, loader }]
+            vec![Effect::SearchCurseForge {
+                slug,
+                query,
+                mc,
+                loader,
+            }]
         }
 
-        Action::CfFilePickerLoaded { slug, mod_detail, files } => {
+        Action::CfFilePickerLoaded {
+            slug,
+            mod_detail,
+            files,
+        } => {
             state.active_view = ActiveView::CfFilePickerModal {
                 slug,
                 mod_detail,
@@ -3061,13 +3616,13 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::CfFilePickerMove(delta) => {
-            if let ActiveView::CfFilePickerModal { files, selected, .. } =
-                &mut state.active_view
+            if let ActiveView::CfFilePickerModal {
+                files, selected, ..
+            } = &mut state.active_view
             {
                 let len = files.len();
                 if len > 0 {
-                    let new_idx = (*selected as i32 + delta)
-                        .clamp(0, len as i32 - 1) as usize;
+                    let new_idx = (*selected as i32 + delta).clamp(0, len as i32 - 1) as usize;
                     *selected = new_idx;
                 }
             }
@@ -3078,13 +3633,18 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             // Pitfall 8 guard: silent no-op when an install is already in flight
             // on this instance (running_mod_jobs is shared with Phase 8).
             let captured = match &state.active_view {
-                ActiveView::CfFilePickerModal { slug, mod_detail, files, selected } => {
+                ActiveView::CfFilePickerModal {
+                    slug,
+                    mod_detail,
+                    files,
+                    selected,
+                } => {
                     if state.running_mod_jobs.contains_key(slug) {
                         return vec![];
                     }
-                    files.get(*selected).map(|f| {
-                        (slug.clone(), mod_detail.clone(), f.clone())
-                    })
+                    files
+                        .get(*selected)
+                        .map(|f| (slug.clone(), mod_detail.clone(), f.clone()))
                 }
                 _ => None,
             };
@@ -3098,7 +3658,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             }]
         }
 
-        Action::CfModInstallStarted { slug, mod_id: _, file_id: _, token } => {
+        Action::CfModInstallStarted {
+            slug,
+            mod_id: _,
+            file_id: _,
+            token,
+        } => {
             // Single-mutation-point invariant for running_mod_jobs (insert site).
             state.running_mod_jobs.insert(slug, token);
             vec![]
@@ -3117,7 +3682,13 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
 
-        Action::CfModInstallFailed { slug, mod_title, file_label, error, web_url } => {
+        Action::CfModInstallFailed {
+            slug,
+            mod_title,
+            file_label,
+            error,
+            web_url,
+        } => {
             // Single-mutation-point invariant for running_mod_jobs (remove site #2).
             state.running_mod_jobs.remove(&slug);
             state.active_view = ActiveView::CfInstallFailedModal {
@@ -3136,7 +3707,6 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         // ── Phase 10 (Modpack Import) ──
-
         Action::OpenModpackImport => {
             state.active_view = ActiveView::ModpackImportPathInput {
                 buffer: String::new(),
@@ -3179,7 +3749,9 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 // Use directories::BaseDirs (cross-platform) rather than the
                 // deprecated std::env::home_dir().
                 let expanded = if let Some(rest) = trimmed.strip_prefix("~/") {
-                    if let Some(home) = directories::BaseDirs::new().map(|b| b.home_dir().to_path_buf()) {
+                    if let Some(home) =
+                        directories::BaseDirs::new().map(|b| b.home_dir().to_path_buf())
+                    {
                         home.join(rest)
                     } else {
                         std::path::PathBuf::from(&trimmed)
@@ -3187,7 +3759,9 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 } else {
                     std::path::PathBuf::from(&trimmed)
                 };
-                return vec![Effect::ImportModpack { mrpack_path: expanded }];
+                return vec![Effect::ImportModpack {
+                    mrpack_path: expanded,
+                }];
             }
             vec![]
         }
@@ -3197,7 +3771,11 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
 
-        Action::ModpackImportStarted { slug, modpack_name, token } => {
+        Action::ModpackImportStarted {
+            slug,
+            modpack_name,
+            token,
+        } => {
             state.running_modpack_imports.insert(slug.clone(), token);
             state.active_view = ActiveView::ModpackImportProgressModal {
                 modpack_name,
@@ -3212,7 +3790,13 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
 
-        Action::ModpackImportProgress { slug: _, pct, step_label, bytes_done, bytes_total } => {
+        Action::ModpackImportProgress {
+            slug: _,
+            pct,
+            step_label,
+            bytes_done,
+            bytes_total,
+        } => {
             if let ActiveView::ModpackImportProgressModal {
                 step_label: ref mut sl,
                 bytes_done: ref mut bd,
@@ -3259,10 +3843,18 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
 
-        Action::ModpackImportFailed { modpack_name, error, log_tail } => {
+        Action::ModpackImportFailed {
+            modpack_name,
+            error,
+            log_tail,
+        } => {
             // Single-entry in v1: clearing all is correct regardless of slug state.
             state.running_modpack_imports.clear();
-            state.active_view = ActiveView::ModpackImportFailedModal { modpack_name, error, log_tail };
+            state.active_view = ActiveView::ModpackImportFailedModal {
+                modpack_name,
+                error,
+                log_tail,
+            };
             vec![]
         }
 
@@ -3296,7 +3888,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 selected: 0,
             };
             vec![
-                Effect::SearchPacks { slug: slug.clone(), kind, query: String::new(), mc },
+                Effect::SearchPacks {
+                    slug: slug.clone(),
+                    kind,
+                    query: String::new(),
+                    mc,
+                },
                 Effect::FetchInstalledPacks { slug, kind },
             ]
         }
@@ -3322,7 +3919,11 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
 
-        Action::PackBrowserSearchFailed { slug, kind, message } => {
+        Action::PackBrowserSearchFailed {
+            slug,
+            kind,
+            message,
+        } => {
             if let ActiveView::PackBrowser {
                 slug: cur_slug,
                 kind: cur_kind,
@@ -3338,11 +3939,14 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::PackBrowserMove(delta) => {
-            if let ActiveView::PackBrowser { results, selected, .. } = &mut state.active_view {
+            if let ActiveView::PackBrowser {
+                results, selected, ..
+            } = &mut state.active_view
+            {
                 let len = results.len();
                 if len > 0 {
-                    let new_idx = (*selected as isize + delta as isize)
-                        .clamp(0, len as isize - 1) as usize;
+                    let new_idx =
+                        (*selected as isize + delta as isize).clamp(0, len as isize - 1) as usize;
                     *selected = new_idx;
                 }
             }
@@ -3350,8 +3954,13 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::PackBrowserTypeSearch(c) => {
-            if let ActiveView::PackBrowser { slug, kind, search, fetch_state, .. } =
-                &mut state.active_view
+            if let ActiveView::PackBrowser {
+                slug,
+                kind,
+                search,
+                fetch_state,
+                ..
+            } = &mut state.active_view
             {
                 search.push(c);
                 *fetch_state = ModBrowserFetchState::Loading;
@@ -3363,14 +3972,24 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     .iter()
                     .find(|m| m.slug == slug2)
                     .map(|m| m.mc_version_id.clone());
-                return vec![Effect::SearchPacks { slug: slug2, kind: kind2, query, mc }];
+                return vec![Effect::SearchPacks {
+                    slug: slug2,
+                    kind: kind2,
+                    query,
+                    mc,
+                }];
             }
             vec![]
         }
 
         Action::PackBrowserBackspaceSearch => {
-            if let ActiveView::PackBrowser { slug, kind, search, fetch_state, .. } =
-                &mut state.active_view
+            if let ActiveView::PackBrowser {
+                slug,
+                kind,
+                search,
+                fetch_state,
+                ..
+            } = &mut state.active_view
             {
                 search.pop();
                 *fetch_state = ModBrowserFetchState::Loading;
@@ -3382,14 +4001,24 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     .iter()
                     .find(|m| m.slug == slug2)
                     .map(|m| m.mc_version_id.clone());
-                return vec![Effect::SearchPacks { slug: slug2, kind: kind2, query, mc }];
+                return vec![Effect::SearchPacks {
+                    slug: slug2,
+                    kind: kind2,
+                    query,
+                    mc,
+                }];
             }
             vec![]
         }
 
         Action::PackBrowserPasteSearch(s) => {
-            if let ActiveView::PackBrowser { slug, kind, search, fetch_state, .. } =
-                &mut state.active_view
+            if let ActiveView::PackBrowser {
+                slug,
+                kind,
+                search,
+                fetch_state,
+                ..
+            } = &mut state.active_view
             {
                 search.push_str(&s);
                 *fetch_state = ModBrowserFetchState::Loading;
@@ -3401,7 +4030,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     .iter()
                     .find(|m| m.slug == slug2)
                     .map(|m| m.mc_version_id.clone());
-                return vec![Effect::SearchPacks { slug: slug2, kind: kind2, query, mc }];
+                return vec![Effect::SearchPacks {
+                    slug: slug2,
+                    kind: kind2,
+                    query,
+                    mc,
+                }];
             }
             vec![]
         }
@@ -3446,11 +4080,17 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
 
         Action::PackDropPathSubmit => {
             let captured = match &state.active_view {
-                ActiveView::PackDropPathInput { slug, kind, buffer, .. } => {
+                ActiveView::PackDropPathInput {
+                    slug, kind, buffer, ..
+                } => {
                     if buffer.is_empty() {
                         None // will set error below
                     } else {
-                        Some((slug.clone(), *kind, std::path::PathBuf::from(buffer.clone())))
+                        Some((
+                            slug.clone(),
+                            *kind,
+                            std::path::PathBuf::from(buffer.clone()),
+                        ))
                     }
                 }
                 _ => return vec![],
@@ -3494,7 +4134,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 results: Vec::new(),
                 selected: 0,
             };
-            vec![Effect::SearchPacks { slug, kind, query: String::new(), mc }]
+            vec![Effect::SearchPacks {
+                slug,
+                kind,
+                query: String::new(),
+                mc,
+            }]
         }
 
         Action::InstalledPacksLoaded { slug, kind, packs } => {
@@ -3516,15 +4161,19 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::InstalledPacksMove(delta) => {
-            if let ActiveView::InstalledPacksList { packs, selected, transient_status, .. } =
-                &mut state.active_view
+            if let ActiveView::InstalledPacksList {
+                packs,
+                selected,
+                transient_status,
+                ..
+            } = &mut state.active_view
             {
                 // Clear transient status on any navigation.
                 *transient_status = None;
                 let len = packs.len();
                 if len > 0 {
-                    let new_idx = (*selected as isize + delta as isize)
-                        .clamp(0, len as isize - 1) as usize;
+                    let new_idx =
+                        (*selected as isize + delta as isize).clamp(0, len as isize - 1) as usize;
                     *selected = new_idx;
                 }
             }
@@ -3544,9 +4193,16 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                         selected: 0,
                         transient_status: None,
                     };
-                    vec![Effect::FetchInstalledPacks { slug: slug2, kind: PackKind::Resource }]
+                    vec![Effect::FetchInstalledPacks {
+                        slug: slug2,
+                        kind: PackKind::Resource,
+                    }]
                 }
-                ActiveView::InstalledPacksList { slug, kind: PackKind::Resource, .. } => {
+                ActiveView::InstalledPacksList {
+                    slug,
+                    kind: PackKind::Resource,
+                    ..
+                } => {
                     let slug2 = slug.clone();
                     state.active_view = ActiveView::InstalledPacksList {
                         slug: slug2.clone(),
@@ -3555,9 +4211,16 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                         selected: 0,
                         transient_status: None,
                     };
-                    vec![Effect::FetchInstalledPacks { slug: slug2, kind: PackKind::Shader }]
+                    vec![Effect::FetchInstalledPacks {
+                        slug: slug2,
+                        kind: PackKind::Shader,
+                    }]
                 }
-                ActiveView::InstalledPacksList { slug, kind: PackKind::Shader, .. } => {
+                ActiveView::InstalledPacksList {
+                    slug,
+                    kind: PackKind::Shader,
+                    ..
+                } => {
                     let slug2 = slug.clone();
                     state.active_view = ActiveView::InstalledModsList {
                         slug: slug2.clone(),
@@ -3572,9 +4235,15 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
 
         Action::TogglePackEnabled => {
             let captured = match &state.active_view {
-                ActiveView::InstalledPacksList { slug, kind, packs, selected, .. } => {
-                    packs.get(*selected).map(|row| (slug.clone(), *kind, row.mod_id.clone()))
-                }
+                ActiveView::InstalledPacksList {
+                    slug,
+                    kind,
+                    packs,
+                    selected,
+                    ..
+                } => packs
+                    .get(*selected)
+                    .map(|row| (slug.clone(), *kind, row.mod_id.clone())),
                 _ => None,
             };
             let Some((slug, kind, mod_id)) = captured else {
@@ -3584,35 +4253,51 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::ShaderToggleNotice => {
-            if let ActiveView::InstalledPacksList { transient_status, .. } = &mut state.active_view {
-                *transient_status = Some(
-                    "Shaders cannot be toggled — use Iris/OptiFine in-game".to_string(),
-                );
+            if let ActiveView::InstalledPacksList {
+                transient_status, ..
+            } = &mut state.active_view
+            {
+                *transient_status =
+                    Some("Shaders cannot be toggled — use Iris/OptiFine in-game".to_string());
             }
             vec![]
         }
 
         Action::OpenUninstallPackConfirm => {
             let captured = match &state.active_view {
-                ActiveView::InstalledPacksList { slug, kind, packs, selected, .. } => {
-                    packs.get(*selected).map(|row| {
-                        (slug.clone(), *kind, row.mod_id.clone(), row.file_name.clone())
-                    })
-                }
+                ActiveView::InstalledPacksList {
+                    slug,
+                    kind,
+                    packs,
+                    selected,
+                    ..
+                } => packs.get(*selected).map(|row| {
+                    (
+                        slug.clone(),
+                        *kind,
+                        row.mod_id.clone(),
+                        row.file_name.clone(),
+                    )
+                }),
                 _ => None,
             };
             let Some((slug, kind, mod_id, file_name)) = captured else {
                 return vec![];
             };
-            state.active_view = ActiveView::UninstallPackConfirm { slug, kind, mod_id, file_name };
+            state.active_view = ActiveView::UninstallPackConfirm {
+                slug,
+                kind,
+                mod_id,
+                file_name,
+            };
             vec![]
         }
 
         Action::ConfirmUninstallPack => {
             let captured = match &state.active_view {
-                ActiveView::UninstallPackConfirm { slug, kind, mod_id, .. } => {
-                    Some((slug.clone(), *kind, mod_id.clone()))
-                }
+                ActiveView::UninstallPackConfirm {
+                    slug, kind, mod_id, ..
+                } => Some((slug.clone(), *kind, mod_id.clone())),
                 _ => None,
             };
             let Some((slug, kind, mod_id)) = captured else {
@@ -3626,16 +4311,18 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 transient_status: None,
             };
             vec![
-                Effect::UninstallPack { slug: slug.clone(), kind, mod_id },
+                Effect::UninstallPack {
+                    slug: slug.clone(),
+                    kind,
+                    mod_id,
+                },
                 Effect::FetchInstalledPacks { slug, kind },
             ]
         }
 
         Action::CancelUninstallPack => {
             let captured = match &state.active_view {
-                ActiveView::UninstallPackConfirm { slug, kind, .. } => {
-                    Some((slug.clone(), *kind))
-                }
+                ActiveView::UninstallPackConfirm { slug, kind, .. } => Some((slug.clone(), *kind)),
                 _ => None,
             };
             let (slug, kind) = captured.unwrap_or_else(|| (String::new(), PackKind::Resource));
@@ -3665,8 +4352,9 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             if let ActiveView::PackBrowser { .. } | ActiveView::InstalledPacksList { .. } =
                 &state.active_view
             {
-                if let ActiveView::InstalledPacksList { transient_status, .. } =
-                    &mut state.active_view
+                if let ActiveView::InstalledPacksList {
+                    transient_status, ..
+                } = &mut state.active_view
                 {
                     *transient_status = Some(format!("Drop failed: {error}"));
                 }
@@ -3675,7 +4363,11 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
 
-        Action::PackUninstalled { slug, kind, mod_id: _ } => {
+        Action::PackUninstalled {
+            slug,
+            kind,
+            mod_id: _,
+        } => {
             vec![Effect::FetchInstalledPacks { slug, kind }]
         }
 
@@ -3695,7 +4387,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
 
-        Action::PackToggled { slug, kind, mod_id, new_enabled } => {
+        Action::PackToggled {
+            slug,
+            kind,
+            mod_id,
+            new_enabled,
+        } => {
             if let ActiveView::InstalledPacksList {
                 slug: cur_slug,
                 kind: cur_kind,
@@ -3718,8 +4415,9 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             // `Effect::FetchPackVersions`. The chain unfolds in run.rs:
             //   list_versions → pick first is_latest_stable → get_version →
             //   `Action::AutoStartPackInstall` → `Effect::InstallPackFromModrinth`.
-            let picked = if let ActiveView::PackBrowser { results, selected, .. } =
-                &state.active_view
+            let picked = if let ActiveView::PackBrowser {
+                results, selected, ..
+            } = &state.active_view
             {
                 results.get(*selected).cloned()
             } else {
@@ -3765,12 +4463,24 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             }]
         }
 
-        Action::PackVersionsFailed { slug, kind, project_id: _, message } => {
+        Action::PackVersionsFailed {
+            slug,
+            kind,
+            project_id: _,
+            message,
+        } => {
             // Tail-route to the existing PackInstallFailed arm so the failure
             // UI surfaces uniformly. project_id is dropped; PackInstallFailed
             // does not carry it (the active PackBrowser view supplies context
             // via slug + kind alone).
-            update(state, Action::PackInstallFailed { slug, kind, error: message })
+            update(
+                state,
+                Action::PackInstallFailed {
+                    slug,
+                    kind,
+                    error: message,
+                },
+            )
         }
     }
 }
@@ -3798,7 +4508,10 @@ mod tests {
     fn test_open_accounts_fetches_list() {
         let mut state = AppState::default();
         let effects = update(&mut state, Action::OpenAccounts);
-        assert!(matches!(state.active_view, ActiveView::AccountsList { selected: 0 }));
+        assert!(matches!(
+            state.active_view,
+            ActiveView::AccountsList { selected: 0 }
+        ));
         assert!(matches!(effects.as_slice(), [Effect::FetchAccounts]));
     }
 
@@ -3820,9 +4533,26 @@ mod tests {
         };
         let effects = update(&mut state, Action::ActivateAccount { id: "B".into() });
         assert_eq!(state.active_account_id.as_deref(), Some("B"));
-        assert!(state.accounts.iter().find(|a| a.id == "B").unwrap().is_active);
-        assert!(!state.accounts.iter().find(|a| a.id == "A").unwrap().is_active);
-        assert!(matches!(effects.as_slice(), [Effect::ActivateAccount { .. }]));
+        assert!(
+            state
+                .accounts
+                .iter()
+                .find(|a| a.id == "B")
+                .unwrap()
+                .is_active
+        );
+        assert!(
+            !state
+                .accounts
+                .iter()
+                .find(|a| a.id == "A")
+                .unwrap()
+                .is_active
+        );
+        assert!(matches!(
+            effects.as_slice(),
+            [Effect::ActivateAccount { .. }]
+        ));
     }
 
     #[test]
@@ -3848,7 +4578,10 @@ mod tests {
         state.active_account_id = Some("id-1".into());
         let effects = update(&mut state, Action::LaunchInstance { slug: "s".into() });
         match effects.as_slice() {
-            [Effect::LaunchInstance { auth_ctx: AuthContext::Msa { account_id }, .. }] => {
+            [Effect::LaunchInstance {
+                auth_ctx: AuthContext::Msa { account_id },
+                ..
+            }] => {
                 assert_eq!(account_id, "id-1");
             }
             other => panic!("expected Msa LaunchInstance; got {other:?}"),
@@ -3864,7 +4597,10 @@ mod tests {
         assert!(state.active_account_id.is_none());
         let effects = update(&mut state, Action::LaunchInstance { slug: "s".into() });
         match effects.as_slice() {
-            [Effect::LaunchInstance { auth_ctx: AuthContext::Offline { username }, .. }] => {
+            [Effect::LaunchInstance {
+                auth_ctx: AuthContext::Offline { username },
+                ..
+            }] => {
                 assert_eq!(username, "Pretty");
             }
             other => panic!("expected Offline LaunchInstance; got {other:?}"),
@@ -3874,18 +4610,29 @@ mod tests {
     #[test]
     fn test_account_auth_started_transitions_to_modal() {
         let mut state = AppState::default();
-        let _ = update(&mut state, Action::AccountAuthStarted {
-            user_code: "ABCD".into(),
-            verification_uri: "https://ms/link".into(),
-            expires_at: std::time::Instant::now() + std::time::Duration::from_secs(900),
-        });
-        assert!(matches!(state.active_view, ActiveView::AddAccountDeviceCode { .. }));
+        let _ = update(
+            &mut state,
+            Action::AccountAuthStarted {
+                user_code: "ABCD".into(),
+                verification_uri: "https://ms/link".into(),
+                expires_at: std::time::Instant::now() + std::time::Duration::from_secs(900),
+            },
+        );
+        assert!(matches!(
+            state.active_view,
+            ActiveView::AddAccountDeviceCode { .. }
+        ));
     }
 
     #[test]
     fn test_account_auth_failed_transitions_to_failed_modal() {
         let mut state = AppState::default();
-        let _ = update(&mut state, Action::AccountAuthFailed { reason: "no license".into() });
+        let _ = update(
+            &mut state,
+            Action::AccountAuthFailed {
+                reason: "no license".into(),
+            },
+        );
         match &state.active_view {
             ActiveView::AccountAuthFailed { reason } => assert_eq!(reason, "no license"),
             other => panic!("expected AccountAuthFailed modal; got {other:?}"),
@@ -3900,22 +4647,31 @@ mod tests {
         let _ = update(&mut state, Action::CancelAddAccount);
         assert!(t.is_cancelled());
         assert!(state.add_account_cancel.is_none());
-        assert!(matches!(state.active_view, ActiveView::AccountsList { selected: 0 }));
+        assert!(matches!(
+            state.active_view,
+            ActiveView::AccountsList { selected: 0 }
+        ));
     }
 
     // ── Phase 6: Loader picker tests ──────────────────────────────────────────
 
     fn fab_versions(n: usize) -> Vec<LoaderVersionEntry> {
-        (0..n).map(|i| LoaderVersionEntry {
-            version: format!("0.16.{i}"),
-            stable: i % 2 == 0,
-            build: Some(500 + i as u32),
-        }).collect()
+        (0..n)
+            .map(|i| LoaderVersionEntry {
+                version: format!("0.16.{i}"),
+                stable: i % 2 == 0,
+                build: Some(500 + i as u32),
+            })
+            .collect()
     }
 
     fn vanilla_state_with(slug: &str, mc: &str) -> AppState {
         let mut s = AppState::default();
-        s.instances.push(crate::domain::InstanceManifest::new(slug.into(), slug.into(), mc.into()));
+        s.instances.push(crate::domain::InstanceManifest::new(
+            slug.into(),
+            slug.into(),
+            mc.into(),
+        ));
         s
     }
 
@@ -3923,13 +4679,17 @@ mod tests {
     fn test_open_loader_picker_sets_active_view() {
         let mut s = vanilla_state_with("ti", "1.21.4");
         let _ = update(&mut s, Action::OpenLoaderPicker { slug: "ti".into() });
-        assert!(matches!(s.active_view, ActiveView::LoaderPickerModal { selected: 0, .. }));
+        assert!(matches!(
+            s.active_view,
+            ActiveView::LoaderPickerModal { selected: 0, .. }
+        ));
     }
 
     #[test]
     fn test_open_loader_picker_blocks_running_instance() {
         let mut s = vanilla_state_with("ti", "1.21.4");
-        s.running_instances.insert("ti".into(), CancellationToken::new());
+        s.running_instances
+            .insert("ti".into(), CancellationToken::new());
         let _ = update(&mut s, Action::OpenLoaderPicker { slug: "ti".into() });
         // No transition — instance is running
         assert!(matches!(s.active_view, ActiveView::InstanceList { .. }));
@@ -3946,13 +4706,17 @@ mod tests {
         // 3 moves → index 3 (Forge row)
         if let ActiveView::LoaderPickerModal { selected, .. } = &s.active_view {
             assert_eq!(*selected, 3);
-        } else { panic!("wrong view"); }
+        } else {
+            panic!("wrong view");
+        }
         let _ = update(&mut s, Action::LoaderPickerMove(1));
         let _ = update(&mut s, Action::LoaderPickerMove(1));
         // 5 moves total → index 5 mod 5 = 0 (wraps back to None row)
         if let ActiveView::LoaderPickerModal { selected, .. } = s.active_view {
             assert_eq!(selected, 0);
-        } else { panic!("wrong view"); }
+        } else {
+            panic!("wrong view");
+        }
     }
 
     #[test]
@@ -3963,9 +4727,18 @@ mod tests {
         let effects = update(&mut s, Action::LoaderPickerSelect);
         assert!(matches!(
             effects.as_slice(),
-            [Effect::FetchLoaderVersions { loader_type: LoaderType::Fabric, .. }]
+            [Effect::FetchLoaderVersions {
+                loader_type: LoaderType::Fabric,
+                ..
+            }]
         ));
-        assert!(matches!(s.active_view, ActiveView::LoaderVersionPickerModal { loader: LoaderType::Fabric, .. }));
+        assert!(matches!(
+            s.active_view,
+            ActiveView::LoaderVersionPickerModal {
+                loader: LoaderType::Fabric,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -3981,50 +4754,85 @@ mod tests {
     fn test_loader_versions_loaded_replaces_versions() {
         let mut s = vanilla_state_with("ti", "1.21.4");
         s.active_view = ActiveView::LoaderVersionPickerModal {
-            slug: "ti".into(), loader: LoaderType::Fabric,
-            versions: vec![], filter_stable_only: true,
-            search: String::new(), selected: 0, current_version: None,
+            slug: "ti".into(),
+            loader: LoaderType::Fabric,
+            versions: vec![],
+            filter_stable_only: true,
+            search: String::new(),
+            selected: 0,
+            current_version: None,
         };
-        let _ = update(&mut s, Action::LoaderVersionsLoaded {
-            slug: "ti".into(), loader: LoaderType::Fabric, versions: fab_versions(3),
-        });
-        if let ActiveView::LoaderVersionPickerModal { versions, selected, .. } = &s.active_view {
+        let _ = update(
+            &mut s,
+            Action::LoaderVersionsLoaded {
+                slug: "ti".into(),
+                loader: LoaderType::Fabric,
+                versions: fab_versions(3),
+            },
+        );
+        if let ActiveView::LoaderVersionPickerModal {
+            versions, selected, ..
+        } = &s.active_view
+        {
             assert_eq!(versions.len(), 3);
             assert_eq!(*selected, 0);
-        } else { panic!() }
+        } else {
+            panic!()
+        }
     }
 
     #[test]
     fn test_toggle_stable_filter_flips_bool() {
         let mut s = vanilla_state_with("ti", "1.21.4");
         s.active_view = ActiveView::LoaderVersionPickerModal {
-            slug: "ti".into(), loader: LoaderType::Fabric,
-            versions: fab_versions(2), filter_stable_only: true,
-            search: String::new(), selected: 0, current_version: None,
+            slug: "ti".into(),
+            loader: LoaderType::Fabric,
+            versions: fab_versions(2),
+            filter_stable_only: true,
+            search: String::new(),
+            selected: 0,
+            current_version: None,
         };
         let _ = update(&mut s, Action::ToggleStableFilter);
-        if let ActiveView::LoaderVersionPickerModal { filter_stable_only, .. } = &s.active_view {
+        if let ActiveView::LoaderVersionPickerModal {
+            filter_stable_only, ..
+        } = &s.active_view
+        {
             assert!(!filter_stable_only);
-        } else { panic!() }
+        } else {
+            panic!()
+        }
     }
 
     #[test]
     fn test_loader_version_select_no_current_emits_install_effect() {
         let mut s = vanilla_state_with("ti", "1.21.4");
         s.active_view = ActiveView::LoaderVersionPickerModal {
-            slug: "ti".into(), loader: LoaderType::Fabric,
-            versions: fab_versions(3), filter_stable_only: false,
-            search: String::new(), selected: 0, current_version: None,
+            slug: "ti".into(),
+            loader: LoaderType::Fabric,
+            versions: fab_versions(3),
+            filter_stable_only: false,
+            search: String::new(),
+            selected: 0,
+            current_version: None,
         };
         let effects = update(&mut s, Action::LoaderVersionSelect);
         match effects.as_slice() {
-            [Effect::InstallLoader { loader_type: LoaderType::Fabric, mc_version, loader_version, .. }] => {
+            [Effect::InstallLoader {
+                loader_type: LoaderType::Fabric,
+                mc_version,
+                loader_version,
+                ..
+            }] => {
                 assert_eq!(mc_version, "1.21.4");
                 assert_eq!(loader_version, "0.16.0");
             }
             other => panic!("expected InstallLoader, got {other:?}"),
         }
-        assert!(matches!(s.active_view, ActiveView::LoaderInstallProgressModal { .. }));
+        assert!(matches!(
+            s.active_view,
+            ActiveView::LoaderInstallProgressModal { .. }
+        ));
     }
 
     /// Phase 6 UAT Check 5 regression pin: when an instance has Fabric installed
@@ -4045,21 +4853,32 @@ mod tests {
         // Open Quilt version picker — current_version is None because the picker
         // filters by target kind (Quilt) and the installed kind is Fabric.
         s.active_view = ActiveView::LoaderVersionPickerModal {
-            slug: "ti".into(), loader: LoaderType::Quilt,
-            versions: fab_versions(3), filter_stable_only: false,
-            search: String::new(), selected: 0, current_version: None,
+            slug: "ti".into(),
+            loader: LoaderType::Quilt,
+            versions: fab_versions(3),
+            filter_stable_only: false,
+            search: String::new(),
+            selected: 0,
+            current_version: None,
         };
         let effects = update(&mut s, Action::LoaderVersionSelect);
         assert!(effects.is_empty(),
             "cross-kind switch must NOT emit InstallLoader directly; it must show the WARNING confirm first");
         match &s.active_view {
-            ActiveView::LoaderSwitchConfirm { from_loader, to_loader, type_switch, .. } => {
+            ActiveView::LoaderSwitchConfirm {
+                from_loader,
+                to_loader,
+                type_switch,
+                ..
+            } => {
                 assert!(*type_switch,
                     "cross-kind switch (Fabric → Quilt) MUST set type_switch: true so the red WARNING line renders (UAT Check 5)");
                 assert_eq!(from_loader.as_deref(), Some("fabric:0.16.9"),
                     "from_loader must reflect the actually-installed loader, not the target-kind filter");
-                assert!(to_loader.starts_with("quilt:"),
-                    "to_loader must reflect the chosen target: {to_loader}");
+                assert!(
+                    to_loader.starts_with("quilt:"),
+                    "to_loader must reflect the chosen target: {to_loader}"
+                );
             }
             other => panic!("expected LoaderSwitchConfirm with type_switch: true, got {other:?}"),
         }
@@ -4076,15 +4895,25 @@ mod tests {
             version_id: "fabric-loader-0.16.5-1.21.4".into(),
         });
         s.active_view = ActiveView::LoaderVersionPickerModal {
-            slug: "ti".into(), loader: LoaderType::Fabric,
-            versions: fab_versions(3), filter_stable_only: false,
-            search: String::new(), selected: 1, current_version: Some("0.16.5".into()),
+            slug: "ti".into(),
+            loader: LoaderType::Fabric,
+            versions: fab_versions(3),
+            filter_stable_only: false,
+            search: String::new(),
+            selected: 1,
+            current_version: Some("0.16.5".into()),
         };
         let effects = update(&mut s, Action::LoaderVersionSelect);
-        assert!(effects.is_empty(), "same-kind diff-version must show confirm, not install directly");
+        assert!(
+            effects.is_empty(),
+            "same-kind diff-version must show confirm, not install directly"
+        );
         match &s.active_view {
             ActiveView::LoaderSwitchConfirm { type_switch, .. } => {
-                assert!(!*type_switch, "same-kind switch must NOT set type_switch (no WARNING)");
+                assert!(
+                    !*type_switch,
+                    "same-kind switch must NOT set type_switch (no WARNING)"
+                );
             }
             other => panic!("expected LoaderSwitchConfirm, got {other:?}"),
         }
@@ -4101,22 +4930,35 @@ mod tests {
             version_id: "fabric-loader-0.16.0-1.21.4".into(),
         });
         s.active_view = ActiveView::LoaderVersionPickerModal {
-            slug: "ti".into(), loader: LoaderType::Fabric,
-            versions: fab_versions(3), filter_stable_only: false,
-            search: String::new(), selected: 0, current_version: Some("0.16.0".into()),
+            slug: "ti".into(),
+            loader: LoaderType::Fabric,
+            versions: fab_versions(3),
+            filter_stable_only: false,
+            search: String::new(),
+            selected: 0,
+            current_version: Some("0.16.0".into()),
         };
         let prev_view = s.active_view.clone();
         let effects = update(&mut s, Action::LoaderVersionSelect);
         assert!(effects.is_empty(), "already-installed must be no-op");
-        assert!(matches!(&s.active_view, ActiveView::LoaderVersionPickerModal { .. }),
-            "already-installed must leave active_view unchanged: was {prev_view:?}, now {:?}", s.active_view);
+        assert!(
+            matches!(&s.active_view, ActiveView::LoaderVersionPickerModal { .. }),
+            "already-installed must leave active_view unchanged: was {prev_view:?}, now {:?}",
+            s.active_view
+        );
     }
 
     #[test]
     fn test_loader_install_started_inserts_token() {
         let mut s = AppState::default();
         let t = CancellationToken::new();
-        let _ = update(&mut s, Action::LoaderInstallStarted { slug: "ti".into(), token: t.clone() });
+        let _ = update(
+            &mut s,
+            Action::LoaderInstallStarted {
+                slug: "ti".into(),
+                token: t.clone(),
+            },
+        );
         assert!(s.running_loader_installs.contains_key("ti"));
         assert!(!t.is_cancelled());
     }
@@ -4124,7 +4966,8 @@ mod tests {
     #[test]
     fn test_loader_installed_clears_token_and_returns_to_list() {
         let mut s = AppState::default();
-        s.running_loader_installs.insert("ti".into(), CancellationToken::new());
+        s.running_loader_installs
+            .insert("ti".into(), CancellationToken::new());
         let effects = update(&mut s, Action::LoaderInstalled { slug: "ti".into() });
         assert!(s.running_loader_installs.is_empty());
         assert!(matches!(s.active_view, ActiveView::InstanceList { .. }));
@@ -4134,13 +4977,23 @@ mod tests {
     #[test]
     fn test_loader_install_failed_routes_to_failed_modal() {
         let mut s = AppState::default();
-        s.running_loader_installs.insert("ti".into(), CancellationToken::new());
-        let _ = update(&mut s, Action::LoaderInstallFailed {
-            slug: "ti".into(), loader: LoaderType::Fabric, version: "0.16.9".into(),
-            error: "network".into(), log_tail: "GET ...".into(),
-        });
+        s.running_loader_installs
+            .insert("ti".into(), CancellationToken::new());
+        let _ = update(
+            &mut s,
+            Action::LoaderInstallFailed {
+                slug: "ti".into(),
+                loader: LoaderType::Fabric,
+                version: "0.16.9".into(),
+                error: "network".into(),
+                log_tail: "GET ...".into(),
+            },
+        );
         assert!(s.running_loader_installs.is_empty());
-        assert!(matches!(s.active_view, ActiveView::LoaderInstallFailedModal { .. }));
+        assert!(matches!(
+            s.active_view,
+            ActiveView::LoaderInstallFailedModal { .. }
+        ));
     }
 
     #[test]
@@ -4151,15 +5004,21 @@ mod tests {
         let effects = update(&mut s, Action::CancelLoaderInstall { slug: "ti".into() });
         assert!(t.is_cancelled());
         assert!(s.running_loader_installs.is_empty());
-        assert!(matches!(effects.as_slice(), [Effect::CancelLoaderInstall { .. }]));
+        assert!(matches!(
+            effects.as_slice(),
+            [Effect::CancelLoaderInstall { .. }]
+        ));
     }
 
     #[test]
     fn test_dismiss_loader_install_failed_returns_to_list() {
         let mut s = AppState {
             active_view: ActiveView::LoaderInstallFailedModal {
-                slug: "ti".into(), loader: LoaderType::Fabric, version: "0.16.9".into(),
-                error: "x".into(), log_tail: "y".into(),
+                slug: "ti".into(),
+                loader: LoaderType::Fabric,
+                version: "0.16.9".into(),
+                error: "x".into(),
+                log_tail: "y".into(),
             },
             ..AppState::default()
         };
@@ -4171,8 +5030,10 @@ mod tests {
     fn test_confirm_loader_switch_emits_remove_when_to_none() {
         let mut s = vanilla_state_with("ti", "1.21.4");
         s.active_view = ActiveView::LoaderSwitchConfirm {
-            slug: "ti".into(), from_loader: Some("fabric:0.16.9".into()),
-            to_loader: "none".into(), type_switch: false,
+            slug: "ti".into(),
+            from_loader: Some("fabric:0.16.9".into()),
+            to_loader: "none".into(),
+            type_switch: false,
         };
         let effects = update(&mut s, Action::ConfirmLoaderSwitch);
         assert!(matches!(effects.as_slice(), [Effect::RemoveLoader { .. }]));
@@ -4183,12 +5044,19 @@ mod tests {
     fn test_confirm_loader_switch_emits_install_for_to_loader() {
         let mut s = vanilla_state_with("ti", "1.21.4");
         s.active_view = ActiveView::LoaderSwitchConfirm {
-            slug: "ti".into(), from_loader: Some("fabric:0.16.8".into()),
-            to_loader: "fabric:0.16.9".into(), type_switch: false,
+            slug: "ti".into(),
+            from_loader: Some("fabric:0.16.8".into()),
+            to_loader: "fabric:0.16.9".into(),
+            type_switch: false,
         };
         let effects = update(&mut s, Action::ConfirmLoaderSwitch);
         match effects.as_slice() {
-            [Effect::InstallLoader { loader_type: LoaderType::Fabric, loader_version, mc_version, .. }] => {
+            [Effect::InstallLoader {
+                loader_type: LoaderType::Fabric,
+                loader_version,
+                mc_version,
+                ..
+            }] => {
                 assert_eq!(loader_version, "0.16.9");
                 assert_eq!(mc_version, "1.21.4");
             }
@@ -4200,18 +5068,38 @@ mod tests {
     fn test_loader_versions_visible_indices_quilt_shows_all_when_filter_on() {
         // Open Question 3 lock: Quilt always shows all versions; UI suffix renders (beta)
         let versions = vec![
-            LoaderVersionEntry { version: "0.30.0-beta.7".into(), stable: false, build: Some(120) },
-            LoaderVersionEntry { version: "0.27.2".into(), stable: true, build: Some(50) },
+            LoaderVersionEntry {
+                version: "0.30.0-beta.7".into(),
+                stable: false,
+                build: Some(120),
+            },
+            LoaderVersionEntry {
+                version: "0.27.2".into(),
+                stable: true,
+                build: Some(50),
+            },
         ];
         let visible = loader_versions_visible_indices(&versions, LoaderType::Quilt, true, "");
-        assert_eq!(visible, vec![0, 1], "Quilt always shows all (per UI-SPEC Open Q3)");
+        assert_eq!(
+            visible,
+            vec![0, 1],
+            "Quilt always shows all (per UI-SPEC Open Q3)"
+        );
     }
 
     #[test]
     fn test_loader_versions_visible_indices_fabric_filters_unstable() {
         let versions = vec![
-            LoaderVersionEntry { version: "0.16.9".into(), stable: true, build: Some(509) },
-            LoaderVersionEntry { version: "0.17.0-beta.1".into(), stable: false, build: Some(600) },
+            LoaderVersionEntry {
+                version: "0.16.9".into(),
+                stable: true,
+                build: Some(509),
+            },
+            LoaderVersionEntry {
+                version: "0.17.0-beta.1".into(),
+                stable: false,
+                build: Some(600),
+            },
         ];
         let visible = loader_versions_visible_indices(&versions, LoaderType::Fabric, true, "");
         assert_eq!(visible, vec![0]);
@@ -4236,10 +5124,13 @@ mod tests {
             },
             ..AppState::default()
         };
-        let _ = update(&mut state, Action::LoaderInstallLogTail {
-            slug: "test".into(),
-            tail: "Running Processor 3/7".into(),
-        });
+        let _ = update(
+            &mut state,
+            Action::LoaderInstallLogTail {
+                slug: "test".into(),
+                tail: "Running Processor 3/7".into(),
+            },
+        );
         if let ActiveView::LoaderInstallProgressModal { log_tail, .. } = &state.active_view {
             assert_eq!(log_tail, "Running Processor 3/7");
         } else {
@@ -4264,10 +5155,13 @@ mod tests {
             },
             ..AppState::default()
         };
-        let _ = update(&mut state, Action::LoaderInstallLogTail {
-            slug: "beta".into(),
-            tail: "different".into(),
-        });
+        let _ = update(
+            &mut state,
+            Action::LoaderInstallLogTail {
+                slug: "beta".into(),
+                tail: "different".into(),
+            },
+        );
         if let ActiveView::LoaderInstallProgressModal { log_tail, .. } = &state.active_view {
             assert_eq!(log_tail, "original", "tail must not change for other slug");
         } else {
@@ -4363,11 +5257,7 @@ mod tests {
     // covered by tests/packs_integration.rs).
     // ------------------------------------------------------------------------
 
-    fn pack_browser_state_with_one_hit(
-        slug: &str,
-        mc: &str,
-        kind: PackKind,
-    ) -> AppState {
+    fn pack_browser_state_with_one_hit(slug: &str, mc: &str, kind: PackKind) -> AppState {
         use crate::mods::types::{ModBrowserFetchState, ModrinthSearchHit};
         let manifest = crate::domain::instance::InstanceManifest::new(
             slug.to_string(),
@@ -4440,7 +5330,10 @@ mod tests {
         assert_eq!(effects.len(), 1);
         assert!(matches!(
             effects[0],
-            Effect::FetchPackVersions { kind: PackKind::Shader, .. }
+            Effect::FetchPackVersions {
+                kind: PackKind::Shader,
+                ..
+            }
         ));
     }
 

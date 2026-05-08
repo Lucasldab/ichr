@@ -122,7 +122,10 @@ impl ForgeMetaClient {
         mc_version: &str,
     ) -> Result<Vec<LoaderVersionEntry>, LoaderError> {
         // 1. Fetch maven-metadata.xml
-        let url = format!("{}/maven-metadata.xml", self.maven_base.trim_end_matches('/'));
+        let url = format!(
+            "{}/maven-metadata.xml",
+            self.maven_base.trim_end_matches('/')
+        );
         let xml = self
             .http
             .get(&url)
@@ -155,7 +158,11 @@ impl ForgeMetaClient {
             .map(|v| {
                 let bare = v.strip_prefix(&prefix).unwrap_or(&v).to_string();
                 let stable = promotions.is_recommended_or_latest(mc_version, &bare);
-                LoaderVersionEntry { version: bare, stable, build: None }
+                LoaderVersionEntry {
+                    version: bare,
+                    stable,
+                    build: None,
+                }
             })
             .collect();
 
@@ -185,12 +192,11 @@ impl ForgeMetaClient {
             reason: format!("body {}: {e}", self.promotions_url),
         })?;
 
-        let parsed: PromotionsSlim = serde_json::from_slice(&bytes).map_err(|e| {
-            LoaderError::MetaParse {
+        let parsed: PromotionsSlim =
+            serde_json::from_slice(&bytes).map_err(|e| LoaderError::MetaParse {
                 loader: "forge",
                 reason: format!("promotions JSON: {e}"),
-            }
-        })?;
+            })?;
 
         Ok(parsed)
     }
@@ -265,12 +271,25 @@ mod tests {
 
         // Fixture has two 1.20.1 entries (47.4.20 and 47.3.0) and two non-1.20.1 entries;
         // only the 1.20.1 entries should be returned.
-        assert_eq!(versions.len(), 2, "only 1.20.1 entries returned: {versions:?}");
-        assert!(versions.iter().all(|v| !v.stable), "no promo pin => all unstable");
+        assert_eq!(
+            versions.len(),
+            2,
+            "only 1.20.1 entries returned: {versions:?}"
+        );
+        assert!(
+            versions.iter().all(|v| !v.stable),
+            "no promo pin => all unstable"
+        );
         assert!(versions.iter().all(|v| v.build.is_none()));
         // Ensure non-matching MC versions were excluded
-        assert!(versions.iter().all(|v| v.version != "58.0.3"), "1.21.8 entry must be excluded");
-        assert!(versions.iter().all(|v| v.version != "36.2.42"), "1.16.5 entry must be excluded");
+        assert!(
+            versions.iter().all(|v| v.version != "58.0.3"),
+            "1.21.8 entry must be excluded"
+        );
+        assert!(
+            versions.iter().all(|v| v.version != "36.2.42"),
+            "1.16.5 entry must be excluded"
+        );
     }
 
     #[tokio::test]
@@ -298,8 +317,14 @@ mod tests {
         assert_eq!(versions.len(), 2);
 
         // Find by version string
-        let v4_20 = versions.iter().find(|v| v.version == "47.4.20").expect("47.4.20");
-        let v3_0 = versions.iter().find(|v| v.version == "47.3.0").expect("47.3.0");
+        let v4_20 = versions
+            .iter()
+            .find(|v| v.version == "47.4.20")
+            .expect("47.4.20");
+        let v3_0 = versions
+            .iter()
+            .find(|v| v.version == "47.3.0")
+            .expect("47.3.0");
         assert!(v4_20.stable, "47.4.20 matches recommended => stable");
         assert!(!v3_0.stable, "47.3.0 has no pin => unstable");
     }
@@ -326,8 +351,14 @@ mod tests {
         let client = make_client(&server);
         let versions = client.list_loader_versions("1.20.1").await.expect("ok");
 
-        let v4_20 = versions.iter().find(|v| v.version == "47.4.20").expect("47.4.20");
-        let v3_0 = versions.iter().find(|v| v.version == "47.3.0").expect("47.3.0");
+        let v4_20 = versions
+            .iter()
+            .find(|v| v.version == "47.4.20")
+            .expect("47.4.20");
+        let v3_0 = versions
+            .iter()
+            .find(|v| v.version == "47.3.0")
+            .expect("47.3.0");
         assert!(v4_20.stable, "47.4.20 matches latest => stable");
         assert!(!v3_0.stable, "47.3.0 has no pin => unstable");
     }
@@ -382,8 +413,14 @@ mod tests {
         });
 
         let client = make_client(&server);
-        let r = client.list_loader_versions("1.20.1").await.expect("ok — empty is not an error");
-        assert!(r.is_empty(), "malformed XML => empty list (D-05 graceful state): {r:?}");
+        let r = client
+            .list_loader_versions("1.20.1")
+            .await
+            .expect("ok — empty is not an error");
+        assert!(
+            r.is_empty(),
+            "malformed XML => empty list (D-05 graceful state): {r:?}"
+        );
     }
 
     #[tokio::test]
@@ -400,11 +437,21 @@ mod tests {
         });
 
         let client = make_client(&server);
-        let versions = client.list_loader_versions("1.20.1").await.expect("ok — promotions failure is graceful");
+        let versions = client
+            .list_loader_versions("1.20.1")
+            .await
+            .expect("ok — promotions failure is graceful");
         // Fixture has two 1.20.1 entries; both should be returned, all unstable
-        assert_eq!(versions.len(), 2, "expected 1.20.1 entries despite promo failure");
+        assert_eq!(
+            versions.len(),
+            2,
+            "expected 1.20.1 entries despite promo failure"
+        );
         for v in &versions {
-            assert!(!v.stable, "all stable=false when promotions unavailable: {v:?}");
+            assert!(
+                !v.stable,
+                "all stable=false when promotions unavailable: {v:?}"
+            );
         }
     }
 

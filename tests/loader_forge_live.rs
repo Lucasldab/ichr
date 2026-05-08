@@ -118,7 +118,10 @@ async fn live_forge_install_1_20_1() {
         .list_loader_versions(LoaderType::Forge, mc)
         .await
         .expect("list_loader_versions Forge");
-    assert!(!versions.is_empty(), "Forge must publish loaders for MC {mc}");
+    assert!(
+        !versions.is_empty(),
+        "Forge must publish loaders for MC {mc}"
+    );
     let loader_version = versions
         .iter()
         .find(|v| v.stable)
@@ -150,7 +153,10 @@ async fn live_forge_install_1_20_1() {
     let loader = m.loader.expect("manifest.loader must be Some");
     assert_eq!(loader.kind, ModloaderKind::Forge);
     assert_eq!(loader.version, loader_version);
-    assert!(!loader.version_id.is_empty(), "version_id must be non-empty");
+    assert!(
+        !loader.version_id.is_empty(),
+        "version_id must be non-empty"
+    );
 
     let vj = paths.version_json(&loader.version_id);
     assert!(vj.is_file(), "version JSON missing: {}", vj.display());
@@ -180,11 +186,7 @@ async fn live_forge_install_1_20_1() {
     let instance_dir = paths.instance_dir(slug);
     let mut found_log = false;
     if let Ok(mut entries) = tokio::fs::read_dir(&instance_dir).await {
-        while let Some(entry) = entries
-            .next_entry()
-            .await
-            .expect("read instance dir")
-        {
+        while let Some(entry) = entries.next_entry().await.expect("read instance dir") {
             if entry
                 .file_name()
                 .to_string_lossy()
@@ -314,8 +316,7 @@ async fn live_forge_install_does_not_throw_install_blocker() {
         Err(e) => {
             let msg = e.to_string();
             // round-1 signature
-            let r1_classdef = msg.contains("NoClassDefFoundError")
-                || msg.contains("modlauncher");
+            let r1_classdef = msg.contains("NoClassDefFoundError") || msg.contains("modlauncher");
             // round-2 signature
             let r2_no_main = msg.contains("Main method not found");
             // round-3 signature (GAP-7-A-v3): Main reaches its body but throws
@@ -348,16 +349,16 @@ async fn live_forge_install_does_not_throw_install_blocker() {
             panic!("install_loader failed for non-GAP-7-A-v3 reason: {msg}");
         }
         Ok(()) => {
-            println!(
-                "[forge_install_blocker] install_loader succeeded — GAP-7-A umbrella closed"
-            );
+            println!("[forge_install_blocker] install_loader succeeded — GAP-7-A umbrella closed");
         }
     }
 
     let m = mineltui::instance::store::read_instance_manifest(&paths, slug)
         .await
         .expect("read manifest");
-    let loader = m.loader.expect("manifest.loader must be Some after install");
+    let loader = m
+        .loader
+        .expect("manifest.loader must be Some after install");
     assert_eq!(loader.kind, ModloaderKind::Forge);
     assert!(
         !loader.version_id.is_empty(),

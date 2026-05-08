@@ -54,24 +54,24 @@ pub fn resolve_inherits(
     // `merged.inherits_from` is set to None at the end of recursion.
     let root_id = compute_root_id(child, parents);
     // Promote merged.{asset_index,assets,downloads} from Option to required.
-    let asset_index = merged.asset_index.ok_or_else(|| {
-        AppError::InheritsFromMissingRequired {
+    let asset_index = merged
+        .asset_index
+        .ok_or_else(|| AppError::InheritsFromMissingRequired {
             field: "asset_index".into(),
             version_id: child.id.clone(),
-        }
-    })?;
-    let assets = merged.assets.ok_or_else(|| {
-        AppError::InheritsFromMissingRequired {
+        })?;
+    let assets = merged
+        .assets
+        .ok_or_else(|| AppError::InheritsFromMissingRequired {
             field: "assets".into(),
             version_id: child.id.clone(),
-        }
-    })?;
-    let downloads = merged.downloads.ok_or_else(|| {
-        AppError::InheritsFromMissingRequired {
+        })?;
+    let downloads = merged
+        .downloads
+        .ok_or_else(|| AppError::InheritsFromMissingRequired {
             field: "downloads".into(),
             version_id: child.id.clone(),
-        }
-    })?;
+        })?;
     Ok(ResolvedVersion {
         id: merged.id,
         root_id,
@@ -219,8 +219,8 @@ fn merge(parent: VersionJson, child: VersionJson) -> VersionJson {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::types::AssetIndex;
+    use super::*;
     use crate::error::AppError;
     use std::collections::HashMap;
 

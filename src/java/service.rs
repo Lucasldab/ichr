@@ -57,7 +57,12 @@ impl JavaService {
         arch: Arch,
         os: OsName,
     ) -> Self {
-        Self { mojang, adoptium, arch, os }
+        Self {
+            mojang,
+            adoptium,
+            arch,
+            os,
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -136,13 +141,13 @@ impl JavaService {
         match id {
             JavaRuntimeId::Mojang { variant } => {
                 // Requires a Mojang platform entry — fall through error if none.
-                let plat = mojang_platform_key(self.os, self.arch)
-                    .ok_or(AppError::JavaNotFound)?;
+                let plat = mojang_platform_key(self.os, self.arch).ok_or(AppError::JavaNotFound)?;
                 let index = self.mojang.fetch_all_json(None).await?;
-                let entry =
-                    MojangJreClient::select_variant(&index, plat, variant)
-                        .ok_or(AppError::JavaNotFound)?;
-                self.mojang.install_mojang_variant(paths, entry, variant).await
+                let entry = MojangJreClient::select_variant(&index, plat, variant)
+                    .ok_or(AppError::JavaNotFound)?;
+                self.mojang
+                    .install_mojang_variant(paths, entry, variant)
+                    .await
             }
 
             JavaRuntimeId::Adoptium { major } => {
@@ -151,7 +156,10 @@ impl JavaService {
                     .await
             }
 
-            JavaRuntimeId::System { path, major_version } => {
+            JavaRuntimeId::System {
+                path,
+                major_version,
+            } => {
                 // System path must exist and pass major-version validation.
                 if !path.is_file() {
                     return Err(AppError::JavaOverrideNotFound { path: path.clone() });
@@ -180,7 +188,9 @@ impl JavaService {
         let index = self.mojang.fetch_all_json(None).await?;
         let entry = MojangJreClient::select_variant(&index, plat, component)
             .ok_or(AppError::JavaNotFound)?;
-        self.mojang.install_mojang_variant(paths, entry, component).await
+        self.mojang
+            .install_mojang_variant(paths, entry, component)
+            .await
     }
 
     /// Install an Adoptium JRE for the given major version.
@@ -190,7 +200,9 @@ impl JavaService {
         paths: &AppPaths,
         major: u32,
     ) -> Result<PathBuf, AppError> {
-        self.adoptium.install_adoptium(paths, major, self.arch, self.os).await
+        self.adoptium
+            .install_adoptium(paths, major, self.arch, self.os)
+            .await
     }
 
     // -----------------------------------------------------------------------
@@ -264,8 +276,7 @@ impl JavaService {
         // 2) Read + parse — `?` auto-wraps via #[from] on AppError::Io and
         //    AppError::MojangParse. No string-based fallback variants.
         let bytes = tokio::fs::read(&json_path).await?;
-        let version_json: crate::mojang::types::VersionJson =
-            serde_json::from_slice(&bytes)?;
+        let version_json: crate::mojang::types::VersionJson = serde_json::from_slice(&bytes)?;
 
         // 2b) Promote VersionJson into ResolvedVersion. This call runs only
         //     for VANILLA installs from MC version strings (loader installers
@@ -277,8 +288,7 @@ impl JavaService {
         //     surfaces with a clear "install vanilla first" message.
         let parents: std::collections::HashMap<String, crate::mojang::types::VersionJson> =
             std::collections::HashMap::new();
-        let resolved =
-            crate::mojang::inherits::resolve_inherits(&version_json, &parents)?;
+        let resolved = crate::mojang::inherits::resolve_inherits(&version_json, &parents)?;
 
         // 3) Synthesize a stub instance manifest — no overrides, drives the
         //    standard precedence chain inside resolve_jre_for_launch.
@@ -306,9 +316,9 @@ mod tests {
     use crate::mojang::types::{
         AssetIndex, JavaVersion, ResolvedVersion, VersionDownloads, VersionJson,
     };
-    use std::collections::HashMap;
-    use httpmock::MockServer;
     use httpmock::Method::GET;
+    use httpmock::MockServer;
+    use std::collections::HashMap;
     use std::sync::OnceLock;
     use tempfile::TempDir;
     use tokio::sync::Mutex;
@@ -502,7 +512,9 @@ mod tests {
         let instance = instance_no_override("env-wins");
         let version = minimal_version("java-runtime-delta", 21);
 
-        let result = svc.resolve_jre_for_launch(&paths, &instance, &version).await;
+        let result = svc
+            .resolve_jre_for_launch(&paths, &instance, &version)
+            .await;
 
         match prior {
             Some(v) => std::env::set_var("MINELTUI_JAVA", v),
@@ -510,7 +522,10 @@ mod tests {
         }
 
         let path = result.expect("should return Ok");
-        assert_eq!(path, fake_java, "must return the MINELTUI_JAVA path verbatim");
+        assert_eq!(
+            path, fake_java,
+            "must return the MINELTUI_JAVA path verbatim"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -538,7 +553,9 @@ mod tests {
         });
         let version = minimal_version("java-runtime-delta", 21); // required = 21
 
-        let result = svc.resolve_jre_for_launch(&paths, &instance, &version).await;
+        let result = svc
+            .resolve_jre_for_launch(&paths, &instance, &version)
+            .await;
         assert!(result.is_ok(), "major == required must succeed: {result:?}");
         assert_eq!(result.unwrap(), fake_java);
     }
@@ -562,9 +579,18 @@ mod tests {
         });
         let version = minimal_version("java-runtime-delta", 21); // required = 21
 
-        let result = svc.resolve_jre_for_launch(&paths, &instance, &version).await;
+        let result = svc
+            .resolve_jre_for_launch(&paths, &instance, &version)
+            .await;
         assert!(
-            matches!(result, Err(AppError::JavaMismatch { required: 21, found: 8, .. })),
+            matches!(
+                result,
+                Err(AppError::JavaMismatch {
+                    required: 21,
+                    found: 8,
+                    ..
+                })
+            ),
             "major mismatch must return JavaMismatch; got: {result:?}"
         );
     }
@@ -585,7 +611,9 @@ mod tests {
         });
         let version = minimal_version("java-runtime-delta", 21);
 
-        let result = svc.resolve_jre_for_launch(&paths, &instance, &version).await;
+        let result = svc
+            .resolve_jre_for_launch(&paths, &instance, &version)
+            .await;
         assert!(
             matches!(result, Err(AppError::JavaOverrideNotFound { .. })),
             "missing override path must return JavaOverrideNotFound (not the env-var/PATH-flavored JavaNotFound); got: {result:?}"
@@ -640,8 +668,8 @@ mod tests {
             then.status(200).body(archive.clone());
         });
 
-        let adoptium = AdoptiumClient::new_with_base_url(server.base_url())
-            .expect("adoptium client");
+        let adoptium =
+            AdoptiumClient::new_with_base_url(server.base_url()).expect("adoptium client");
         let mojang = MojangJreClient::new().expect("mojang client");
         let svc = JavaService::with_clients(mojang, adoptium, Arch::X86_64, OsName::Linux);
 
@@ -649,7 +677,9 @@ mod tests {
         instance.java_override = Some(JavaRuntimeId::Adoptium { major: 21 });
         let version = minimal_version("java-runtime-delta", 21);
 
-        let result = svc.resolve_jre_for_launch(&paths, &instance, &version).await;
+        let result = svc
+            .resolve_jre_for_launch(&paths, &instance, &version)
+            .await;
         assert!(result.is_ok(), "Adoptium override must succeed: {result:?}");
 
         let exe = result.unwrap();
@@ -673,18 +703,15 @@ mod tests {
 
         let component = "java-runtime-delta";
         let manifest_body = make_manifest_body(&server.base_url(), component);
-        let manifest_sha1 =
-            crate::mojang::cache::sha1_hex_of_bytes(manifest_body.as_bytes());
-        let all_json_body =
-            make_all_json_body(&server.base_url(), component, &manifest_sha1);
+        let manifest_sha1 = crate::mojang::cache::sha1_hex_of_bytes(manifest_body.as_bytes());
+        let all_json_body = make_all_json_body(&server.base_url(), component, &manifest_sha1);
 
         let _m_all = server.mock(|when, then| {
             when.method(GET).path("/all.json");
             then.status(200).body(all_json_body.clone());
         });
         let _m_manifest = server.mock(|when, then| {
-            when.method(GET)
-                .path(format!("/manifest-{component}.json"));
+            when.method(GET).path(format!("/manifest-{component}.json"));
             then.status(200).body(manifest_body.clone());
         });
         let _m_file = server.mock(|when, then| {
@@ -704,7 +731,9 @@ mod tests {
         let instance = instance_no_override("auto-mojang");
         let version = minimal_version(component, 21);
 
-        let result = svc.resolve_jre_for_launch(&paths, &instance, &version).await;
+        let result = svc
+            .resolve_jre_for_launch(&paths, &instance, &version)
+            .await;
 
         match prior {
             Some(v) => std::env::set_var(crate::java::mojang_jre::MOJANG_JRE_URL_ENV, v),
@@ -770,8 +799,13 @@ mod tests {
         let instance = instance_no_override("aarch64-fallback");
         let version = minimal_version("java-runtime-delta", 21);
 
-        let result = svc.resolve_jre_for_launch(&paths, &instance, &version).await;
-        assert!(result.is_ok(), "aarch64 must fall through to Adoptium: {result:?}");
+        let result = svc
+            .resolve_jre_for_launch(&paths, &instance, &version)
+            .await;
+        assert!(
+            result.is_ok(),
+            "aarch64 must fall through to Adoptium: {result:?}"
+        );
 
         let exe = result.unwrap();
         assert!(exe.exists(), "executable must exist: {exe:?}");
@@ -794,18 +828,15 @@ mod tests {
 
         let component = "jre-legacy";
         let manifest_body = make_manifest_body(&server.base_url(), component);
-        let manifest_sha1 =
-            crate::mojang::cache::sha1_hex_of_bytes(manifest_body.as_bytes());
-        let all_json_body =
-            make_all_json_body(&server.base_url(), component, &manifest_sha1);
+        let manifest_sha1 = crate::mojang::cache::sha1_hex_of_bytes(manifest_body.as_bytes());
+        let all_json_body = make_all_json_body(&server.base_url(), component, &manifest_sha1);
 
         let _m_all = server.mock(|when, then| {
             when.method(GET).path("/all.json");
             then.status(200).body(all_json_body.clone());
         });
         let _m_manifest = server.mock(|when, then| {
-            when.method(GET)
-                .path(format!("/manifest-{component}.json"));
+            when.method(GET).path(format!("/manifest-{component}.json"));
             then.status(200).body(manifest_body.clone());
         });
         let _m_file = server.mock(|when, then| {
@@ -824,7 +855,9 @@ mod tests {
         let instance = instance_no_override("legacy-mc");
         let version = version_without_java_version();
 
-        let result = svc.resolve_jre_for_launch(&paths, &instance, &version).await;
+        let result = svc
+            .resolve_jre_for_launch(&paths, &instance, &version)
+            .await;
 
         match prior {
             Some(v) => std::env::set_var(crate::java::mojang_jre::MOJANG_JRE_URL_ENV, v),
@@ -854,7 +887,9 @@ mod tests {
         svc.set_override_for_instance(
             &paths,
             "alpha",
-            Some(JavaRuntimeId::Mojang { variant: "java-runtime-delta".into() }),
+            Some(JavaRuntimeId::Mojang {
+                variant: "java-runtime-delta".into(),
+            }),
         )
         .await
         .expect("set override must succeed");
@@ -862,7 +897,9 @@ mod tests {
         let loaded = read_instance_manifest(&paths, "alpha").await.unwrap();
         assert_eq!(
             loaded.java_override,
-            Some(JavaRuntimeId::Mojang { variant: "java-runtime-delta".into() }),
+            Some(JavaRuntimeId::Mojang {
+                variant: "java-runtime-delta".into()
+            }),
             "override must be persisted"
         );
 
@@ -872,10 +909,7 @@ mod tests {
             .expect("clear override must succeed");
 
         let loaded2 = read_instance_manifest(&paths, "alpha").await.unwrap();
-        assert!(
-            loaded2.java_override.is_none(),
-            "override must be cleared"
-        );
+        assert!(loaded2.java_override.is_none(), "override must be cleared");
     }
 
     // -----------------------------------------------------------------------
@@ -888,10 +922,15 @@ mod tests {
         let td = TempDir::new().unwrap();
         let paths = make_paths(&td);
         let svc = JavaService::new().unwrap();
-        let r = svc.resolve_jre_for_mc_version_install(&paths, "1.21.4").await;
+        let r = svc
+            .resolve_jre_for_mc_version_install(&paths, "1.21.4")
+            .await;
         match r {
             Err(AppError::VersionNotInstalled { slug }) => {
-                assert_eq!(slug, "1.21.4", "slug should carry the missing MC version id");
+                assert_eq!(
+                    slug, "1.21.4",
+                    "slug should carry the missing MC version id"
+                );
             }
             other => panic!("expected VersionNotInstalled, got {other:?}"),
         }

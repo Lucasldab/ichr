@@ -102,12 +102,8 @@ pub async fn run_full_auth(
     msa_expires_in_sec: i64,
 ) -> Result<AuthChainOutput, AuthError> {
     // Step 3: XBL authenticate
-    let xbl = xbox::authenticate_xbox_live(
-        &config.http,
-        &config.xbl_base_url,
-        msa_access_token,
-    )
-    .await?;
+    let xbl =
+        xbox::authenticate_xbox_live(&config.http, &config.xbl_base_url, msa_access_token).await?;
 
     // Step 4: XSTS authorize
     let xsts: XstsTokens =
@@ -123,13 +119,11 @@ pub async fn run_full_auth(
     .await?;
 
     // Step 6: entitlement
-    mc_services::check_entitlement(&config.http, &config.mc_base_url, &mc.access_token)
-        .await?;
+    mc_services::check_entitlement(&config.http, &config.mc_base_url, &mc.access_token).await?;
 
     // Step 7: profile
     let profile: McProfile =
-        mc_services::fetch_profile(&config.http, &config.mc_base_url, &mc.access_token)
-            .await?;
+        mc_services::fetch_profile(&config.http, &config.mc_base_url, &mc.access_token).await?;
 
     let mc_uuid = mc_services::format_uuid(&profile.id)?;
     let now = Account::to_unix(SystemTime::now());
@@ -189,12 +183,9 @@ pub async fn ensure_valid_mc_token(
     config: &AuthChainConfig,
     refresh_token: &str,
 ) -> Result<AuthChainOutput, AuthError> {
-    let refreshed = device_code::refresh_access_token(
-        &config.http,
-        &config.msa_base_url,
-        refresh_token,
-    )
-    .await?;
+    let refreshed =
+        device_code::refresh_access_token(&config.http, &config.msa_base_url, refresh_token)
+            .await?;
     // refresh returned a new MSA access_token and a (possibly rotated)
     // refresh_token. Re-run the chain.
     run_full_auth(
@@ -227,9 +218,8 @@ mod tests {
                 when.method(POST)
                     .path("/user/authenticate")
                     .body_includes("\"RpsTicket\":\"d=");
-                then.status(200).body(
-                    r#"{"Token":"xbl-tok","DisplayClaims":{"xui":[{"uhs":"uhs-1"}]}}"#,
-                );
+                then.status(200)
+                    .body(r#"{"Token":"xbl-tok","DisplayClaims":{"xui":[{"uhs":"uhs-1"}]}}"#);
             })
             .await;
         // XSTS
@@ -238,9 +228,8 @@ mod tests {
                 when.method(POST)
                     .path("/xsts/authorize")
                     .body_includes("\"SandboxId\":\"RETAIL\"");
-                then.status(200).body(
-                    r#"{"Token":"xsts-tok","DisplayClaims":{"xui":[{"uhs":"uhs-1"}]}}"#,
-                );
+                then.status(200)
+                    .body(r#"{"Token":"xsts-tok","DisplayClaims":{"xui":[{"uhs":"uhs-1"}]}}"#);
             })
             .await;
         // MC login
@@ -267,9 +256,8 @@ mod tests {
         server
             .mock_async(|when, then| {
                 when.method(GET).path("/minecraft/profile");
-                then.status(200).body(
-                    r#"{"id":"c6bf819300004000800000000000abcd","name":"PlayerOne"}"#,
-                );
+                then.status(200)
+                    .body(r#"{"id":"c6bf819300004000800000000000abcd","name":"PlayerOne"}"#);
             })
             .await;
     }
@@ -304,18 +292,16 @@ mod tests {
         server
             .mock_async(|when, then| {
                 when.method(POST).path("/user/authenticate");
-                then.status(200).body(
-                    r#"{"Token":"xbl","DisplayClaims":{"xui":[{"uhs":"u"}]}}"#,
-                );
+                then.status(200)
+                    .body(r#"{"Token":"xbl","DisplayClaims":{"xui":[{"uhs":"u"}]}}"#);
             })
             .await;
         // XSTS
         server
             .mock_async(|when, then| {
                 when.method(POST).path("/xsts/authorize");
-                then.status(200).body(
-                    r#"{"Token":"xsts","DisplayClaims":{"xui":[{"uhs":"u"}]}}"#,
-                );
+                then.status(200)
+                    .body(r#"{"Token":"xsts","DisplayClaims":{"xui":[{"uhs":"u"}]}}"#);
             })
             .await;
         // MC login
@@ -348,9 +334,8 @@ mod tests {
         server
             .mock_async(|when, then| {
                 when.method(POST).path("/user/authenticate");
-                then.status(200).body(
-                    r#"{"Token":"xbl","DisplayClaims":{"xui":[{"uhs":"u"}]}}"#,
-                );
+                then.status(200)
+                    .body(r#"{"Token":"xbl","DisplayClaims":{"xui":[{"uhs":"u"}]}}"#);
             })
             .await;
         // XSTS 401 with XErr
@@ -407,13 +392,14 @@ mod tests {
                 when.method(POST)
                     .path("/consumers/oauth2/v2.0/token")
                     .body_includes("grant_type=refresh_token");
-                then.status(400).body(
-                    r#"{"error":"invalid_grant","error_description":"token revoked"}"#,
-                );
+                then.status(400)
+                    .body(r#"{"error":"invalid_grant","error_description":"token revoked"}"#);
             })
             .await;
         let cfg = AuthChainConfig::single_host(http_client(), &server.base_url());
-        let err = ensure_valid_mc_token(&cfg, "revoked-ref").await.unwrap_err();
+        let err = ensure_valid_mc_token(&cfg, "revoked-ref")
+            .await
+            .unwrap_err();
         assert!(matches!(err, AuthError::RefreshFailed), "got {err:?}");
     }
 }

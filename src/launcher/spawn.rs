@@ -79,7 +79,9 @@ pub async fn run_process(
         "spawning Minecraft process"
     );
 
-    let mut child = cmd.spawn().map_err(|e| AppError::SpawnFailed(format!("spawn: {e}")))?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| AppError::SpawnFailed(format!("spawn: {e}")))?;
 
     // PITFALLS.md Pitfall 15: take pipes and start drain tasks BEFORE
     // awaiting child.wait(). If we await wait first and the child writes
@@ -135,7 +137,10 @@ pub async fn run_process(
             guard.iter().cloned().collect::<Vec<_>>().join("\n")
         };
         tracing::warn!(code, "Minecraft exited non-zero");
-        Err(AppError::LaunchFailed { code, message: tail })
+        Err(AppError::LaunchFailed {
+            code,
+            message: tail,
+        })
     }
 }
 

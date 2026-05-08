@@ -162,10 +162,7 @@ fn extract_one_entry<R: std::io::Read>(
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(
-            &safe_path,
-            std::fs::Permissions::from_mode(0o644),
-        )?;
+        std::fs::set_permissions(&safe_path, std::fs::Permissions::from_mode(0o644))?;
     }
 
     Ok(1)
@@ -192,8 +189,7 @@ mod tests {
     fn build_test_mrpack(path: &std::path::Path, entries: &[(&str, &[u8])]) {
         let file = std::fs::File::create(path).unwrap();
         let mut writer = zip::ZipWriter::new(file);
-        let opts = SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Stored);
+        let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
         for (name, content) in entries {
             writer.start_file(*name, opts).unwrap();
             writer.write_all(content).unwrap();
@@ -230,8 +226,7 @@ mod tests {
     ) {
         let file = std::fs::File::create(path).unwrap();
         let mut writer = zip::ZipWriter::new(file);
-        let opts = SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Stored);
+        let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
         // Regular file
         writer.start_file(regular_name, opts).unwrap();
         writer.write_all(regular_content).unwrap();
@@ -338,10 +333,7 @@ mod tests {
 
         // The raw entry name includes the overrides/ prefix followed by a
         // traversal sequence.
-        build_test_mrpack(
-            &mrpack,
-            &[("overrides/../../../etc/passwd", b"root:x:0:0")],
-        );
+        build_test_mrpack(&mrpack, &[("overrides/../../../etc/passwd", b"root:x:0:0")]);
 
         let token = CancellationToken::new();
         let count = apply_overrides(&mrpack, &dest, &token).await.unwrap();
@@ -360,10 +352,7 @@ mod tests {
         let mrpack = tmp.path().join("test.mrpack");
         let dest = tmp.path().join("minecraft");
 
-        build_test_mrpack(
-            &mrpack,
-            &[("client-overrides/../../etc/shadow", b"x")],
-        );
+        build_test_mrpack(&mrpack, &[("client-overrides/../../etc/shadow", b"x")]);
 
         let token = CancellationToken::new();
         let count = apply_overrides(&mrpack, &dest, &token).await.unwrap();
@@ -382,7 +371,7 @@ mod tests {
         build_test_mrpack(
             &mrpack,
             &[
-                ("overrides/config/", b""),      // directory stub
+                ("overrides/config/", b""), // directory stub
                 ("overrides/config/real.toml", b"ok"),
             ],
         );
@@ -470,7 +459,10 @@ mod tests {
         assert_eq!(count, 1);
         let meta = std::fs::metadata(dest.join("foo.txt")).unwrap();
         let mode = meta.permissions().mode() & 0o777;
-        assert_eq!(mode, 0o644, "permissions must be normalized to 0o644, got 0o{mode:o}");
+        assert_eq!(
+            mode, 0o644,
+            "permissions must be normalized to 0o644, got 0o{mode:o}"
+        );
     }
 
     // ── test 11: symlink entry silently skipped ───────────────────────────────

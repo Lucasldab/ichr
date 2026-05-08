@@ -36,25 +36,41 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
     let modal_h = (area.height.saturating_sub(4)).min(20);
     let x = area.x + area.width.saturating_sub(modal_w) / 2;
     let y = area.y + area.height.saturating_sub(modal_h) / 2;
-    let modal_area = Rect { x, y, width: modal_w, height: modal_h };
+    let modal_area = Rect {
+        x,
+        y,
+        width: modal_w,
+        height: modal_h,
+    };
 
     f.render_widget(Clear, modal_area);
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Length(3), Constraint::Min(1)])
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Min(1),
+        ])
         .split(modal_area);
 
     // Header
     let filter_label = match loader {
         LoaderType::Quilt => "(all versions are pre-release)",
         LoaderType::Fabric | LoaderType::Forge | LoaderType::NeoForge => {
-            if *filter_stable_only { "stable only (s for all)" } else { "all (s for stable only)" }
+            if *filter_stable_only {
+                "stable only (s for all)"
+            } else {
+                "all (s for stable only)"
+            }
         }
     };
     let header = Paragraph::new(vec![
         Line::from(format!("Instance: {slug}")),
-        Line::from(Span::styled(filter_label, Style::default().fg(Color::DarkGray))),
+        Line::from(Span::styled(
+            filter_label,
+            Style::default().fg(Color::DarkGray),
+        )),
     ])
     .block(
         Block::default()
@@ -86,13 +102,13 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
     // Forge/NeoForge when the instance's MC version is below the supported floor.
     // Otherwise fall back to the generic "check network" message.
     let empty_msg: String = if visible.is_empty() {
-        let mc_str: Option<&str> = state.instances.iter()
+        let mc_str: Option<&str> = state
+            .instances
+            .iter()
             .find(|i| i.slug == *slug)
             .map(|i| i.mc_version_id.as_str());
         match (loader, mc_str) {
-            (LoaderType::Forge, Some(mc))
-                if !crate::loader::types::forge_supported_for_mc(mc) =>
-            {
+            (LoaderType::Forge, Some(mc)) if !crate::loader::types::forge_supported_for_mc(mc) => {
                 format!("No Forge available for MC {mc} (Forge requires 1.13+)")
             }
             (LoaderType::NeoForge, Some(mc))
@@ -108,7 +124,9 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
 
     let items: Vec<ListItem> = if visible.is_empty() {
         vec![ListItem::new(empty_msg).style(
-            Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
         )]
     } else {
         visible
@@ -133,39 +151,53 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
             .collect()
     };
 
-    let list_block = Block::default().borders(Borders::ALL).title("Versions (Enter / Esc)");
+    let list_block = Block::default()
+        .borders(Borders::ALL)
+        .title("Versions (Enter / Esc)");
     let list = List::new(items).block(list_block);
     let mut list_state = ratatui::widgets::ListState::default();
     list_state.select(Some(*selected));
     f.render_stateful_widget(list, chunks[2], &mut list_state);
 }
 
-pub fn map_loader_version_picker_event(
-    ev: ratatui::crossterm::event::Event,
-) -> Option<Action> {
+pub fn map_loader_version_picker_event(ev: ratatui::crossterm::event::Event) -> Option<Action> {
     use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Up, .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
-            Some(Action::LoaderVersionPickerMove(-1))
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Down, .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
-            Some(Action::LoaderVersionPickerMove(1))
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('s'), .. }) => {
-            Some(Action::ToggleStableFilter)
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Backspace, .. }) => {
-            Some(Action::LoaderVersionBackspaceSearch)
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => Some(Action::LoaderVersionSelect),
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => {
-            Some(Action::LoaderVersionPickerCancel)
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char(c), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) && c != 'k' && c != 'j' && c != 's' =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Up, ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('k'),
+            ..
+        }) => Some(Action::LoaderVersionPickerMove(-1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Down,
+            ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('j'),
+            ..
+        }) => Some(Action::LoaderVersionPickerMove(1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('s'),
+            ..
+        }) => Some(Action::ToggleStableFilter),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        }) => Some(Action::LoaderVersionBackspaceSearch),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        }) => Some(Action::LoaderVersionSelect),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::LoaderVersionPickerCancel),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) && c != 'k' && c != 'j' && c != 's' => {
             Some(Action::LoaderVersionTypeSearch(c))
         }
         _ => None,

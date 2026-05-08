@@ -263,9 +263,21 @@ mod tests {
 
     #[test]
     fn test_mc_to_neoforge_prefix_rejects_non_1x() {
-        assert_eq!(mc_to_neoforge_prefix("2.0"), None, "NeoForge doesn't exist for 2.x");
-        assert_eq!(mc_to_neoforge_prefix(""), None, "empty string must return None");
-        assert_eq!(mc_to_neoforge_prefix("0.9"), None, "pre-1.x MC must return None");
+        assert_eq!(
+            mc_to_neoforge_prefix("2.0"),
+            None,
+            "NeoForge doesn't exist for 2.x"
+        );
+        assert_eq!(
+            mc_to_neoforge_prefix(""),
+            None,
+            "empty string must return None"
+        );
+        assert_eq!(
+            mc_to_neoforge_prefix("0.9"),
+            None,
+            "pre-1.x MC must return None"
+        );
     }
 
     // ---- is_neoforge_stable ----
@@ -280,12 +292,18 @@ mod tests {
         // Pre-release markers
         assert!(!is_neoforge_stable("21.4.114-beta"), "beta => unstable");
         // Pitfall 8: 4-segment beta must also be caught (never split by '.')
-        assert!(!is_neoforge_stable("26.1.2.41-beta"), "4-segment beta => unstable");
+        assert!(
+            !is_neoforge_stable("26.1.2.41-beta"),
+            "4-segment beta => unstable"
+        );
         assert!(!is_neoforge_stable("21.0.0-pre.1"), "pre => unstable");
         assert!(!is_neoforge_stable("21.1.0-rc.1"), "rc => unstable");
         assert!(!is_neoforge_stable("21.0.0-alpha.15"), "alpha => unstable");
         // Case-insensitive check
-        assert!(!is_neoforge_stable("21.4.0-BETA.7"), "BETA (upper) => unstable");
+        assert!(
+            !is_neoforge_stable("21.4.0-BETA.7"),
+            "BETA (upper) => unstable"
+        );
     }
 
     // ---- list_loader_versions ----
@@ -323,7 +341,10 @@ mod tests {
             .find(|v| v.version == "21.4.114-beta")
             .expect("21.4.114-beta present in fixture");
 
-        assert!(stable_entry.stable, "21.4.121 has no pre-release marker => stable");
+        assert!(
+            stable_entry.stable,
+            "21.4.121 has no pre-release marker => stable"
+        );
         assert!(!beta_entry.stable, "21.4.114-beta => unstable");
         assert_eq!(stable_entry.build, None);
         assert_eq!(beta_entry.build, None);
@@ -367,10 +388,13 @@ mod tests {
     async fn test_list_loader_versions_non_1x_mc_returns_empty_without_http() {
         // For non-1.x MC, mc_to_neoforge_prefix returns None → must return empty
         // without making any HTTP call (no server mock set up deliberately)
-        let client = NeoForgeMetaClient::new_with_base_url("http://127.0.0.1:1")
-            .expect("client build");
+        let client =
+            NeoForgeMetaClient::new_with_base_url("http://127.0.0.1:1").expect("client build");
         let versions = client.list_loader_versions("2.0").await.expect("ok");
-        assert!(versions.is_empty(), "non-1.x MC => empty Vec (no HTTP): {versions:?}");
+        assert!(
+            versions.is_empty(),
+            "non-1.x MC => empty Vec (no HTTP): {versions:?}"
+        );
     }
 
     #[tokio::test]

@@ -12,8 +12,7 @@ use crate::error::AppError;
 use crate::mojang::cache::{atomic_write, cache_is_fresh, verify_sha1, MANIFEST_CACHE_TTL};
 use crate::mojang::types::{AssetIndexFile, VersionJson, VersionManifest};
 
-pub const MANIFEST_URL: &str =
-    "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
+pub const MANIFEST_URL: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
 
 pub const ASSET_CDN_BASE: &str = "https://resources.download.minecraft.net";
 
@@ -46,10 +45,7 @@ impl MojangClient {
 
     /// Fetch the version manifest, using `cache_path` as a 1h TTL cache.
     /// If cache is fresh, parses and returns without hitting the network.
-    pub async fn fetch_manifest(
-        &self,
-        cache_path: &Path,
-    ) -> Result<VersionManifest, AppError> {
+    pub async fn fetch_manifest(&self, cache_path: &Path) -> Result<VersionManifest, AppError> {
         if cache_is_fresh(cache_path, MANIFEST_CACHE_TTL).await? {
             let bytes = tokio::fs::read(cache_path).await?;
             return Ok(serde_json::from_slice(&bytes)?);
@@ -152,11 +148,7 @@ impl MojangClient {
     /// libraries — see Phase 8.4 GAP-LIBRARY-SHAPE-08). All Mojang-protocol
     /// callers MUST use `download_verified` instead. The caller is responsible
     /// for logging the trade-off (e.g. tracing::info!) at the call site.
-    pub async fn download_unverified(
-        &self,
-        url: &str,
-        dest: &Path,
-    ) -> Result<(), AppError> {
+    pub async fn download_unverified(&self, url: &str, dest: &Path) -> Result<(), AppError> {
         let bytes = self.download_stream(url).await?;
         atomic_write(dest, &bytes).await?;
         Ok(())

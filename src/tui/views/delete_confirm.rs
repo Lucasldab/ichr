@@ -27,13 +27,11 @@ pub fn render_delete_confirm(f: &mut Frame, area: Rect, state: &AppState) {
         )),
     ];
 
-    let para = Paragraph::new(lines)
-        .alignment(Alignment::Center)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Confirm Delete (y / N)"),
-        );
+    let para = Paragraph::new(lines).alignment(Alignment::Center).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Confirm Delete (y / N)"),
+    );
     f.render_widget(para, modal_area);
 }
 

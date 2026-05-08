@@ -14,14 +14,23 @@ use crate::mods::types::ModSource;
 use crate::tui::app::{Action, ActiveView, AppState};
 
 pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
-    let ActiveView::InstalledModsList { slug, mods, selected } = &state.active_view else {
+    let ActiveView::InstalledModsList {
+        slug,
+        mods,
+        selected,
+    } = &state.active_view
+    else {
         return;
     };
 
     if mods.is_empty() {
         // UI-SPEC line 365 — empty-state copy, DIM, single line.
         let p = Paragraph::new("No mods installed — press Esc and M to browse")
-            .style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM))
+            .style(
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
+            )
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -43,15 +52,21 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
                 ModSource::CurseForge => ("[CF]", Style::default()),
                 ModSource::Manual => (
                     "manual",
-                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::DIM),
                 ),
                 ModSource::Modpack => (
                     "modpack",
-                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::DIM),
                 ),
                 ModSource::Local => (
                     "local",
-                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::DIM),
                 ),
             };
             // State cell — body for enabled, DIM for disabled.
@@ -60,7 +75,9 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
             } else {
                 (
                     "disabled",
-                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::DIM),
                 )
             };
 
@@ -99,23 +116,36 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
 
 pub fn map_installed_mods_list_event(ev: CtEvent) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Up, .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
-            Some(Action::InstalledModsMove(-1))
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Down, .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
-            Some(Action::InstalledModsMove(1))
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Up, ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('k'),
+            ..
+        }) => Some(Action::InstalledModsMove(-1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Down,
+            ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('j'),
+            ..
+        }) => Some(Action::InstalledModsMove(1)),
         // Phase 11 D-LOCK Tab switcher: Tab from InstalledMods cycles to Resource.
-        CtEvent::Key(KeyEvent { code: KeyCode::Tab, .. }) => {
-            Some(Action::InstalledPacksCycleKind)
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('e'), .. }) => Some(Action::ToggleModEnabled),
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('x'), .. }) => {
-            Some(Action::OpenUninstallModConfirm)
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CloseInstalledMods),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Tab, ..
+        }) => Some(Action::InstalledPacksCycleKind),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('e'),
+            ..
+        }) => Some(Action::ToggleModEnabled),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('x'),
+            ..
+        }) => Some(Action::OpenUninstallModConfirm),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::CloseInstalledMods),
         _ => None,
     }
 }

@@ -20,35 +20,21 @@
 /// that includes the raw code and instructs the user to report it.
 pub fn map_xerr(code: u64) -> String {
     match code {
-        2148916227 => {
-            "This Microsoft account has been banned from Xbox services.".into()
-        }
-        2148916233 => {
-            "This Microsoft account does not have an Xbox profile. \
+        2148916227 => "This Microsoft account has been banned from Xbox services.".into(),
+        2148916233 => "This Microsoft account does not have an Xbox profile. \
              Visit https://xbox.com/profile to create one, then try again."
-                .into()
-        }
-        2148916235 => {
-            "Xbox Live is not available in your country or region.".into()
-        }
-        2148916236 => {
-            "Adult verification is required on this account (South Korea). \
+            .into(),
+        2148916235 => "Xbox Live is not available in your country or region.".into(),
+        2148916236 => "Adult verification is required on this account (South Korea). \
              Please verify your age at https://account.microsoft.com."
-                .into()
-        }
-        2148916237 => {
-            "Adult re-verification is required on this account (South Korea). \
+            .into(),
+        2148916237 => "Adult re-verification is required on this account (South Korea). \
              Please re-verify your age at https://account.microsoft.com."
-                .into()
-        }
-        2148916238 => {
-            "This account belongs to a child. A parent or family account \
+            .into(),
+        2148916238 => "This account belongs to a child. A parent or family account \
              manager must approve Xbox Live access at https://account.microsoft.com/family."
-                .into()
-        }
-        2148916262 => {
-            "This account has been banned from Xbox Live services.".into()
-        }
+            .into(),
+        2148916262 => "This account has been banned from Xbox Live services.".into(),
         other => format!(
             "Xbox authentication failed (XErr: {other}). \
              If this persists, please report this error code to the mineltui issue tracker."
@@ -136,8 +122,13 @@ mod tests {
     #[test]
     fn test_all_xerr_codes_distinct() {
         let codes = [
-            2148916227u64, 2148916233, 2148916235, 2148916236,
-            2148916237, 2148916238, 2148916262,
+            2148916227u64,
+            2148916233,
+            2148916235,
+            2148916236,
+            2148916237,
+            2148916238,
+            2148916262,
         ];
         let mut seen = std::collections::HashSet::new();
         for c in codes {

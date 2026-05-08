@@ -41,30 +41,45 @@ async fn test_fabric_translate_at_write_end_to_end() {
     let td = TempDir::new().unwrap();
     let paths = paths_in(&td);
 
-    let mojang_bytes = mineltui::loader::fabric::to_mojang_shape(REAL_FABRIC_META_BYTES)
-        .expect("translate ok");
+    let mojang_bytes =
+        mineltui::loader::fabric::to_mojang_shape(REAL_FABRIC_META_BYTES).expect("translate ok");
     let json_path = paths.version_json("fabric-loader-0.19.2-1.20.4");
-    tokio::fs::create_dir_all(json_path.parent().unwrap()).await.unwrap();
+    tokio::fs::create_dir_all(json_path.parent().unwrap())
+        .await
+        .unwrap();
     tokio::fs::write(&json_path, &mojang_bytes).await.unwrap();
 
     // The launcher's Library struct deserialises cleanly:
     let bytes = tokio::fs::read(&json_path).await.unwrap();
-    let v: VersionJson = serde_json::from_slice(&bytes)
-        .expect("Mojang-shape JSON parses");
+    let v: VersionJson = serde_json::from_slice(&bytes).expect("Mojang-shape JSON parses");
     assert_eq!(v.id, "fabric-loader-0.19.2-1.20.4");
     assert_eq!(v.libraries.len(), 8);
     for lib in &v.libraries {
         let art = lib.downloads.artifact.as_ref().unwrap_or_else(|| {
-            panic!("library {} must have downloads.artifact after translate-at-write", lib.name)
+            panic!(
+                "library {} must have downloads.artifact after translate-at-write",
+                lib.name
+            )
         });
         assert!(!art.path.is_empty());
         assert!(!art.url.is_empty());
     }
     // Spot-check: the 6 libraries with hashes have Some(sha1), the 2 without have None.
-    let with_hashes  = v.libraries.iter().filter(|l| l.downloads.artifact.as_ref().unwrap().sha1.is_some()).count();
-    let without_hashes = v.libraries.iter().filter(|l| l.downloads.artifact.as_ref().unwrap().sha1.is_none()).count();
-    assert_eq!(with_hashes,  6, "6 fabric libraries have upstream sha1");
-    assert_eq!(without_hashes, 2, "intermediary + fabric-loader have no sha1");
+    let with_hashes = v
+        .libraries
+        .iter()
+        .filter(|l| l.downloads.artifact.as_ref().unwrap().sha1.is_some())
+        .count();
+    let without_hashes = v
+        .libraries
+        .iter()
+        .filter(|l| l.downloads.artifact.as_ref().unwrap().sha1.is_none())
+        .count();
+    assert_eq!(with_hashes, 6, "6 fabric libraries have upstream sha1");
+    assert_eq!(
+        without_hashes, 2,
+        "intermediary + fabric-loader have no sha1"
+    );
 }
 
 // --- Test 2: Quilt translate-at-write end-to-end ---
@@ -74,10 +89,12 @@ async fn test_quilt_translate_at_write_end_to_end() {
     let td = TempDir::new().unwrap();
     let paths = paths_in(&td);
 
-    let mojang_bytes = mineltui::loader::quilt::to_mojang_shape(REAL_QUILT_META_BYTES)
-        .expect("translate ok");
+    let mojang_bytes =
+        mineltui::loader::quilt::to_mojang_shape(REAL_QUILT_META_BYTES).expect("translate ok");
     let json_path = paths.version_json("quilt-loader-0.30.0-beta.7-1.20.4");
-    tokio::fs::create_dir_all(json_path.parent().unwrap()).await.unwrap();
+    tokio::fs::create_dir_all(json_path.parent().unwrap())
+        .await
+        .unwrap();
     tokio::fs::write(&json_path, &mojang_bytes).await.unwrap();
 
     let bytes = tokio::fs::read(&json_path).await.unwrap();
@@ -87,10 +104,21 @@ async fn test_quilt_translate_at_write_end_to_end() {
 
     // Quilt has no upstream hashes; every library's artifact has sha1=None, size=None.
     for lib in &v.libraries {
-        let art = lib.downloads.artifact.as_ref()
+        let art = lib
+            .downloads
+            .artifact
+            .as_ref()
             .unwrap_or_else(|| panic!("library {} must have artifact", lib.name));
-        assert!(art.sha1.is_none(), "{} sha1 must be None for Quilt", lib.name);
-        assert!(art.size.is_none(), "{} size must be None for Quilt", lib.name);
+        assert!(
+            art.sha1.is_none(),
+            "{} sha1 must be None for Quilt",
+            lib.name
+        );
+        assert!(
+            art.size.is_none(),
+            "{} size must be None for Quilt",
+            lib.name
+        );
         assert!(!art.path.is_empty());
         assert!(!art.url.is_empty());
     }
@@ -111,12 +139,16 @@ async fn test_classpath_emits_at_least_six_fabric_libraries_after_install() {
     let paths = paths_in(&td);
 
     // Translate + write the loader JSON.
-    let loader_bytes = mineltui::loader::fabric::to_mojang_shape(REAL_FABRIC_META_BYTES)
-        .expect("translate ok");
+    let loader_bytes =
+        mineltui::loader::fabric::to_mojang_shape(REAL_FABRIC_META_BYTES).expect("translate ok");
     let loader_id = "fabric-loader-0.19.2-1.20.4";
     let loader_json_path = paths.version_json(loader_id);
-    tokio::fs::create_dir_all(loader_json_path.parent().unwrap()).await.unwrap();
-    tokio::fs::write(&loader_json_path, &loader_bytes).await.unwrap();
+    tokio::fs::create_dir_all(loader_json_path.parent().unwrap())
+        .await
+        .unwrap();
+    tokio::fs::write(&loader_json_path, &loader_bytes)
+        .await
+        .unwrap();
 
     // Stub vanilla parent JSON (Mojang shape; minimal but valid) — needed
     // for resolve_inherits to produce a ResolvedVersion.
@@ -133,29 +165,43 @@ async fn test_classpath_emits_at_least_six_fabric_libraries_after_install() {
         "time":"2024-01-01T00:00:00Z"
     }"#;
     let vanilla_json_path = paths.version_json(vanilla_id);
-    tokio::fs::create_dir_all(vanilla_json_path.parent().unwrap()).await.unwrap();
-    tokio::fs::write(&vanilla_json_path, vanilla_json).await.unwrap();
+    tokio::fs::create_dir_all(vanilla_json_path.parent().unwrap())
+        .await
+        .unwrap();
+    tokio::fs::write(&vanilla_json_path, vanilla_json)
+        .await
+        .unwrap();
 
     // Read + resolve.
-    let loader: VersionJson = serde_json::from_slice(&tokio::fs::read(&loader_json_path).await.unwrap()).unwrap();
+    let loader: VersionJson =
+        serde_json::from_slice(&tokio::fs::read(&loader_json_path).await.unwrap()).unwrap();
     let vanilla: VersionJson = serde_json::from_slice(vanilla_json).unwrap();
     let mut parents = std::collections::HashMap::new();
     parents.insert(vanilla_id.to_string(), vanilla);
-    let resolved = mineltui::mojang::inherits::resolve_inherits(&loader, &parents)
-        .expect("resolve ok");
+    let resolved =
+        mineltui::mojang::inherits::resolve_inherits(&loader, &parents).expect("resolve ok");
 
     // Build classpath. Use a stubbed RuleContext that allows everything.
     let ctx = mineltui::mojang::rules::RuleContext::current();
     let cp = mineltui::launcher::classpath::build_classpath(&resolved, &ctx, &paths)
         .expect("build_classpath ok");
     // build_classpath returns a String of os-specific path-separated entries.
-    let separator = if cfg!(target_os = "windows") { ';' } else { ':' };
+    let separator = if cfg!(target_os = "windows") {
+        ';'
+    } else {
+        ':'
+    };
     let entries: Vec<&str> = cp.split(separator).collect();
 
     // Filter to fabric library entries (paths under .../net/fabricmc/ or .../org/ow2/asm/).
-    let fabric_entries: Vec<&&str> = entries.iter()
-        .filter(|p| p.contains("net/fabricmc/") || p.contains("net\\fabricmc\\")
-                 || p.contains("org/ow2/asm/")  || p.contains("org\\ow2\\asm\\"))
+    let fabric_entries: Vec<&&str> = entries
+        .iter()
+        .filter(|p| {
+            p.contains("net/fabricmc/")
+                || p.contains("net\\fabricmc\\")
+                || p.contains("org/ow2/asm/")
+                || p.contains("org\\ow2\\asm\\")
+        })
         .collect();
 
     assert!(
@@ -177,8 +223,12 @@ async fn test_migration_hook_auto_heals_flat_shape_phase5_smoke() {
     let paths = paths_in(&td);
     let version_id = "fabric-loader-0.19.2-1.20.4";
     let json_path = paths.version_json(version_id);
-    tokio::fs::create_dir_all(json_path.parent().unwrap()).await.unwrap();
-    tokio::fs::write(&json_path, REAL_FABRIC_META_BYTES).await.unwrap();
+    tokio::fs::create_dir_all(json_path.parent().unwrap())
+        .await
+        .unwrap();
+    tokio::fs::write(&json_path, REAL_FABRIC_META_BYTES)
+        .await
+        .unwrap();
 
     // Set up a httpmock-backed Fabric meta server returning the same
     // flat-shape body for the profile endpoint (the migration translates
@@ -200,8 +250,9 @@ async fn test_migration_hook_auto_heals_flat_shape_phase5_smoke() {
 
     // Run migration.
     let result = mineltui::launcher::service::__test_migrate_loader_json_in_place_if_needed(
-        &paths, version_id, &fabric, &quilt
-    ).await;
+        &paths, version_id, &fabric, &quilt,
+    )
+    .await;
 
     match prior {
         Some(v) => std::env::set_var("MINELTUI_FABRIC_META_BASE_URL", v),
@@ -215,8 +266,11 @@ async fn test_migration_hook_auto_heals_flat_shape_phase5_smoke() {
     let bytes = tokio::fs::read(&json_path).await.unwrap();
     let v: VersionJson = serde_json::from_slice(&bytes).expect("parses as Mojang");
     for lib in &v.libraries {
-        assert!(lib.downloads.artifact.is_some(),
-            "library {} must have artifact after migration", lib.name);
+        assert!(
+            lib.downloads.artifact.is_some(),
+            "library {} must have artifact after migration",
+            lib.name
+        );
     }
 }
 
@@ -229,10 +283,12 @@ async fn test_migration_hook_idempotent_on_already_mojang_shape() {
     let version_id = "fabric-loader-0.19.2-1.20.4";
 
     // Pre-seed with a MOJANG-shape JSON (the OUTPUT of test 4).
-    let mojang_bytes = mineltui::loader::fabric::to_mojang_shape(REAL_FABRIC_META_BYTES)
-        .expect("translate ok");
+    let mojang_bytes =
+        mineltui::loader::fabric::to_mojang_shape(REAL_FABRIC_META_BYTES).expect("translate ok");
     let json_path = paths.version_json(version_id);
-    tokio::fs::create_dir_all(json_path.parent().unwrap()).await.unwrap();
+    tokio::fs::create_dir_all(json_path.parent().unwrap())
+        .await
+        .unwrap();
     tokio::fs::write(&json_path, &mojang_bytes).await.unwrap();
     let bytes_before = tokio::fs::read(&json_path).await.unwrap();
 
@@ -250,8 +306,9 @@ async fn test_migration_hook_idempotent_on_already_mojang_shape() {
     let quilt = QuiltMetaClient::new_with_base_url(server.base_url()).expect("quilt client");
 
     let result = mineltui::launcher::service::__test_migrate_loader_json_in_place_if_needed(
-        &paths, version_id, &fabric, &quilt
-    ).await;
+        &paths, version_id, &fabric, &quilt,
+    )
+    .await;
 
     match prior {
         Some(v) => std::env::set_var("MINELTUI_FABRIC_META_BASE_URL", v),
@@ -264,5 +321,8 @@ async fn test_migration_hook_idempotent_on_already_mojang_shape() {
 
     // On-disk JSON unchanged byte-for-byte.
     let bytes_after = tokio::fs::read(&json_path).await.unwrap();
-    assert_eq!(bytes_before, bytes_after, "idempotent migration must not rewrite the file");
+    assert_eq!(
+        bytes_before, bytes_after,
+        "idempotent migration must not rewrite the file"
+    );
 }

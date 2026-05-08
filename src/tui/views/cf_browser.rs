@@ -64,7 +64,11 @@ pub fn render_cf_browser(f: &mut Frame, area: Rect, state: &AppState) {
         .instances
         .iter()
         .find(|m| m.slug == *slug)
-        .and_then(|m| m.loader.as_ref().map(|l| loader_kind_str(l.kind).to_string()))
+        .and_then(|m| {
+            m.loader
+                .as_ref()
+                .map(|l| loader_kind_str(l.kind).to_string())
+        })
         .unwrap_or_else(|| "vanilla".to_string());
 
     // Chip text + style depend on whether the user has overridden the default.
@@ -73,7 +77,9 @@ pub fn render_cf_browser(f: &mut Frame, area: Rect, state: &AppState) {
         Some(_) => "MC: any (v=any)".to_string(),
     };
     let mc_chip_style = if mc_filter.is_none() {
-        Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
+        Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::DIM)
     } else {
         Style::default().fg(Color::Yellow)
     };
@@ -82,7 +88,9 @@ pub fn render_cf_browser(f: &mut Frame, area: Rect, state: &AppState) {
         Some(_) => "Loader: any (l=any)".to_string(),
     };
     let loader_chip_style = if loader_filter.is_none() {
-        Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
+        Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::DIM)
     } else {
         Style::default().fg(Color::Yellow)
     };
@@ -107,21 +115,21 @@ pub fn render_cf_browser(f: &mut Frame, area: Rect, state: &AppState) {
         format!("search: {search_input}_")
     };
     let search_style = if search_input.is_empty() {
-        Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
+        Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::DIM)
     } else {
         Style::default().fg(Color::Yellow)
     };
     // GAP-FOCUS-INDICATOR-08 (Phase 8.2): symmetric mirror of mod_browser
     // focus indicator. Both browsers must communicate focus identically
     // for visual consistency across mod sources.
-    let search_para = Paragraph::new(search_display)
-        .style(search_style)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Search")
-                .border_style(Style::default().fg(Color::Yellow)),
-        );
+    let search_para = Paragraph::new(search_display).style(search_style).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Search")
+            .border_style(Style::default().fg(Color::Yellow)),
+    );
     f.render_widget(search_para, chunks[1]);
 
     // ---- Body: 40/60 horizontal split (results / detail) ----
@@ -171,9 +179,9 @@ fn render_results_pane(
     };
     if let Some(text) = placeholder {
         let style = match fetch_state {
-            ModBrowserFetchState::Loading | ModBrowserFetchState::Ready => {
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
-            }
+            ModBrowserFetchState::Loading | ModBrowserFetchState::Ready => Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
             ModBrowserFetchState::Error(_) => Style::default(),
         };
         let p = Paragraph::new(text).style(style);
@@ -186,15 +194,21 @@ fn render_results_pane(
         .iter()
         .enumerate()
         .map(|(i, hit)| {
-            let installed_suffix = if hit.already_installed { "   ✓ installed" } else { "" };
+            let installed_suffix = if hit.already_installed {
+                "   ✓ installed"
+            } else {
+                ""
+            };
             let cursor_glyph = if i == selected { " ▶" } else { "" };
-            let max_name_w =
-                width.saturating_sub(installed_suffix.len() + cursor_glyph.len() + 1);
+            let max_name_w = width.saturating_sub(installed_suffix.len() + cursor_glyph.len() + 1);
             let name = truncate(&hit.name, max_name_w);
             let line1 = if hit.already_installed {
                 Line::from(vec![
                     Span::raw(name),
-                    Span::styled(installed_suffix.to_string(), Style::default().fg(Color::Green)),
+                    Span::styled(
+                        installed_suffix.to_string(),
+                        Style::default().fg(Color::Green),
+                    ),
                     Span::raw(cursor_glyph.to_string()),
                 ])
             } else {
@@ -203,7 +217,9 @@ fn render_results_pane(
             let desc = truncate(&hit.summary, width.saturating_sub(3));
             let line2 = Line::from(Span::styled(
                 format!("  {desc}"),
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
             ));
 
             let style = if i == selected {
@@ -233,8 +249,11 @@ fn render_detail_pane(
     f.render_widget(block, area);
 
     if selected_hit.is_none() {
-        let p = Paragraph::new("Select a mod to see details")
-            .style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM));
+        let p = Paragraph::new("Select a mod to see details").style(
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
+        );
         f.render_widget(p, inner);
         return;
     }
@@ -259,13 +278,18 @@ fn render_detail_pane(
         if !authors_joined.is_empty() {
             lines.push(Line::from(Span::styled(
                 format!("by {authors_joined}"),
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
             )));
         }
         lines.push(divider_line(inner.width));
         lines.push(Line::raw(d.summary.clone()));
         lines.push(Line::raw(""));
-        lines.push(Line::raw(format!("Downloads: {}", thousands(d.download_count))));
+        lines.push(Line::raw(format!(
+            "Downloads: {}",
+            thousands(d.download_count)
+        )));
         // CurseForge mod response does not carry "latest version" inline —
         // direct the user to the file picker.
         lines.push(Line::raw("Latest: see Files (Enter)"));
@@ -276,12 +300,17 @@ fn render_detail_pane(
         lines.push(divider_line(inner.width));
         lines.push(Line::raw(hit.summary.clone()));
         lines.push(Line::raw(""));
-        lines.push(Line::raw(format!("Downloads: {}", thousands(hit.download_count))));
+        lines.push(Line::raw(format!(
+            "Downloads: {}",
+            thousands(hit.download_count)
+        )));
         if let ModBrowserFetchState::Error(_) = fetch_state {
             lines.push(Line::raw(""));
             lines.push(Line::from(Span::styled(
                 "Could not load details — check network".to_string(),
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
             )));
         }
     }
@@ -326,7 +355,9 @@ fn divider_line(width: u16) -> Line<'static> {
     let s: String = "─".repeat(n);
     Line::from(Span::styled(
         s,
-        Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+        Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::DIM),
     ))
 }
 
@@ -369,50 +400,69 @@ pub fn map_cf_browser_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             _ => (true, None, None),
         };
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Up, .. }) => Some(Action::CfBrowserMoveSelection(-1)),
-        CtEvent::Key(KeyEvent { code: KeyCode::Down, .. }) => Some(Action::CfBrowserMoveSelection(1)),
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::CloseModal),
-        CtEvent::Key(KeyEvent { code: KeyCode::Backspace, .. }) => {
-            Some(Action::CfBrowserBackspaceSearch)
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Up, ..
+        }) => Some(Action::CfBrowserMoveSelection(-1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Down,
+            ..
+        }) => Some(Action::CfBrowserMoveSelection(1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::CloseModal),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        }) => Some(Action::CfBrowserBackspaceSearch),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        }) => {
             let slug = selected_slug?;
             let mod_id = selected_mod_id?;
             Some(Action::CfBrowserOpenDetail { slug, mod_id })
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('v'), modifiers, .. })
-            if search_empty && !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('v'),
+            modifiers,
+            ..
+        }) if search_empty && !modifiers.contains(KeyModifiers::CONTROL) => {
             Some(Action::CfBrowserToggleMcFilter)
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('l'), modifiers, .. })
-            if search_empty && !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('l'),
+            modifiers,
+            ..
+        }) if search_empty && !modifiers.contains(KeyModifiers::CONTROL) => {
             Some(Action::CfBrowserToggleLoaderFilter)
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('k'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
             if search_empty {
                 Some(Action::CfBrowserMoveSelection(-1))
             } else {
                 Some(Action::CfBrowserTypeSearch('k'))
             }
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('j'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
             if search_empty {
                 Some(Action::CfBrowserMoveSelection(1))
             } else {
                 Some(Action::CfBrowserTypeSearch('j'))
             }
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char(c), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
-            Some(Action::CfBrowserTypeSearch(c))
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::CfBrowserTypeSearch(c)),
         // Bracketed-paste payload (08.1-04 / GAP-8-C): the terminal delivers
         // pasted text as a single `Event::Paste(String)` when bracketed paste
         // is enabled at terminal init. Route the whole payload through one

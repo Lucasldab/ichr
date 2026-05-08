@@ -1,7 +1,7 @@
 //! Java runtime identifier variants. Used as the serde tag inside
 //! `InstanceManifest.java_override`.
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Identifies which Java runtime to use for a specific instance.
 ///
@@ -26,10 +26,18 @@ mod tests {
 
     #[test]
     fn test_mojang_variant_serde() {
-        let id = JavaRuntimeId::Mojang { variant: "java-runtime-delta".into() };
+        let id = JavaRuntimeId::Mojang {
+            variant: "java-runtime-delta".into(),
+        };
         let json = serde_json::to_string(&id).unwrap();
-        assert!(json.contains("\"type\":\"mojang\""), "missing type tag in: {json}");
-        assert!(json.contains("\"variant\":\"java-runtime-delta\""), "missing variant in: {json}");
+        assert!(
+            json.contains("\"type\":\"mojang\""),
+            "missing type tag in: {json}"
+        );
+        assert!(
+            json.contains("\"variant\":\"java-runtime-delta\""),
+            "missing variant in: {json}"
+        );
         let roundtrip: JavaRuntimeId = serde_json::from_str(&json).unwrap();
         assert_eq!(roundtrip, id);
     }

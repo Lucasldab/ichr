@@ -11,9 +11,9 @@ use tempfile::TempDir;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use mineltui::mojang::client::MojangClient;
-use mineltui::modpack::ModpackError;
 use mineltui::modpack::service::ModpackService;
+use mineltui::modpack::ModpackError;
+use mineltui::mojang::client::MojangClient;
 use mineltui::persistence::paths::AppPaths;
 use mineltui::tasks::JobId;
 
@@ -35,13 +35,13 @@ fn make_paths(tmp: &TempDir) -> AppPaths {
 }
 
 fn make_svc() -> ModpackService {
-    let http = reqwest::Client::builder()
-        .build()
-        .expect("reqwest client");
+    let http = reqwest::Client::builder().build().expect("reqwest client");
     ModpackService::with_client(http)
 }
 
-async fn make_services(paths: &AppPaths) -> (
+async fn make_services(
+    paths: &AppPaths,
+) -> (
     mineltui::loader::service::LoaderService,
     mineltui::java::service::JavaService,
     MojangClient,
@@ -111,7 +111,16 @@ async fn end_to_end_import_minimal_pack() {
     let token = CancellationToken::new();
 
     let result = svc
-        .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(1))
+        .import_mrpack(
+            &paths,
+            &mrpack,
+            &mojang_svc,
+            &loader_svc,
+            &java_svc,
+            tx,
+            token,
+            JobId(1),
+        )
         .await;
 
     let manifest = result.expect("end-to-end import must succeed");
@@ -127,9 +136,16 @@ async fn end_to_end_import_minimal_pack() {
 
     // Mod jar must exist
     let mod_jar = paths.instance_mod_file(&manifest.slug, "minimal-mod.jar");
-    assert!(mod_jar.exists(), "mod jar must exist: {}", mod_jar.display());
+    assert!(
+        mod_jar.exists(),
+        "mod jar must exist: {}",
+        mod_jar.display()
+    );
     let mod_bytes = std::fs::read(&mod_jar).unwrap();
-    assert_eq!(mod_bytes, mod_body, "mod jar bytes must match fixture payload");
+    assert_eq!(
+        mod_bytes, mod_body,
+        "mod jar bytes must match fixture payload"
+    );
 
     // overrides/config/test.txt → .minecraft/config/test.txt
     let config_txt = paths
@@ -143,7 +159,10 @@ async fn end_to_end_import_minimal_pack() {
     let options_txt = paths
         .instance_minecraft_dir(&manifest.slug)
         .join("options.txt");
-    assert!(options_txt.exists(), "client-override options.txt must exist");
+    assert!(
+        options_txt.exists(),
+        "client-override options.txt must exist"
+    );
     let options_content = std::fs::read_to_string(&options_txt).unwrap();
     assert_eq!(options_content, "from client-overrides");
 }
@@ -187,10 +206,22 @@ async fn import_atomicity_failure_cleans_dir() {
     let token = CancellationToken::new();
 
     let result = svc
-        .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(2))
+        .import_mrpack(
+            &paths,
+            &mrpack,
+            &mojang_svc,
+            &loader_svc,
+            &java_svc,
+            tx,
+            token,
+            JobId(2),
+        )
         .await;
 
-    assert!(result.is_err(), "failed download must return Err: {result:?}");
+    assert!(
+        result.is_err(),
+        "failed download must return Err: {result:?}"
+    );
 
     // Atomicity: instance dir must not exist
     let slug = "fail-pack";
@@ -241,7 +272,16 @@ async fn import_pre_cancel_cleans_state() {
     token.cancel();
 
     let result = svc
-        .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(3))
+        .import_mrpack(
+            &paths,
+            &mrpack,
+            &mojang_svc,
+            &loader_svc,
+            &java_svc,
+            tx,
+            token,
+            JobId(3),
+        )
         .await;
 
     assert!(
@@ -314,7 +354,16 @@ async fn import_with_unsupported_client_skips_files() {
     let token = CancellationToken::new();
 
     let result = svc
-        .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(4))
+        .import_mrpack(
+            &paths,
+            &mrpack,
+            &mojang_svc,
+            &loader_svc,
+            &java_svc,
+            tx,
+            token,
+            JobId(4),
+        )
         .await;
 
     let manifest = result.expect("filter-test import must succeed");
@@ -360,7 +409,16 @@ async fn import_with_path_traversal_in_overrides_skips_safely() {
 
     // Import must succeed (traversal entries are silently skipped, not errored)
     let result = svc
-        .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(5))
+        .import_mrpack(
+            &paths,
+            &mrpack,
+            &mojang_svc,
+            &loader_svc,
+            &java_svc,
+            tx,
+            token,
+            JobId(5),
+        )
         .await;
 
     let manifest = result.expect("traversal-skipping import must succeed");

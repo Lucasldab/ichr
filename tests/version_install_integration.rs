@@ -23,7 +23,10 @@ async fn test_install_1_20_4_live() {
 
     let client = MojangClient::new().expect("MojangClient::new");
     let manifest_cache = paths.cache_dir.join("manifest_v2.json");
-    let manifest = client.fetch_manifest(&manifest_cache).await.expect("fetch manifest");
+    let manifest = client
+        .fetch_manifest(&manifest_cache)
+        .await
+        .expect("fetch manifest");
 
     let entry = manifest
         .versions

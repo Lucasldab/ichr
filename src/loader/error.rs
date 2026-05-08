@@ -9,15 +9,25 @@
 pub enum LoaderError {
     /// HTTP fetch of the meta API failed (network / non-2xx status / body read).
     #[error("Failed to fetch {loader} meta: {reason}")]
-    MetaFetch { loader: &'static str, reason: String },
+    MetaFetch {
+        loader: &'static str,
+        reason: String,
+    },
 
     /// JSON parse of a meta API response failed (unexpected shape).
     #[error("Failed to parse {loader} meta response: {reason}")]
-    MetaParse { loader: &'static str, reason: String },
+    MetaParse {
+        loader: &'static str,
+        reason: String,
+    },
 
     /// SHA-1 verification of a downloaded loader library failed.
     #[error("SHA1 mismatch for {path}: expected {expected}, got {got}")]
-    Sha1Mismatch { path: String, expected: String, got: String },
+    Sha1Mismatch {
+        path: String,
+        expected: String,
+        got: String,
+    },
 
     /// A Maven coordinate was rejected by `maven_coord_to_path` validation.
     #[error("Invalid Maven coordinate: {coord}")]
@@ -72,7 +82,10 @@ mod tests {
 
     #[test]
     fn test_meta_fetch_display_contains_loader_and_reason() {
-        let e = LoaderError::MetaFetch { loader: "fabric", reason: "connect timeout".into() };
+        let e = LoaderError::MetaFetch {
+            loader: "fabric",
+            reason: "connect timeout".into(),
+        };
         let s = e.to_string();
         assert!(s.contains("fabric"), "missing loader name: {s}");
         assert!(s.contains("connect timeout"), "missing reason: {s}");
@@ -80,7 +93,10 @@ mod tests {
 
     #[test]
     fn test_meta_parse_display() {
-        let e = LoaderError::MetaParse { loader: "quilt", reason: "expected array at line 1".into() };
+        let e = LoaderError::MetaParse {
+            loader: "quilt",
+            reason: "expected array at line 1".into(),
+        };
         let s = e.to_string();
         assert!(s.contains("quilt"), "loader missing: {s}");
         assert!(s.contains("expected array"), "reason missing: {s}");
@@ -101,9 +117,14 @@ mod tests {
 
     #[test]
     fn test_invalid_maven_coord_display() {
-        let e = LoaderError::InvalidMavenCoord { coord: "org.evil:../traversal:1.0".into() };
+        let e = LoaderError::InvalidMavenCoord {
+            coord: "org.evil:../traversal:1.0".into(),
+        };
         let s = e.to_string();
-        assert!(s.contains("Invalid Maven coordinate"), "headline missing: {s}");
+        assert!(
+            s.contains("Invalid Maven coordinate"),
+            "headline missing: {s}"
+        );
         assert!(s.contains("org.evil"), "coord missing: {s}");
     }
 
@@ -147,7 +168,9 @@ mod tests {
 
     #[test]
     fn test_staging_populate_display() {
-        let e = LoaderError::StagingPopulate { reason: "no space left".into() };
+        let e = LoaderError::StagingPopulate {
+            reason: "no space left".into(),
+        };
         let s = e.to_string();
         assert!(s.contains("staging"), "headline missing: {s}");
         assert!(s.contains("no space"), "reason missing: {s}");
@@ -155,7 +178,9 @@ mod tests {
 
     #[test]
     fn test_harvest_failed_display() {
-        let e = LoaderError::HarvestFailed { reason: "no version dir produced".into() };
+        let e = LoaderError::HarvestFailed {
+            reason: "no version dir produced".into(),
+        };
         let s = e.to_string();
         assert!(s.contains("harvest"), "headline missing: {s}");
         assert!(s.contains("no version dir"), "reason missing: {s}");
@@ -163,7 +188,9 @@ mod tests {
 
     #[test]
     fn test_installer_jar_fetch_display() {
-        let e = LoaderError::InstallerJarFetch { reason: "404 Not Found".into() };
+        let e = LoaderError::InstallerJarFetch {
+            reason: "404 Not Found".into(),
+        };
         let s = e.to_string();
         assert!(s.contains("installer"), "headline missing: {s}");
         assert!(s.contains("404"), "reason missing: {s}");
@@ -171,7 +198,9 @@ mod tests {
 
     #[test]
     fn test_maven_metadata_parse_display() {
-        let e = LoaderError::MavenMetadataParse { reason: "empty version list".into() };
+        let e = LoaderError::MavenMetadataParse {
+            reason: "empty version list".into(),
+        };
         let s = e.to_string();
         assert!(s.contains("Maven"), "headline missing: {s}");
         assert!(s.contains("empty version list"), "reason missing: {s}");
@@ -179,7 +208,9 @@ mod tests {
 
     #[test]
     fn test_maven_metadata_fetch_display() {
-        let e = LoaderError::MavenMetadataFetch { reason: "tls handshake failed".into() };
+        let e = LoaderError::MavenMetadataFetch {
+            reason: "tls handshake failed".into(),
+        };
         let s = e.to_string();
         assert!(s.contains("Maven"), "headline missing: {s}");
         assert!(s.contains("tls handshake failed"), "reason missing: {s}");

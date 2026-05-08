@@ -73,8 +73,7 @@ pub const FORGE_WRAPPER_FILENAME: &str = "ForgeWrapper-mmc4.jar";
 /// removed the attribute when service.rs briefly consumed the constant;
 /// 07.3-01 removes that consumer and the attribute returns.
 #[allow(dead_code)]
-pub const FORGE_WRAPPER_MAIN_CLASS: &str =
-    "io.github.zekerzhayard.forgewrapper.installer.Main";
+pub const FORGE_WRAPPER_MAIN_CLASS: &str = "io.github.zekerzhayard.forgewrapper.installer.Main";
 
 /// Path where the wrapper JAR lives after extraction:
 /// `<cache_dir>/forge_wrapper/ForgeWrapper-mmc4.jar`.
@@ -137,9 +136,15 @@ mod tests {
 
     #[test]
     fn test_sha256_constant_is_lowercase_hex_64_chars() {
-        assert_eq!(FORGE_WRAPPER_SHA256.len(), 64, "SHA256 must be 64 hex chars");
+        assert_eq!(
+            FORGE_WRAPPER_SHA256.len(),
+            64,
+            "SHA256 must be 64 hex chars"
+        );
         assert!(
-            FORGE_WRAPPER_SHA256.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
+            FORGE_WRAPPER_SHA256
+                .chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
             "SHA256 must be lowercase hex"
         );
     }

@@ -63,7 +63,13 @@ async fn live_install_continuity_with_deps_fabric_1_20_4() {
     //    projects; we accept by EXACT slug == "continuity" or fall back to a direct
     //    project_id match for determinism.
     let hits = svc
-        .search("continuity", Some(mc), Some(&loader_info), Some(&paths), Some(slug))
+        .search(
+            "continuity",
+            Some(mc),
+            Some(&loader_info),
+            Some(&paths),
+            Some(slug),
+        )
         .await
         .expect("search");
     assert!(!hits.is_empty(), "search returned zero hits");

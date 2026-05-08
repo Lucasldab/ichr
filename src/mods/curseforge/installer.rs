@@ -58,10 +58,7 @@ pub async fn resolve_download_url(
     }
 
     // Case 2 / 3: inline absent or empty, try dedicated endpoint.
-    match client
-        .get_file_download_url(mod_detail.id, file.id)
-        .await?
-    {
+    match client.get_file_download_url(mod_detail.id, file.id).await? {
         Some(url) => Ok(DownloadResolution::Resolved(url)),
         None => Err(CurseForgeError::FileNotDownloadable {
             web_url: web_url_for_file(&mod_detail.slug, file.id),
@@ -126,7 +123,8 @@ mod tests {
         let server = MockServer::start();
         // Prepare a mock that MUST NOT be called (assert_hits(0) at end).
         let unwanted = server.mock(|when, then| {
-            when.method(GET).path("/v1/mods/443959/files/1/download-url");
+            when.method(GET)
+                .path("/v1/mods/443959/files/1/download-url");
             then.status(200)
                 .body(r#"{"data":"https://should-not-be-called/x.jar"}"#);
         });
@@ -146,7 +144,8 @@ mod tests {
     async fn test_inline_null_with_fallback_some_resolves() {
         let server = MockServer::start();
         server.mock(|when, then| {
-            when.method(GET).path("/v1/mods/443959/files/1/download-url");
+            when.method(GET)
+                .path("/v1/mods/443959/files/1/download-url");
             then.status(200)
                 .body(r#"{"data":"https://edge.forgecdn.net/files/fallback.jar"}"#);
         });
@@ -165,7 +164,8 @@ mod tests {
     async fn test_inline_empty_string_treated_as_null() {
         let server = MockServer::start();
         server.mock(|when, then| {
-            when.method(GET).path("/v1/mods/443959/files/1/download-url");
+            when.method(GET)
+                .path("/v1/mods/443959/files/1/download-url");
             then.status(200)
                 .body(r#"{"data":"https://edge.forgecdn.net/files/fallback.jar"}"#);
         });
@@ -214,7 +214,8 @@ mod tests {
     async fn test_inline_null_with_fallback_404_returns_file_not_downloadable() {
         let server = MockServer::start();
         server.mock(|when, then| {
-            when.method(GET).path("/v1/mods/443959/files/1/download-url");
+            when.method(GET)
+                .path("/v1/mods/443959/files/1/download-url");
             then.status(404).body("not found");
         });
         let c = make_client(&server);
@@ -232,7 +233,8 @@ mod tests {
     async fn test_inline_null_with_fallback_429_bubbles_rate_limited() {
         let server = MockServer::start();
         server.mock(|when, then| {
-            when.method(GET).path("/v1/mods/443959/files/1/download-url");
+            when.method(GET)
+                .path("/v1/mods/443959/files/1/download-url");
             then.status(429)
                 .header("Retry-After", "30")
                 .body("rate limited");

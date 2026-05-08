@@ -20,9 +20,8 @@ use crate::loader::error::LoaderError;
 fn is_safe_maven_segment(s: &str) -> bool {
     !s.is_empty()
         && s != ".."
-        && s.bytes().all(|b| {
-            b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-' || b == b'+'
-        })
+        && s.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-' || b == b'+')
 }
 
 /// Parsed Maven coordinate. Lifetime-borrowed from the input slice — no
@@ -63,7 +62,9 @@ pub fn parse_maven_coord(coord: &str) -> Result<MavenCoord<'_>, LoaderError> {
     // splitn(5, ':') produces at most 5 parts. A 6th colon (or more) lands
     // in the 5th part, which then fails is_safe_maven_segment.
     let parts: Vec<&str> = coord.splitn(5, ':').collect();
-    let invalid = || LoaderError::InvalidMavenCoord { coord: coord.to_string() };
+    let invalid = || LoaderError::InvalidMavenCoord {
+        coord: coord.to_string(),
+    };
 
     let mc = match parts.as_slice() {
         [group, artifact, version] => MavenCoord {
@@ -135,7 +136,11 @@ pub fn maven_coord_to_path(coord: &str) -> Result<String, LoaderError> {
             artifact = mc.artifact,
             version = mc.version,
         ),
-        None => format!("{artifact}-{version}.{ext}", artifact = mc.artifact, version = mc.version),
+        None => format!(
+            "{artifact}-{version}.{ext}",
+            artifact = mc.artifact,
+            version = mc.version
+        ),
     };
     Ok(format!(
         "{group_path}/{artifact}/{version}/{basename}",
@@ -160,13 +165,19 @@ mod tests {
     #[test]
     fn test_maven_coord_to_path_fabric_loader() {
         let p = maven_coord_to_path("net.fabricmc:fabric-loader:0.16.9").unwrap();
-        assert_eq!(p, "net/fabricmc/fabric-loader/0.16.9/fabric-loader-0.16.9.jar");
+        assert_eq!(
+            p,
+            "net/fabricmc/fabric-loader/0.16.9/fabric-loader-0.16.9.jar"
+        );
     }
 
     #[test]
     fn test_maven_coord_to_path_quilt_loader() {
         let p = maven_coord_to_path("org.quiltmc:quilt-loader:0.30.0-beta.7").unwrap();
-        assert_eq!(p, "org/quiltmc/quilt-loader/0.30.0-beta.7/quilt-loader-0.30.0-beta.7.jar");
+        assert_eq!(
+            p,
+            "org/quiltmc/quilt-loader/0.30.0-beta.7/quilt-loader-0.30.0-beta.7.jar"
+        );
     }
 
     #[test]
@@ -219,7 +230,11 @@ mod tests {
 
     #[test]
     fn test_maven_download_url_fabric() {
-        let u = maven_download_url("https://maven.fabricmc.net/", "net.fabricmc:fabric-loader:0.16.9").unwrap();
+        let u = maven_download_url(
+            "https://maven.fabricmc.net/",
+            "net.fabricmc:fabric-loader:0.16.9",
+        )
+        .unwrap();
         assert_eq!(
             u,
             "https://maven.fabricmc.net/net/fabricmc/fabric-loader/0.16.9/fabric-loader-0.16.9.jar"
@@ -229,8 +244,8 @@ mod tests {
     #[test]
     fn test_maven_download_url_strips_trailing_slash() {
         // Both with and without trailing slash should produce identical URLs.
-        let with    = maven_download_url("https://maven.example.com/", "g:a:1").unwrap();
-        let without = maven_download_url("https://maven.example.com",  "g:a:1").unwrap();
+        let with = maven_download_url("https://maven.example.com/", "g:a:1").unwrap();
+        let without = maven_download_url("https://maven.example.com", "g:a:1").unwrap();
         assert_eq!(with, without);
     }
 

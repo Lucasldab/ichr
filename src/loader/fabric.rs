@@ -76,7 +76,10 @@ impl FabricMetaClient {
                 loader: "fabric",
                 reason: format!("reqwest build: {e}"),
             })?;
-        Ok(Self { http, base_url: base_url.into() })
+        Ok(Self {
+            http,
+            base_url: base_url.into(),
+        })
     }
 
     #[tracing::instrument(skip_all)]
@@ -194,12 +197,11 @@ impl FabricMetaClient {
 pub fn to_mojang_shape(raw_bytes: &[u8]) -> Result<Vec<u8>, LoaderError> {
     use serde_json::{Map, Value};
 
-    let mut root: Value = serde_json::from_slice(raw_bytes).map_err(|e| {
-        LoaderError::MetaParse {
+    let mut root: Value =
+        serde_json::from_slice(raw_bytes).map_err(|e| LoaderError::MetaParse {
             loader: "fabric",
             reason: format!("translate: parse profile json: {e}"),
-        }
-    })?;
+        })?;
     let obj = root.as_object_mut().ok_or_else(|| LoaderError::MetaParse {
         loader: "fabric",
         reason: "translate: top-level not an object".into(),
@@ -212,16 +214,20 @@ pub fn to_mojang_shape(raw_bytes: &[u8]) -> Result<Vec<u8>, LoaderError> {
             reason: format!("translate: serialize: {e}"),
         });
     };
-    let libs = libs_value.as_array_mut().ok_or_else(|| LoaderError::MetaParse {
-        loader: "fabric",
-        reason: "translate: libraries is not an array".into(),
-    })?;
+    let libs = libs_value
+        .as_array_mut()
+        .ok_or_else(|| LoaderError::MetaParse {
+            loader: "fabric",
+            reason: "translate: libraries is not an array".into(),
+        })?;
 
     for (idx, entry) in libs.iter_mut().enumerate() {
-        let entry_obj = entry.as_object_mut().ok_or_else(|| LoaderError::MetaParse {
-            loader: "fabric",
-            reason: format!("translate: libraries[{idx}] is not an object"),
-        })?;
+        let entry_obj = entry
+            .as_object_mut()
+            .ok_or_else(|| LoaderError::MetaParse {
+                loader: "fabric",
+                reason: format!("translate: libraries[{idx}] is not an object"),
+            })?;
         let name = entry_obj
             .get("name")
             .and_then(|v| v.as_str())
@@ -241,7 +247,10 @@ pub fn to_mojang_shape(raw_bytes: &[u8]) -> Result<Vec<u8>, LoaderError> {
             .unwrap_or_else(|| fabric_default_repo(&name).to_string());
         let url = crate::loader::maven::maven_download_url(&repo, &name)?;
 
-        let sha1 = entry_obj.get("sha1").and_then(|v| v.as_str()).map(String::from);
+        let sha1 = entry_obj
+            .get("sha1")
+            .and_then(|v| v.as_str())
+            .map(String::from);
         let size = entry_obj.get("size").and_then(|v| v.as_u64());
 
         let mut artifact = Map::new();
@@ -331,7 +340,13 @@ mod tests {
 
         let client = make_client(&server);
         let r = client.list_loader_versions().await;
-        assert!(matches!(r, Err(LoaderError::MetaFetch { loader: "fabric", .. })));
+        assert!(matches!(
+            r,
+            Err(LoaderError::MetaFetch {
+                loader: "fabric",
+                ..
+            })
+        ));
     }
 
     #[tokio::test]
@@ -344,7 +359,13 @@ mod tests {
 
         let client = make_client(&server);
         let r = client.list_loader_versions().await;
-        assert!(matches!(r, Err(LoaderError::MetaParse { loader: "fabric", .. })));
+        assert!(matches!(
+            r,
+            Err(LoaderError::MetaParse {
+                loader: "fabric",
+                ..
+            })
+        ));
     }
 
     // ---- fetch_profile ----
@@ -389,11 +410,16 @@ mod tests {
         assert_eq!(p.id, "fabric-loader-0.16.9-1.21.4");
         assert_eq!(p.libraries.len(), 2);
         assert_eq!(p.libraries[0].name, "org.ow2.asm:asm:9.7.1");
-        assert_eq!(p.libraries[0].sha1.as_deref(), Some("f0ed132a49244b042cd0e15702ab9f2ce3cc8436"));
+        assert_eq!(
+            p.libraries[0].sha1.as_deref(),
+            Some("f0ed132a49244b042cd0e15702ab9f2ce3cc8436")
+        );
         assert_eq!(p.libraries[0].size, Some(65000));
         // raw_bytes is preserved verbatim for atomic_write later
         assert!(p.raw_bytes.len() > 200);
-        assert!(std::str::from_utf8(&p.raw_bytes).unwrap().contains("inheritsFrom"));
+        assert!(std::str::from_utf8(&p.raw_bytes)
+            .unwrap()
+            .contains("inheritsFrom"));
     }
 
     #[tokio::test]
@@ -407,7 +433,13 @@ mod tests {
 
         let client = make_client(&server);
         let r = client.fetch_profile("1.21.4", "0.99.99").await;
-        assert!(matches!(r, Err(LoaderError::MetaFetch { loader: "fabric", .. })));
+        assert!(matches!(
+            r,
+            Err(LoaderError::MetaFetch {
+                loader: "fabric",
+                ..
+            })
+        ));
     }
 
     // ---- env override ----
@@ -466,14 +498,21 @@ mod tests {
         assert_eq!(v.inherits_from.as_deref(), Some("1.20.4"));
         for lib in &v.libraries {
             let art = lib.downloads.artifact.as_ref().unwrap_or_else(|| {
-                panic!("library {} must have downloads.artifact after translation", lib.name)
+                panic!(
+                    "library {} must have downloads.artifact after translation",
+                    lib.name
+                )
             });
             // Path matches the Maven-coord transform.
             let expected_path = crate::loader::maven::maven_coord_to_path(&lib.name).unwrap();
             assert_eq!(art.path, expected_path, "path for {}", lib.name);
             // URL ends with the path (a regular Maven repo URL).
-            assert!(art.url.ends_with(&art.path),
-                "url {} should end with {}", art.url, art.path);
+            assert!(
+                art.url.ends_with(&art.path),
+                "url {} should end with {}",
+                art.url,
+                art.path
+            );
         }
     }
 
@@ -484,9 +523,16 @@ mod tests {
         let v: VersionJson = serde_json::from_slice(&translated).unwrap();
 
         // org.ow2.asm:asm:9.9 has full hashes in fabric-meta.
-        let asm = v.libraries.iter().find(|l| l.name == "org.ow2.asm:asm:9.9").unwrap();
+        let asm = v
+            .libraries
+            .iter()
+            .find(|l| l.name == "org.ow2.asm:asm:9.9")
+            .unwrap();
         let art = asm.downloads.artifact.as_ref().unwrap();
-        assert_eq!(art.sha1.as_deref(), Some("c29635c8a7afa03d74b33c1884df8abb2b3f3dcc"));
+        assert_eq!(
+            art.sha1.as_deref(),
+            Some("c29635c8a7afa03d74b33c1884df8abb2b3f3dcc")
+        );
         assert_eq!(art.size, Some(126122));
     }
 
@@ -497,12 +543,19 @@ mod tests {
         let v: VersionJson = serde_json::from_slice(&translated).unwrap();
 
         // intermediary has only name + url (no sha1) in fabric-meta.
-        let inter = v.libraries.iter().find(|l| l.name == "net.fabricmc:intermediary:1.20.4").unwrap();
+        let inter = v
+            .libraries
+            .iter()
+            .find(|l| l.name == "net.fabricmc:intermediary:1.20.4")
+            .unwrap();
         let art = inter.downloads.artifact.as_ref().unwrap();
         assert!(art.sha1.is_none(), "intermediary has no upstream sha1");
         assert!(art.size.is_none(), "intermediary has no upstream size");
         // path + url are still populated.
-        assert_eq!(art.path, "net/fabricmc/intermediary/1.20.4/intermediary-1.20.4.jar");
+        assert_eq!(
+            art.path,
+            "net/fabricmc/intermediary/1.20.4/intermediary-1.20.4.jar"
+        );
         assert!(art.url.starts_with("https://maven.fabricmc.net/"));
     }
 
@@ -513,9 +566,15 @@ mod tests {
         // Top-level fields preserved verbatim.
         assert_eq!(v["id"], "fabric-loader-0.19.2-1.20.4");
         assert_eq!(v["inheritsFrom"], "1.20.4");
-        assert_eq!(v["mainClass"], "net.fabricmc.loader.impl.launch.knot.KnotClient");
+        assert_eq!(
+            v["mainClass"],
+            "net.fabricmc.loader.impl.launch.knot.KnotClient"
+        );
         assert_eq!(v["type"], "release");
         // arguments.jvm preserved as-is.
-        assert_eq!(v["arguments"]["jvm"][0], "-DFabricMcEmu= net.minecraft.client.main.Main ");
+        assert_eq!(
+            v["arguments"]["jvm"][0],
+            "-DFabricMcEmu= net.minecraft.client.main.Main "
+        );
     }
 }

@@ -62,7 +62,10 @@ async fn test_verify_sha1_passes_on_match() {
     let expected = sha1_hex_of_bytes(data);
     tokio::fs::write(&path, data).await.unwrap();
     let result = verify_sha1(&path, &expected).await.unwrap();
-    assert!(result, "verify_sha1 should return Ok(true) when hash matches");
+    assert!(
+        result,
+        "verify_sha1 should return Ok(true) when hash matches"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -73,12 +76,18 @@ async fn test_verify_sha1_fails_on_mismatch() {
     tokio::fs::write(&path, data).await.unwrap();
     let wrong_hash = "0000000000000000000000000000000000000000";
     let result = verify_sha1(&path, wrong_hash).await.unwrap();
-    assert!(!result, "verify_sha1 should return Ok(false) on hash mismatch");
+    assert!(
+        !result,
+        "verify_sha1 should return Ok(false) on hash mismatch"
+    );
 
     // Missing file also returns Ok(false)
     let missing = dir.path().join("does_not_exist.bin");
     let result_missing = verify_sha1(&missing, wrong_hash).await.unwrap();
-    assert!(!result_missing, "verify_sha1 should return Ok(false) for missing file");
+    assert!(
+        !result_missing,
+        "verify_sha1 should return Ok(false) for missing file"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -107,8 +116,13 @@ async fn test_cache_fresh_within_ttl() {
 
     // Missing file returns false (not an error)
     let missing = dir.path().join("missing.json");
-    let missing_result = cache_is_fresh(&missing, Duration::from_secs(3600)).await.unwrap();
-    assert!(!missing_result, "missing file should return Ok(false) from cache_is_fresh");
+    let missing_result = cache_is_fresh(&missing, Duration::from_secs(3600))
+        .await
+        .unwrap();
+    assert!(
+        !missing_result,
+        "missing file should return Ok(false) from cache_is_fresh"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -137,8 +151,13 @@ async fn test_download_verified_skips_when_already_correct() {
     let client = MojangClient::new().unwrap();
     // URL that will definitely fail if contacted — we guarantee no network call
     let unreachable_url = "http://127.0.0.1:1/nonexistent";
-    let result = client.download_verified(unreachable_url, &path, &expected_sha1).await;
-    assert!(result.is_ok(), "download_verified should skip network when file already matches SHA1");
+    let result = client
+        .download_verified(unreachable_url, &path, &expected_sha1)
+        .await;
+    assert!(
+        result.is_ok(),
+        "download_verified should skip network when file already matches SHA1"
+    );
     // File contents unchanged
     let after = tokio::fs::read(&path).await.unwrap();
     assert_eq!(after, data);
@@ -170,7 +189,10 @@ async fn test_download_verified_retries_once_on_mismatch() {
         .expect("download_verified should succeed after retry with correct bytes");
 
     let written = tokio::fs::read(&dest).await.unwrap();
-    assert_eq!(written, correct_data, "file should contain the correct data after retry");
+    assert_eq!(
+        written, correct_data,
+        "file should contain the correct data after retry"
+    );
 }
 
 /// Minimal hand-rolled HTTP/1.1 server that serves canned responses in sequence.
@@ -201,7 +223,10 @@ async fn test_fetch_manifest_live() {
     let dir = tempfile::tempdir().unwrap();
     let cache_path = dir.path().join("version_manifest_v2.json");
     let client = MojangClient::new().unwrap();
-    let manifest = client.fetch_manifest(&cache_path).await.expect("live manifest fetch failed");
+    let manifest = client
+        .fetch_manifest(&cache_path)
+        .await
+        .expect("live manifest fetch failed");
     assert!(
         !manifest.latest.release.is_empty(),
         "latest.release should not be empty"

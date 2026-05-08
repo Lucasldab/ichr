@@ -11,8 +11,13 @@ use crate::loader::types::LoaderType;
 use crate::tui::app::{Action, ActiveView, AppState};
 
 pub fn render_loader_install_failed_modal(f: &mut Frame, area: Rect, state: &AppState) {
-    let ActiveView::LoaderInstallFailedModal { slug, loader, version, error, log_tail } =
-        &state.active_view
+    let ActiveView::LoaderInstallFailedModal {
+        slug,
+        loader,
+        version,
+        error,
+        log_tail,
+    } = &state.active_view
     else {
         return;
     };
@@ -20,7 +25,12 @@ pub fn render_loader_install_failed_modal(f: &mut Frame, area: Rect, state: &App
     let h = area.height.min(20);
     let x = area.x + (area.width.saturating_sub(w)) / 2;
     let y = area.y + (area.height.saturating_sub(h)) / 2;
-    let rect = Rect { x, y, width: w, height: h };
+    let rect = Rect {
+        x,
+        y,
+        width: w,
+        height: h,
+    };
 
     f.render_widget(Clear, rect);
     let kind = match loader {
@@ -58,9 +68,9 @@ pub fn render_loader_install_failed_modal(f: &mut Frame, area: Rect, state: &App
 pub fn map_loader_install_failed_event(ev: ratatui::crossterm::event::Event) -> Option<Action> {
     use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => {
-            Some(Action::DismissLoaderInstallFailed)
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::DismissLoaderInstallFailed),
         _ => None,
     }
 }

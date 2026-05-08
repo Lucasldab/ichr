@@ -37,7 +37,10 @@ fn load(path: &str) -> ResolvedVersion {
 
 fn assert_arg_pair(args: &[String], flag: &str, value: &str) {
     let found = args.windows(2).any(|w| w[0] == flag && w[1] == value);
-    assert!(found, "expected `{flag} {value}` consecutively; got {args:?}");
+    assert!(
+        found,
+        "expected `{flag} {value}` consecutively; got {args:?}"
+    );
 }
 
 fn assert_no_placeholders(args: &[String]) {
@@ -54,10 +57,20 @@ fn snapshot_compose_1_21_4() {
     let v = load("tests/fixtures/mojang/version_1_21_4.json");
     let auth = offline_auth("TestUser");
     let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-    let cmd =
-        compose(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+    let cmd = compose(
+        &v,
+        &auth,
+        &fixture_paths(),
+        "myslug",
+        &ctx,
+        Path::new("java"),
+    )
+    .unwrap();
 
-    assert_eq!(cmd.main_class, v.main_class, "main_class mismatch for 1.21.4");
+    assert_eq!(
+        cmd.main_class, v.main_class,
+        "main_class mismatch for 1.21.4"
+    );
     assert!(
         cmd.jvm_args.iter().any(|a| a == "-cp"),
         "jvm_args must contain -cp; got {:?}",
@@ -78,13 +91,25 @@ fn snapshot_compose_1_12_2_legacy_args() {
     let v = load("tests/fixtures/mojang/version_1_12_2.json");
     let auth = offline_auth("TestUser");
     let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-    let cmd =
-        compose(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+    let cmd = compose(
+        &v,
+        &auth,
+        &fixture_paths(),
+        "myslug",
+        &ctx,
+        Path::new("java"),
+    )
+    .unwrap();
 
-    assert_eq!(cmd.main_class, v.main_class, "main_class mismatch for 1.12.2");
+    assert_eq!(
+        cmd.main_class, v.main_class,
+        "main_class mismatch for 1.12.2"
+    );
     // Pre-1.13: arguments.jvm is absent -> LEGACY_JVM_ARGS baseline applies.
     assert!(
-        cmd.jvm_args.iter().any(|a| a.starts_with("-Djava.library.path=")),
+        cmd.jvm_args
+            .iter()
+            .any(|a| a.starts_with("-Djava.library.path=")),
         "legacy versions need -Djava.library.path; got {:?}",
         cmd.jvm_args
     );
@@ -105,8 +130,7 @@ fn snapshot_access_token_is_offline_placeholder_zero() {
     let v = load("tests/fixtures/mojang/version_1_21_4.json");
     let auth = offline_auth("OfflineDude");
     let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-    let cmd =
-        compose(&v, &auth, &fixture_paths(), "slug", &ctx, Path::new("java")).unwrap();
+    let cmd = compose(&v, &auth, &fixture_paths(), "slug", &ctx, Path::new("java")).unwrap();
     assert_arg_pair(&cmd.game_args, "--accessToken", "0");
 }
 

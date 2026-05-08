@@ -78,19 +78,22 @@ pub async fn harvest_install(
     vanilla_mc_id: &str,
 ) -> Result<HarvestedInstall, LoaderError> {
     let versions_dir = staging.join("versions");
-    let mut entries = tokio::fs::read_dir(&versions_dir).await.map_err(|e| {
-        LoaderError::HarvestFailed {
-            reason: format!("read {}: {e}", versions_dir.display()),
-        }
-    })?;
+    let mut entries =
+        tokio::fs::read_dir(&versions_dir)
+            .await
+            .map_err(|e| LoaderError::HarvestFailed {
+                reason: format!("read {}: {e}", versions_dir.display()),
+            })?;
 
     // Step 1: collect ALL subdirectories EXCEPT the vanilla MC dir.
     let mut candidates: Vec<String> = Vec::new();
-    while let Some(entry) = entries.next_entry().await.map_err(|e| {
-        LoaderError::HarvestFailed {
+    while let Some(entry) = entries
+        .next_entry()
+        .await
+        .map_err(|e| LoaderError::HarvestFailed {
             reason: format!("iterate {}: {e}", versions_dir.display()),
-        }
-    })? {
+        })?
+    {
         if !entry.file_type().await.map(|t| t.is_dir()).unwrap_or(false) {
             continue;
         }
@@ -120,16 +123,16 @@ pub async fn harvest_install(
     let version_json_path = versions_dir
         .join(&version_id)
         .join(format!("{version_id}.json"));
-    let raw_bytes = tokio::fs::read(&version_json_path).await.map_err(|e| {
-        LoaderError::HarvestFailed {
-            reason: format!("read {}: {e}", version_json_path.display()),
-        }
-    })?;
-    let parsed: ProducedVersion = serde_json::from_slice(&raw_bytes).map_err(|e| {
-        LoaderError::HarvestFailed {
+    let raw_bytes =
+        tokio::fs::read(&version_json_path)
+            .await
+            .map_err(|e| LoaderError::HarvestFailed {
+                reason: format!("read {}: {e}", version_json_path.display()),
+            })?;
+    let parsed: ProducedVersion =
+        serde_json::from_slice(&raw_bytes).map_err(|e| LoaderError::HarvestFailed {
             reason: format!("parse {}: {e}", version_json_path.display()),
-        }
-    })?;
+        })?;
 
     // Step 3 (Open Question 4 fix): validate JSON `id` field against directory name.
     if parsed.id != version_id {
@@ -196,11 +199,12 @@ pub async fn copy_libraries_into_shared(
         let paths = paths.clone();
         let token = token.clone();
         set.spawn(async move {
-            let _permit = sem.acquire_owned().await.map_err(|e| {
-                LoaderError::HarvestFailed {
+            let _permit = sem
+                .acquire_owned()
+                .await
+                .map_err(|e| LoaderError::HarvestFailed {
                     reason: format!("semaphore: {e}"),
-                }
-            })?;
+                })?;
             if token.is_cancelled() {
                 return Err(LoaderError::Cancelled);
             }
@@ -233,20 +237,17 @@ pub async fn copy_libraries_into_shared(
     }
 }
 
-async fn copy_one_library(
-    paths: &AppPaths,
-    lib: &HarvestedLibrary,
-) -> Result<(), LoaderError> {
+async fn copy_one_library(paths: &AppPaths, lib: &HarvestedLibrary) -> Result<(), LoaderError> {
     let dst = paths.library_path(&lib.maven_path);
 
     // Skip if already present and SHA matches (or no SHA known and file exists).
     if tokio::fs::try_exists(&dst).await.unwrap_or(false) {
         if let Some(expected) = &lib.sha1 {
-            let ok = verify_sha1(&dst, expected).await.map_err(|e| {
-                LoaderError::HarvestFailed {
+            let ok = verify_sha1(&dst, expected)
+                .await
+                .map_err(|e| LoaderError::HarvestFailed {
                     reason: format!("verify_sha1 {}: {e}", dst.display()),
-                }
-            })?;
+                })?;
             if ok {
                 return Ok(());
             }
@@ -257,28 +258,29 @@ async fn copy_one_library(
     }
 
     if let Some(parent) = dst.parent() {
-        tokio::fs::create_dir_all(parent).await.map_err(|e| {
-            LoaderError::HarvestFailed {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| LoaderError::HarvestFailed {
                 reason: format!("mkdir {}: {e}", parent.display()),
-            }
-        })?;
+            })?;
     }
-    let bytes = tokio::fs::read(&lib.source_path).await.map_err(|e| {
-        LoaderError::HarvestFailed {
-            reason: format!("read {}: {e}", lib.source_path.display()),
-        }
-    })?;
-    atomic_write(&dst, &bytes).await.map_err(|e| {
-        LoaderError::HarvestFailed {
+    let bytes =
+        tokio::fs::read(&lib.source_path)
+            .await
+            .map_err(|e| LoaderError::HarvestFailed {
+                reason: format!("read {}: {e}", lib.source_path.display()),
+            })?;
+    atomic_write(&dst, &bytes)
+        .await
+        .map_err(|e| LoaderError::HarvestFailed {
             reason: format!("write {}: {e}", dst.display()),
-        }
-    })?;
-    if let Some(expected) = &lib.sha1 {
-        let ok = verify_sha1(&dst, expected).await.map_err(|e| {
-            LoaderError::HarvestFailed {
-                reason: format!("verify_sha1 {}: {e}", dst.display()),
-            }
         })?;
+    if let Some(expected) = &lib.sha1 {
+        let ok = verify_sha1(&dst, expected)
+            .await
+            .map_err(|e| LoaderError::HarvestFailed {
+                reason: format!("verify_sha1 {}: {e}", dst.display()),
+            })?;
         if !ok {
             return Err(LoaderError::Sha1Mismatch {
                 path: dst.display().to_string(),
@@ -299,10 +301,12 @@ pub async fn write_version_json(
     bytes: &[u8],
 ) -> Result<(), LoaderError> {
     let dest = paths.version_json(version_id);
-    atomic_write(&dest, bytes).await.map_err(|e| LoaderError::ProfileWrite {
-        path: dest.display().to_string(),
-        reason: e.to_string(),
-    })
+    atomic_write(&dest, bytes)
+        .await
+        .map_err(|e| LoaderError::ProfileWrite {
+            path: dest.display().to_string(),
+            reason: e.to_string(),
+        })
 }
 
 #[cfg(test)]
@@ -322,21 +326,20 @@ mod tests {
     ///   versions/<vanilla>/   (empty dir — represents vanilla)
     ///   versions/<loader_id>/<loader_id>.json
     ///   libraries/              (empty dir)
-    async fn make_staging_tree(
-        base: &Path,
-        vanilla_mc_id: &str,
-        loader_id: &str,
-        json: &str,
-    ) {
+    async fn make_staging_tree(base: &Path, vanilla_mc_id: &str, loader_id: &str, json: &str) {
         tokio::fs::create_dir_all(base.join("versions").join(vanilla_mc_id))
             .await
             .unwrap();
         tokio::fs::create_dir_all(base.join("versions").join(loader_id))
             .await
             .unwrap();
-        tokio::fs::create_dir_all(base.join("libraries")).await.unwrap();
+        tokio::fs::create_dir_all(base.join("libraries"))
+            .await
+            .unwrap();
         tokio::fs::write(
-            base.join("versions").join(loader_id).join(format!("{loader_id}.json")),
+            base.join("versions")
+                .join(loader_id)
+                .join(format!("{loader_id}.json")),
             json.as_bytes(),
         )
         .await
@@ -377,7 +380,9 @@ mod tests {
         tokio::fs::create_dir_all(staging.join("versions").join("1.20.1"))
             .await
             .unwrap();
-        tokio::fs::create_dir_all(staging.join("libraries")).await.unwrap();
+        tokio::fs::create_dir_all(staging.join("libraries"))
+            .await
+            .unwrap();
 
         let err = harvest_install(staging, None, "1.20.1").await.unwrap_err();
         match err {
@@ -405,7 +410,10 @@ mod tests {
             .await
             .unwrap();
         tokio::fs::write(
-            staging.join("versions").join(id2).join(format!("{id2}.json")),
+            staging
+                .join("versions")
+                .join(id2)
+                .join(format!("{id2}.json")),
             j2.as_bytes(),
         )
         .await
@@ -430,13 +438,14 @@ mod tests {
 
         // One library in staging.
         let coord = "org.ow2.asm:asm:9.7.1";
-        let maven_path =
-            crate::loader::maven::maven_coord_to_path(coord).unwrap();
+        let maven_path = crate::loader::maven::maven_coord_to_path(coord).unwrap();
         let source_path = td.path().join("staging-libs").join(&maven_path);
         tokio::fs::create_dir_all(source_path.parent().unwrap())
             .await
             .unwrap();
-        tokio::fs::write(&source_path, b"FAKE_ASM_JAR").await.unwrap();
+        tokio::fs::write(&source_path, b"FAKE_ASM_JAR")
+            .await
+            .unwrap();
 
         let lib = HarvestedLibrary {
             maven_path: maven_path.clone(),
@@ -468,7 +477,9 @@ mod tests {
         let version_id = "1.20.1-forge-47.4.20";
         let json_bytes = br#"{"id":"1.20.1-forge-47.4.20","inheritsFrom":"1.20.1"}"#;
 
-        write_version_json(&paths, version_id, json_bytes).await.unwrap();
+        write_version_json(&paths, version_id, json_bytes)
+            .await
+            .unwrap();
 
         let dest = paths.version_json(version_id);
         let read_back = tokio::fs::read(&dest).await.unwrap();

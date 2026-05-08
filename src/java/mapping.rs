@@ -100,11 +100,7 @@ pub fn parse_java_major(stderr: &str) -> Option<u32> {
 /// accepted for all vanilla MC versions. Modded 1.12.x on Java 21 may need
 /// additional `--add-opens` JVM flags — that is handled in a future modloader
 /// phase, not here.
-pub fn validate_java_major(
-    found: u32,
-    required: u32,
-    java_path: &Path,
-) -> Result<(), AppError> {
+pub fn validate_java_major(found: u32, required: u32, java_path: &Path) -> Result<(), AppError> {
     if found < required {
         return Err(AppError::JavaMismatch {
             required,

@@ -10,10 +10,7 @@ fn assert_path_contains_segment(p: &std::path::Path, segment: &str) {
     let found = p
         .components()
         .any(|c| c.as_os_str().to_string_lossy() == segment);
-    assert!(
-        found,
-        "expected path {p:?} to contain segment {segment:?}"
-    );
+    assert!(found, "expected path {p:?} to contain segment {segment:?}");
 }
 
 #[test]
@@ -55,9 +52,13 @@ fn log_file_lives_under_data_dir() {
     assert!(
         log.starts_with(&paths.data_dir),
         "log file {:?} should descend from data_dir {:?}",
-        log, paths.data_dir
+        log,
+        paths.data_dir
     );
-    assert_eq!(log.file_name().and_then(|f| f.to_str()), Some("mineltui.log"));
+    assert_eq!(
+        log.file_name().and_then(|f| f.to_str()),
+        Some("mineltui.log")
+    );
 }
 
 #[test]
@@ -67,9 +68,13 @@ fn app_config_file_lives_under_config_dir() {
     assert!(
         cfg.starts_with(&paths.config_dir),
         "config file {:?} should descend from config_dir {:?}",
-        cfg, paths.config_dir
+        cfg,
+        paths.config_dir
     );
-    assert_eq!(cfg.file_name().and_then(|f| f.to_str()), Some("config.toml"));
+    assert_eq!(
+        cfg.file_name().and_then(|f| f.to_str()),
+        Some("config.toml")
+    );
 }
 
 #[cfg(target_os = "linux")]
@@ -79,13 +84,15 @@ fn linux_xdg_paths() {
     let paths = AppPaths::resolve().expect("paths resolve");
     let data_str = paths.data_dir.to_string_lossy();
     assert!(
-        data_str.contains(".local/share") || std::env::var("XDG_DATA_HOME").is_ok_and(|v| data_str.starts_with(&v)),
+        data_str.contains(".local/share")
+            || std::env::var("XDG_DATA_HOME").is_ok_and(|v| data_str.starts_with(&v)),
         "Linux data_dir {:?} should be under ~/.local/share or $XDG_DATA_HOME",
         paths.data_dir
     );
     let config_str = paths.config_dir.to_string_lossy();
     assert!(
-        config_str.contains(".config") || std::env::var("XDG_CONFIG_HOME").is_ok_and(|v| config_str.starts_with(&v)),
+        config_str.contains(".config")
+            || std::env::var("XDG_CONFIG_HOME").is_ok_and(|v| config_str.starts_with(&v)),
         "Linux config_dir {:?} should be under ~/.config or $XDG_CONFIG_HOME",
         paths.config_dir
     );

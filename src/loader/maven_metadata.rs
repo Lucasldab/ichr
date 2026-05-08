@@ -50,8 +50,7 @@ mod tests {
     use super::*;
 
     const FORGE_FIXTURE: &str = include_str!("../../tests/fixtures/forge_maven_metadata.xml");
-    const NEOFORGE_FIXTURE: &str =
-        include_str!("../../tests/fixtures/neoforge_maven_metadata.xml");
+    const NEOFORGE_FIXTURE: &str = include_str!("../../tests/fixtures/neoforge_maven_metadata.xml");
 
     #[test]
     fn test_extract_versions_empty() {
@@ -95,7 +94,10 @@ mod tests {
             v.iter().any(|x| x == "1.20.1-47.4.20"),
             "Forge 1.20.1-47.4.20 missing: {v:?}"
         );
-        assert!(v.iter().any(|x| x == "1.16.5-36.2.42"), "Forge 1.16.5-36.2.42 missing");
+        assert!(
+            v.iter().any(|x| x == "1.16.5-36.2.42"),
+            "Forge 1.16.5-36.2.42 missing"
+        );
     }
 
     #[test]

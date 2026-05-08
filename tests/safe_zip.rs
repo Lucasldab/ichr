@@ -52,7 +52,10 @@ fn test_rejects_parent_traversal() {
     let td = tempdir().unwrap();
     let base = td.path();
     let result = safe_extract_path("../etc/passwd", base);
-    assert_eq!(result, None, "../etc/passwd must be rejected (ParentDir component)");
+    assert_eq!(
+        result, None,
+        "../etc/passwd must be rejected (ParentDir component)"
+    );
 }
 
 /// Deeper traversal embedded mid-path: `a/../../b/c`.
@@ -62,7 +65,10 @@ fn test_rejects_deep_parent_traversal() {
     let td = tempdir().unwrap();
     let base = td.path();
     let result = safe_extract_path("a/../../b/c", base);
-    assert_eq!(result, None, "a/../../b/c must be rejected (embedded ParentDir component)");
+    assert_eq!(
+        result, None,
+        "a/../../b/c must be rejected (embedded ParentDir component)"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -75,7 +81,10 @@ fn test_rejects_absolute_unix_path() {
     let td = tempdir().unwrap();
     let base = td.path();
     let result = safe_extract_path("/etc/passwd", base);
-    assert_eq!(result, None, "/etc/passwd must be rejected (RootDir component)");
+    assert_eq!(
+        result, None,
+        "/etc/passwd must be rejected (RootDir component)"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -95,8 +104,7 @@ fn test_rejects_current_dir_prefix() {
     let base = td.path();
     let result = safe_extract_path("./mods/foo.jar", base);
     assert_eq!(
-        result,
-        None,
+        result, None,
         "./mods/foo.jar must be rejected (CurDir component); \
         callers must strip leading './' before calling safe_extract_path"
     );
@@ -118,8 +126,7 @@ fn test_rejects_windows_prefix() {
     let result = safe_extract_path("C:\\Windows\\System32\\foo.dll", base);
     #[cfg(windows)]
     assert_eq!(
-        result,
-        None,
+        result, None,
         "Windows drive-prefix path must be rejected on Windows (Prefix component)"
     );
     #[cfg(not(windows))]
@@ -154,7 +161,10 @@ fn test_rejects_unc_path() {
     //   normal path component, so safe_extract_path returns Some.
     // We assert the documented platform-specific behavior.
     #[cfg(windows)]
-    assert_eq!(result, None, "UNC path must be rejected on Windows (Prefix component)");
+    assert_eq!(
+        result, None,
+        "UNC path must be rejected on Windows (Prefix component)"
+    );
     #[cfg(not(windows))]
     {
         // On Linux, backslash is a valid filename character. The path
@@ -210,8 +220,7 @@ fn test_atlauncher_cve_vector() {
     let base = td.path();
     let result = safe_extract_path("../../.bashrc", base);
     assert_eq!(
-        result,
-        None,
+        result, None,
         "ATLauncher GHSA-7cff-8xv4-mvx6 vector '../../.bashrc' must be rejected"
     );
 }
@@ -231,8 +240,7 @@ fn test_prism_cve_vector() {
     // Raw call: ParentDir components appear in the middle → None.
     let result = safe_extract_path("overrides/../../../.profile", base);
     assert_eq!(
-        result,
-        None,
+        result, None,
         "Prism GHSA-wxgx-8v36-mj2m vector 'overrides/../../../.profile' must be rejected"
     );
 }

@@ -31,18 +31,18 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use crate::domain::InstanceManifest;
+use crate::install::install_version;
 use crate::instance::store::{read_instance_manifest, write_instance_manifest};
 use crate::java::service::JavaService;
-use crate::install::install_version;
 use crate::loader::error::LoaderError;
 use crate::loader::service::LoaderService;
-use crate::mojang::client::MojangClient;
 use crate::modpack::download::download_files;
 use crate::modpack::error::ModpackError;
 use crate::modpack::overrides::apply_overrides;
 use crate::modpack::parse::{detect_loader, parse_index, MrpackIndex};
 use crate::mods::error::ModrinthError;
 use crate::mods::ledger::upsert_mod;
+use crate::mojang::client::MojangClient;
 use crate::persistence::paths::AppPaths;
 use crate::services::instance_service::create_instance;
 use crate::tasks::{JobId, TaskEvent};
@@ -306,13 +306,15 @@ impl ModpackService {
                 s.push(".tmp");
                 std::path::PathBuf::from(s)
             };
-            tokio::fs::rename(&tmp_path, &final_path).await.map_err(|e| {
-                ModpackError::Io(std::io::Error::other(format!(
-                    "rename {} -> {}: {e}",
-                    tmp_path.display(),
-                    final_path.display(),
-                )))
-            })?;
+            tokio::fs::rename(&tmp_path, &final_path)
+                .await
+                .map_err(|e| {
+                    ModpackError::Io(std::io::Error::other(format!(
+                        "rename {} -> {}: {e}",
+                        tmp_path.display(),
+                        final_path.display(),
+                    )))
+                })?;
         }
 
         let _ = progress_tx
@@ -408,8 +410,9 @@ async fn read_and_parse_mrpack_index(
     .await
     .map_err(|e| ModpackError::Io(std::io::Error::other(format!("spawn_blocking join: {e}"))))??;
 
-    let json = std::str::from_utf8(&bytes)
-        .map_err(|e| ModpackError::ManifestParse(serde_json::Error::io(std::io::Error::other(e))))?;
+    let json = std::str::from_utf8(&bytes).map_err(|e| {
+        ModpackError::ManifestParse(serde_json::Error::io(std::io::Error::other(e)))
+    })?;
     let index = parse_index(json)?;
 
     Ok((bytes, index))
@@ -431,8 +434,8 @@ mod tests {
     use zip::write::SimpleFileOptions;
 
     use super::ModpackService;
-    use crate::mojang::client::MojangClient;
     use crate::modpack::error::ModpackError;
+    use crate::mojang::client::MojangClient;
     use crate::persistence::paths::AppPaths;
     use crate::tasks::JobId;
 
@@ -518,14 +521,15 @@ mod tests {
 
         let file = std::fs::File::create(path).unwrap();
         let mut writer = zip::ZipWriter::new(file);
-        let opts =
-            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
 
         writer.start_file("modrinth.index.json", opts).unwrap();
         writer.write_all(manifest.as_bytes()).unwrap();
 
         if let Some(content) = override_content {
-            writer.start_file("overrides/config/test.txt", opts).unwrap();
+            writer
+                .start_file("overrides/config/test.txt", opts)
+                .unwrap();
             writer.write_all(content).unwrap();
         }
 
@@ -536,8 +540,7 @@ mod tests {
     fn build_bad_mrpack(path: &Path) {
         let file = std::fs::File::create(path).unwrap();
         let mut writer = zip::ZipWriter::new(file);
-        let opts =
-            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
         writer.start_file("modrinth.index.json", opts).unwrap();
         writer
             .write_all(br#"{ "formatVersion": 2, "game": "minecraft", "versionId": "1.0", "name": "Bad", "dependencies": { "minecraft": "1.20.4" }, "files": [] }"#)
@@ -554,7 +557,9 @@ mod tests {
     }
 
     fn make_http_client() -> reqwest::Client {
-        reqwest::Client::builder().build().expect("build reqwest client")
+        reqwest::Client::builder()
+            .build()
+            .expect("build reqwest client")
     }
 
     /// Pre-populate the vanilla MC version JSON so Step 2.5's existence check
@@ -643,7 +648,10 @@ mod tests {
 
         assert!(result.is_ok(), "vanilla import must succeed: {result:?}");
         let manifest = result.unwrap();
-        assert_eq!(manifest.slug, "minimal-test-pack", "slug must be derived from pack name");
+        assert_eq!(
+            manifest.slug, "minimal-test-pack",
+            "slug must be derived from pack name"
+        );
 
         // instance.json must exist (atomicity gate was written)
         assert!(
@@ -653,7 +661,11 @@ mod tests {
 
         // The mod jar must exist (after rename from .tmp)
         let mod_jar = paths.instance_mod_file(&manifest.slug, "required-mod.jar");
-        assert!(mod_jar.exists(), "mod jar must exist: {}", mod_jar.display());
+        assert!(
+            mod_jar.exists(),
+            "mod jar must exist: {}",
+            mod_jar.display()
+        );
 
         // The override file must exist
         let override_file = paths
@@ -738,7 +750,15 @@ mod tests {
         let mrpack = tmp.path().join("test.mrpack");
 
         // Malformed pack — doesn't matter; cancel fires first
-        build_mrpack(&mrpack, "https://cdn.modrinth.com/fake.jar", b"x", "", "", None, &[]);
+        build_mrpack(
+            &mrpack,
+            "https://cdn.modrinth.com/fake.jar",
+            b"x",
+            "",
+            "",
+            None,
+            &[],
+        );
 
         let svc = ModpackService::with_client(make_http_client());
         let loader_svc = crate::loader::service::LoaderService::new().unwrap();
@@ -968,8 +988,10 @@ mod tests {
             )
             .await;
 
-        assert!(matches!(result, Err(ModpackError::DisallowedSource { .. })),
-            "non-allowlisted URL must return DisallowedSource: {result:?}");
+        assert!(
+            matches!(result, Err(ModpackError::DisallowedSource { .. })),
+            "non-allowlisted URL must return DisallowedSource: {result:?}"
+        );
 
         // Instance dir must be cleaned up
         assert!(
@@ -1009,15 +1031,27 @@ mod tests {
             let svc = ModpackService::with_client(make_http_client());
             let loader_svc = crate::loader::service::LoaderService::new().unwrap();
             let java_svc = crate::java::service::JavaService::new().unwrap();
-        let mojang_svc = make_mojang_client();
-        pre_install_vanilla_marker(&paths, "1.20.4").await;
+            let mojang_svc = make_mojang_client();
+            pre_install_vanilla_marker(&paths, "1.20.4").await;
             let (tx, _rx) = mpsc::channel(64);
             let token = CancellationToken::new();
             token.cancel();
             let r = svc
-                .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(7))
+                .import_mrpack(
+                    &paths,
+                    &mrpack,
+                    &mojang_svc,
+                    &loader_svc,
+                    &java_svc,
+                    tx,
+                    token,
+                    JobId(7),
+                )
                 .await;
-            assert!(matches!(r, Err(ModpackError::Cancelled)), "first run must cancel: {r:?}");
+            assert!(
+                matches!(r, Err(ModpackError::Cancelled)),
+                "first run must cancel: {r:?}"
+            );
         }
 
         // Second run — same .mrpack, no pre-cancel
@@ -1025,12 +1059,21 @@ mod tests {
             let svc = ModpackService::with_client(make_http_client());
             let loader_svc = crate::loader::service::LoaderService::new().unwrap();
             let java_svc = crate::java::service::JavaService::new().unwrap();
-        let mojang_svc = make_mojang_client();
-        pre_install_vanilla_marker(&paths, "1.20.4").await;
+            let mojang_svc = make_mojang_client();
+            pre_install_vanilla_marker(&paths, "1.20.4").await;
             let (tx, _rx) = mpsc::channel(64);
             let token = CancellationToken::new();
             let r = svc
-                .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(8))
+                .import_mrpack(
+                    &paths,
+                    &mrpack,
+                    &mojang_svc,
+                    &loader_svc,
+                    &java_svc,
+                    tx,
+                    token,
+                    JobId(8),
+                )
                 .await;
             assert!(r.is_ok(), "second run must succeed: {r:?}");
             let manifest = r.unwrap();
@@ -1086,7 +1129,16 @@ mod tests {
         let token = CancellationToken::new();
 
         let result = svc
-            .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(9))
+            .import_mrpack(
+                &paths,
+                &mrpack,
+                &mojang_svc,
+                &loader_svc,
+                &java_svc,
+                tx,
+                token,
+                JobId(9),
+            )
             .await;
 
         assert!(result.is_ok(), "must succeed: {result:?}");
@@ -1101,7 +1153,12 @@ mod tests {
         }
 
         // Must include the required step labels in order
-        let required = &["Parsing manifest", "Creating instance", "Mods installed", "Done"];
+        let required = &[
+            "Parsing manifest",
+            "Creating instance",
+            "Mods installed",
+            "Done",
+        ];
         for req in required {
             assert!(
                 labels.iter().any(|l| l.contains(req)),
@@ -1110,7 +1167,10 @@ mod tests {
         }
 
         // Ordering: Parsing manifest must come before Done
-        let parsing_pos = labels.iter().position(|l| l.contains("Parsing manifest")).unwrap();
+        let parsing_pos = labels
+            .iter()
+            .position(|l| l.contains("Parsing manifest"))
+            .unwrap();
         let done_pos = labels.iter().position(|l| l.contains("Done")).unwrap();
         assert!(parsing_pos < done_pos, "Parsing manifest must precede Done");
     }
@@ -1156,7 +1216,16 @@ mod tests {
         let token = CancellationToken::new();
 
         let result = svc
-            .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(10))
+            .import_mrpack(
+                &paths,
+                &mrpack,
+                &mojang_svc,
+                &loader_svc,
+                &java_svc,
+                tx,
+                token,
+                JobId(10),
+            )
             .await;
 
         assert!(result.is_err(), "loader install failure must return Err");
@@ -1241,10 +1310,22 @@ mod tests {
         let token = CancellationToken::new();
 
         let result = svc
-            .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(11))
+            .import_mrpack(
+                &paths,
+                &mrpack,
+                &mojang_svc,
+                &loader_svc,
+                &java_svc,
+                tx,
+                token,
+                JobId(11),
+            )
             .await;
 
-        assert!(result.is_ok(), "filter-test import must succeed: {result:?}");
+        assert!(
+            result.is_ok(),
+            "filter-test import must succeed: {result:?}"
+        );
         let manifest_out = result.unwrap();
 
         // Only the Required file's mock must have been hit
@@ -1252,7 +1333,9 @@ mod tests {
         mock_unsupported.assert_calls(0);
 
         // Only the Required mod jar should exist in the mods dir
-        let mods_dir = paths.instance_minecraft_dir(&manifest_out.slug).join("mods");
+        let mods_dir = paths
+            .instance_minecraft_dir(&manifest_out.slug)
+            .join("mods");
         let jars: Vec<_> = std::fs::read_dir(&mods_dir)
             .unwrap()
             .filter_map(|e| e.ok())

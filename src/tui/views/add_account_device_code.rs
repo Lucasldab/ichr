@@ -18,14 +18,21 @@ pub fn render_add_account_device_code(f: &mut Frame, area: Rect, state: &AppStat
             verification_uri,
             expires_at,
             stage,
-        } => (user_code.clone(), verification_uri.clone(), *expires_at, stage.clone()),
+        } => (
+            user_code.clone(),
+            verification_uri.clone(),
+            *expires_at,
+            stage.clone(),
+        ),
         _ => return,
     };
 
     let area = centered_rect(60, 40, area);
     f.render_widget(Clear, area);
 
-    let remaining = expires_at.saturating_duration_since(Instant::now()).as_secs();
+    let remaining = expires_at
+        .saturating_duration_since(Instant::now())
+        .as_secs();
     let chunks = Layout::vertical([
         Constraint::Length(3),
         Constraint::Length(3),
@@ -55,8 +62,7 @@ pub fn render_add_account_device_code(f: &mut Frame, area: Rect, state: &AppStat
     let count = Paragraph::new(Line::from(format!("Expires in: {remaining}s  |  {stage}")));
     f.render_widget(count, chunks[3]);
 
-    let hint = Paragraph::new("Esc to cancel")
-        .block(Block::default().borders(Borders::ALL));
+    let hint = Paragraph::new("Esc to cancel").block(Block::default().borders(Borders::ALL));
     f.render_widget(hint, chunks[4]);
 }
 

@@ -34,7 +34,11 @@ fn init_writes_info_to_data_dir_log_file_without_ansi() {
     std::thread::sleep(Duration::from_millis(50));
 
     let log_path = paths.log_file();
-    assert!(log_path.exists(), "log file {} should exist", log_path.display());
+    assert!(
+        log_path.exists(),
+        "log file {} should exist",
+        log_path.display()
+    );
 
     let mut contents = String::new();
     std::fs::File::open(&log_path)

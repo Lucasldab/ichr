@@ -63,7 +63,11 @@ pub async fn install_version(
         .as_ref()
         .ok_or_else(|| AppError::Http("version JSON missing downloads.client".into()))?;
     mojang
-        .download_verified(&client_dl.url, &paths.version_jar(&version.id), &client_dl.sha1)
+        .download_verified(
+            &client_dl.url,
+            &paths.version_jar(&version.id),
+            &client_dl.sha1,
+        )
         .await?;
     if token.is_cancelled() {
         return Err(AppError::Cancelled);
@@ -131,7 +135,11 @@ pub async fn install_version(
 /// Return the subset of `version.libraries` that pass rule evaluation for `ctx`.
 /// Pub for testability.
 pub fn selected_libraries<'a>(version: &'a ResolvedVersion, ctx: &RuleContext) -> Vec<&'a Library> {
-    version.libraries.iter().filter(|lib| evaluate_rules(&lib.rules, ctx)).collect()
+    version
+        .libraries
+        .iter()
+        .filter(|lib| evaluate_rules(&lib.rules, ctx))
+        .collect()
 }
 
 /// Walk the inheritsFrom chain starting at `child` and fetch every parent's
@@ -148,8 +156,9 @@ pub(crate) async fn collect_inherits_chain(
     };
 
     // Load the manifest so we can resolve parent URLs by id.
-    let manifest =
-        mojang.fetch_manifest(&paths.cache_dir.join("manifest_v2.json")).await?;
+    let manifest = mojang
+        .fetch_manifest(&paths.cache_dir.join("manifest_v2.json"))
+        .await?;
 
     let mut next_id = Some(first);
     let mut depth: u32 = 0;
@@ -299,8 +308,11 @@ async fn extract_natives_for_libraries(
             continue;
         };
         let jar_path = paths.library_path(&cl.path);
-        let exclude: Vec<String> =
-            lib.extract.as_ref().map(|e| e.exclude.clone()).unwrap_or_default();
+        let exclude: Vec<String> = lib
+            .extract
+            .as_ref()
+            .map(|e| e.exclude.clone())
+            .unwrap_or_default();
         extract_native_jar(&jar_path, &natives_dir, &exclude).await?;
     }
     Ok(())
@@ -323,5 +335,11 @@ async fn copy_virtual_assets(
 }
 
 async fn send_progress(tx: &mpsc::Sender<TaskEvent>, id: JobId, pct: u8, msg: &str) {
-    let _ = tx.send(TaskEvent::Progress { id, pct, msg: msg.to_string() }).await;
+    let _ = tx
+        .send(TaskEvent::Progress {
+            id,
+            pct,
+            msg: msg.to_string(),
+        })
+        .await;
 }

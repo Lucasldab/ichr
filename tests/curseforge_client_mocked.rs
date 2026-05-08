@@ -36,8 +36,7 @@ use mineltui::mods::curseforge::client::CurseForgeClient;
 use mineltui::mods::curseforge::error::CurseForgeError;
 use mineltui::mods::curseforge::service::CurseForgeService;
 use mineltui::mods::curseforge::types::{
-    CurseForgeAuthor, CurseForgeFileEntry, CurseForgeHash, CurseForgeLinks,
-    CurseForgeProjectDetail,
+    CurseForgeAuthor, CurseForgeFileEntry, CurseForgeHash, CurseForgeLinks, CurseForgeProjectDetail,
 };
 use mineltui::mods::types::{HashAlgo, Ledger, ModSource};
 use mineltui::persistence::paths::AppPaths;
@@ -110,8 +109,7 @@ async fn test_x_api_key_present_at_integration_layer() {
             .header("x-api-key", "test-key");
         then.status(200).body(r#"{"data":[]}"#);
     });
-    let client =
-        CurseForgeClient::new_with_base_url("test-key", server.base_url()).unwrap();
+    let client = CurseForgeClient::new_with_base_url("test-key", server.base_url()).unwrap();
     let svc = CurseForgeService::with_client(client);
     // Search must succeed only because the mock matched on the header; if the
     // header was dropped at the service-layer wrap, the mock would not match
@@ -136,8 +134,7 @@ async fn test_install_with_inline_url_writes_ledger_row_with_curseforge_source()
         then.status(200).body(body.clone());
     });
 
-    let client =
-        CurseForgeClient::new_with_base_url("test-key", server.base_url()).unwrap();
+    let client = CurseForgeClient::new_with_base_url("test-key", server.base_url()).unwrap();
     let svc = CurseForgeService::with_client(client);
 
     let td = TempDir::new().unwrap();
@@ -178,12 +175,17 @@ async fn test_install_with_inline_url_writes_ledger_row_with_curseforge_source()
         .expect("install");
 
     // Ledger assertions.
-    let ledger_raw =
-        tokio::fs::read_to_string(paths.instance_mod_ledger(slug)).await.unwrap();
+    let ledger_raw = tokio::fs::read_to_string(paths.instance_mod_ledger(slug))
+        .await
+        .unwrap();
     let ledger: Ledger = toml::from_str(&ledger_raw).unwrap();
     assert_eq!(ledger.mods.len(), 1, "expected exactly 1 ledger row");
     let row = &ledger.mods[0];
-    assert_eq!(row.source, ModSource::CurseForge, "source must be CurseForge");
+    assert_eq!(
+        row.source,
+        ModSource::CurseForge,
+        "source must be CurseForge"
+    );
     assert_eq!(row.hash_algo, HashAlgo::Sha1, "hash_algo must be Sha1");
     assert_eq!(row.mod_id, "443959");
     assert_eq!(row.version_id, "4567890");
@@ -202,8 +204,7 @@ async fn test_install_with_inline_url_writes_ledger_row_with_curseforge_source()
 // ============================================================================
 
 #[tokio::test]
-async fn test_install_with_null_download_url_returns_file_not_downloadable_no_ledger_row()
-{
+async fn test_install_with_null_download_url_returns_file_not_downloadable_no_ledger_row() {
     let server = MockServer::start();
     // The /download-url fallback endpoint must return 403 (restricted).
     server.mock(|when, then| {
@@ -212,8 +213,7 @@ async fn test_install_with_null_download_url_returns_file_not_downloadable_no_le
         then.status(403).body(r#"{"error":"restricted"}"#);
     });
 
-    let client =
-        CurseForgeClient::new_with_base_url("test-key", server.base_url()).unwrap();
+    let client = CurseForgeClient::new_with_base_url("test-key", server.base_url()).unwrap();
     let svc = CurseForgeService::with_client(client);
 
     let td = TempDir::new().unwrap();
@@ -296,8 +296,7 @@ async fn test_cancel_aborts_install_no_ledger_row() {
             .body(body.clone());
     });
 
-    let client =
-        CurseForgeClient::new_with_base_url("test-key", server.base_url()).unwrap();
+    let client = CurseForgeClient::new_with_base_url("test-key", server.base_url()).unwrap();
     let svc = std::sync::Arc::new(CurseForgeService::with_client(client));
 
     let td = TempDir::new().unwrap();
@@ -363,9 +362,6 @@ async fn test_cancel_aborts_install_no_ledger_row() {
     if ledger_path.exists() {
         let raw = tokio::fs::read_to_string(&ledger_path).await.unwrap();
         let ledger: Ledger = toml::from_str(&raw).unwrap_or_default();
-        assert!(
-            ledger.mods.is_empty(),
-            "ledger MUST be empty after cancel"
-        );
+        assert!(ledger.mods.is_empty(), "ledger MUST be empty after cancel");
     }
 }

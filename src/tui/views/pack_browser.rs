@@ -22,8 +22,14 @@ use crate::packs::kind::PackKind;
 use crate::tui::app::{Action, ActiveView, AppState};
 
 pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
-    let ActiveView::PackBrowser { slug, kind, search, fetch_state, results, selected } =
-        &state.active_view
+    let ActiveView::PackBrowser {
+        slug,
+        kind,
+        search,
+        fetch_state,
+        results,
+        selected,
+    } = &state.active_view
     else {
         return;
     };
@@ -58,18 +64,18 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
         format!("search: {search}_")
     };
     let search_style = if search.is_empty() {
-        Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
+        Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::DIM)
     } else {
         Style::default().fg(Color::Yellow)
     };
-    let search_para = Paragraph::new(search_display)
-        .style(search_style)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Search")
-                .border_style(Style::default().fg(Color::Yellow)),
-        );
+    let search_para = Paragraph::new(search_display).style(search_style).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Search")
+            .border_style(Style::default().fg(Color::Yellow)),
+    );
     f.render_widget(search_para, chunks[1]);
 
     // ---- Body: 40/60 horizontal split (results / detail) ----
@@ -110,9 +116,9 @@ fn render_results_pane(
     };
     if let Some(text) = placeholder {
         let style = match fetch_state {
-            ModBrowserFetchState::Loading | ModBrowserFetchState::Ready => {
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
-            }
+            ModBrowserFetchState::Loading | ModBrowserFetchState::Ready => Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
             ModBrowserFetchState::Error(_) => Style::default(),
         };
         f.render_widget(Paragraph::new(text).style(style), inner);
@@ -124,15 +130,21 @@ fn render_results_pane(
         .iter()
         .enumerate()
         .map(|(i, hit)| {
-            let installed_suffix = if hit.already_installed { "   ✓ installed" } else { "" };
+            let installed_suffix = if hit.already_installed {
+                "   ✓ installed"
+            } else {
+                ""
+            };
             let cursor_glyph = if i == selected { " ▶" } else { "" };
-            let max_name_w =
-                width.saturating_sub(installed_suffix.len() + cursor_glyph.len() + 1);
+            let max_name_w = width.saturating_sub(installed_suffix.len() + cursor_glyph.len() + 1);
             let name = truncate(&hit.title, max_name_w);
             let line1 = if hit.already_installed {
                 Line::from(vec![
                     Span::raw(name),
-                    Span::styled(installed_suffix.to_string(), Style::default().fg(Color::Green)),
+                    Span::styled(
+                        installed_suffix.to_string(),
+                        Style::default().fg(Color::Green),
+                    ),
                     Span::raw(cursor_glyph.to_string()),
                 ])
             } else {
@@ -141,7 +153,9 @@ fn render_results_pane(
             let desc = truncate(&hit.description, width.saturating_sub(3));
             let line2 = Line::from(Span::styled(
                 format!("  {desc}"),
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
             ));
             let style = if i == selected {
                 Style::default().add_modifier(Modifier::REVERSED)
@@ -169,8 +183,11 @@ fn render_detail_pane(
     f.render_widget(block, area);
 
     if selected_hit.is_none() {
-        let p = Paragraph::new("Select a pack to see details")
-            .style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM));
+        let p = Paragraph::new("Select a pack to see details").style(
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
+        );
         f.render_widget(p, inner);
         return;
     }
@@ -184,16 +201,23 @@ fn render_detail_pane(
     let divider: String = "─".repeat(inner.width.max(1) as usize);
     lines.push(Line::from(Span::styled(
         divider,
-        Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+        Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::DIM),
     )));
     lines.push(Line::raw(hit.description.clone()));
     lines.push(Line::raw(""));
-    lines.push(Line::raw(format!("Downloads: {}", thousands(hit.downloads))));
+    lines.push(Line::raw(format!(
+        "Downloads: {}",
+        thousands(hit.downloads)
+    )));
     if let ModBrowserFetchState::Error(_) = fetch_state {
         lines.push(Line::raw(""));
         lines.push(Line::from(Span::styled(
             "Could not load details — check network".to_string(),
-            Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
         )));
     }
 
@@ -240,41 +264,56 @@ fn thousands(n: u64) -> String {
 ///  - Esc → PackBrowserClose.
 pub fn map_pack_browser_event(ev: CtEvent, state: &AppState) -> Option<Action> {
     let (search_empty, slug, kind) = match &state.active_view {
-        ActiveView::PackBrowser { search, slug, kind, .. } => {
-            (search.is_empty(), slug.clone(), *kind)
-        }
+        ActiveView::PackBrowser {
+            search, slug, kind, ..
+        } => (search.is_empty(), slug.clone(), *kind),
         _ => return None,
     };
 
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Up, .. }) => Some(Action::PackBrowserMove(-1)),
-        CtEvent::Key(KeyEvent { code: KeyCode::Down, .. }) => Some(Action::PackBrowserMove(1)),
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::PackBrowserClose),
-        CtEvent::Key(KeyEvent { code: KeyCode::Backspace, .. }) => {
-            Some(Action::PackBrowserBackspaceSearch)
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
-            Some(Action::InstallPackFromBrowser { slug, kind })
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Up, ..
+        }) => Some(Action::PackBrowserMove(-1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Down,
+            ..
+        }) => Some(Action::PackBrowserMove(1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::PackBrowserClose),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        }) => Some(Action::PackBrowserBackspaceSearch),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        }) => Some(Action::InstallPackFromBrowser { slug, kind }),
         // D (uppercase) opens the drop-from-path modal — kind inherited.
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('D'), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('D'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
             Some(Action::PackDropPathOpen { slug, kind })
         }
         // j/k disambiguation.
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('k'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
             if search_empty {
                 Some(Action::PackBrowserMove(-1))
             } else {
                 Some(Action::PackBrowserTypeSearch('k'))
             }
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('j'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
             if search_empty {
                 Some(Action::PackBrowserMove(1))
             } else {
@@ -282,11 +321,11 @@ pub fn map_pack_browser_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             }
         }
         // All other printable chars → search input.
-        CtEvent::Key(KeyEvent { code: KeyCode::Char(c), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
-            Some(Action::PackBrowserTypeSearch(c))
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::PackBrowserTypeSearch(c)),
         CtEvent::Paste(s) => Some(Action::PackBrowserPasteSearch(s)),
         _ => None,
     }
@@ -375,7 +414,10 @@ mod tests {
         assert!(
             matches!(
                 result,
-                Some(Action::PackDropPathOpen { kind: PackKind::Resource, .. })
+                Some(Action::PackDropPathOpen {
+                    kind: PackKind::Resource,
+                    ..
+                })
             ),
             "expected PackDropPathOpen(Resource); got {result:?}"
         );
@@ -388,7 +430,10 @@ mod tests {
         assert!(
             matches!(
                 result,
-                Some(Action::PackDropPathOpen { kind: PackKind::Shader, .. })
+                Some(Action::PackDropPathOpen {
+                    kind: PackKind::Shader,
+                    ..
+                })
             ),
             "expected PackDropPathOpen(Shader); got {result:?}"
         );

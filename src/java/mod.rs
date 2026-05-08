@@ -6,5 +6,5 @@ pub mod adoptium;
 pub mod detect;
 pub mod mapping;
 pub mod mojang_jre;
-pub mod types;
 pub mod service;
+pub mod types;

@@ -33,20 +33,31 @@ async fn test_full_lifecycle() {
     let list = list_instances(&paths).await.unwrap();
     assert_eq!(list.len(), 2);
 
-    let renamed = rename_instance(&paths, "alpha", "Alpha Renamed").await.unwrap();
+    let renamed = rename_instance(&paths, "alpha", "Alpha Renamed")
+        .await
+        .unwrap();
     assert_eq!(renamed.display_name, "Alpha Renamed");
     assert_eq!(renamed.slug, "alpha");
     assert!(paths.instance_dir("alpha").exists());
 
-    let grouped = set_group(&paths, "alpha", Some("vanilla".into())).await.unwrap();
+    let grouped = set_group(&paths, "alpha", Some("vanilla".into()))
+        .await
+        .unwrap();
     assert_eq!(grouped.group.as_deref(), Some("vanilla"));
 
-    let mod_path = paths.instance_minecraft_dir("alpha").join("mods").join("fakemod.jar");
+    let mod_path = paths
+        .instance_minecraft_dir("alpha")
+        .join("mods")
+        .join("fakemod.jar");
     tokio::fs::write(&mod_path, b"mod contents").await.unwrap();
-    let cloned = clone_instance(&paths, "alpha", "Alpha Clone").await.unwrap();
+    let cloned = clone_instance(&paths, "alpha", "Alpha Clone")
+        .await
+        .unwrap();
     assert_eq!(cloned.slug, "alpha-clone");
-    let cloned_mod =
-        paths.instance_minecraft_dir("alpha-clone").join("mods").join("fakemod.jar");
+    let cloned_mod = paths
+        .instance_minecraft_dir("alpha-clone")
+        .join("mods")
+        .join("fakemod.jar");
     assert_eq!(tokio::fs::read(&cloned_mod).await.unwrap(), b"mod contents");
 
     delete_instance(&paths, "alpha").await.unwrap();

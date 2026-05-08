@@ -3,13 +3,13 @@
 
 use std::collections::HashMap;
 
-use mineltui::mojang::{AssetIndexFile, Library, Rule, VersionJson, VersionManifest};
-use mineltui::mojang::rules::RuleContext;
-use mineltui::mojang::rules::evaluate_rules;
-use mineltui::mojang::natives::needs_native_extraction;
-use mineltui::mojang::inherits::resolve_inherits;
-use mineltui::error::AppError;
 use mineltui::domain::platform::{Arch, OsName};
+use mineltui::error::AppError;
+use mineltui::mojang::inherits::resolve_inherits;
+use mineltui::mojang::natives::needs_native_extraction;
+use mineltui::mojang::rules::evaluate_rules;
+use mineltui::mojang::rules::RuleContext;
+use mineltui::mojang::{AssetIndexFile, Library, Rule, VersionJson, VersionManifest};
 
 // ---------------------------------------------------------------------------
 // Task 2-02-01: Parse tests (tests 1–7)
@@ -19,15 +19,24 @@ use mineltui::domain::platform::{Arch, OsName};
 fn test_parse_manifest() {
     let raw = include_str!("./fixtures/mojang/version_manifest_v2_sample.json");
     let manifest: VersionManifest = serde_json::from_str(raw).expect("manifest must parse");
-    assert!(!manifest.latest.release.is_empty(), "latest.release must be non-empty");
-    assert!(manifest.versions.len() >= 10, "versions list must have >= 10 entries");
+    assert!(
+        !manifest.latest.release.is_empty(),
+        "latest.release must be non-empty"
+    );
+    assert!(
+        manifest.versions.len() >= 10,
+        "versions list must have >= 10 entries"
+    );
     assert_eq!(
         manifest.versions[0].sha1.len(),
         40,
         "first version sha1 must be 40 chars"
     );
     assert!(
-        manifest.versions.iter().any(|v| v.version_type == "snapshot"),
+        manifest
+            .versions
+            .iter()
+            .any(|v| v.version_type == "snapshot"),
         "manifest sample must contain at least one snapshot entry for VERS-02 regression"
     );
 }
@@ -39,13 +48,25 @@ fn test_parse_modern_version_json() {
     assert_eq!(v.id, "1.21.4");
     assert_eq!(v.version_type, "release");
     assert_eq!(v.main_class, "net.minecraft.client.main.Main");
-    assert!(v.arguments.is_some(), "1.21.4 must have structured arguments");
-    assert!(v.minecraft_arguments.is_none(), "1.21.4 must not have legacy minecraftArguments");
+    assert!(
+        v.arguments.is_some(),
+        "1.21.4 must have structured arguments"
+    );
+    assert!(
+        v.minecraft_arguments.is_none(),
+        "1.21.4 must not have legacy minecraftArguments"
+    );
     assert_eq!(
-        v.java_version.as_ref().expect("javaVersion must be present").major_version,
+        v.java_version
+            .as_ref()
+            .expect("javaVersion must be present")
+            .major_version,
         21
     );
-    let aid = v.asset_index.as_ref().expect("vanilla 1.21.4 declares assetIndex");
+    let aid = v
+        .asset_index
+        .as_ref()
+        .expect("vanilla 1.21.4 declares assetIndex");
     let assets = v.assets.as_ref().expect("vanilla 1.21.4 declares assets");
     assert_eq!(&aid.id, assets, "assetIndex.id must equal assets field");
 }
@@ -56,8 +77,14 @@ fn test_parse_legacy_version_json() {
     let v: VersionJson = serde_json::from_str(raw).expect("1.12.2 must parse");
     assert_eq!(v.id, "1.12.2");
     assert_eq!(v.version_type, "release");
-    assert!(v.arguments.is_none(), "1.12.2 must not have structured arguments");
-    assert!(v.minecraft_arguments.is_some(), "1.12.2 must have legacy minecraftArguments");
+    assert!(
+        v.arguments.is_none(),
+        "1.12.2 must not have structured arguments"
+    );
+    assert!(
+        v.minecraft_arguments.is_some(),
+        "1.12.2 must have legacy minecraftArguments"
+    );
     assert!(
         v.minecraft_arguments
             .as_ref()
@@ -71,16 +98,29 @@ fn test_parse_legacy_version_json() {
 fn test_parse_asset_index_virtual() {
     let raw = include_str!("./fixtures/mojang/asset_index_1_6_4.json");
     let idx: AssetIndexFile = serde_json::from_str(raw).expect("asset_index_1_6_4 must parse");
-    assert_eq!(idx.virtual_, Some(true), "1.6.4 asset index must have virtual == true");
-    assert!(idx.objects.len() > 100, "1.6.4 asset index must have many objects");
+    assert_eq!(
+        idx.virtual_,
+        Some(true),
+        "1.6.4 asset index must have virtual == true"
+    );
+    assert!(
+        idx.objects.len() > 100,
+        "1.6.4 asset index must have many objects"
+    );
 }
 
 #[test]
 fn test_parse_asset_index_modern() {
     let raw = include_str!("./fixtures/mojang/asset_index_1_7_10.json");
     let idx: AssetIndexFile = serde_json::from_str(raw).expect("asset_index_1_7_10 must parse");
-    assert!(idx.virtual_ != Some(true), "1.7.10 asset index must not have virtual=true");
-    assert!(!idx.objects.is_empty(), "1.7.10 asset index must have objects");
+    assert!(
+        idx.virtual_ != Some(true),
+        "1.7.10 asset index must not have virtual=true"
+    );
+    assert!(
+        !idx.objects.is_empty(),
+        "1.7.10 asset index must have objects"
+    );
 }
 
 #[test]
@@ -104,7 +144,8 @@ fn test_instance_manifest_unknown_fields_tolerated() {
         "unknownFieldFromFutureVersion": true,
         "anotherUnknownField": { "nested": "value" }
     }"#;
-    let v: VersionJson = serde_json::from_str(json).expect("unknown fields must not cause parse failure");
+    let v: VersionJson =
+        serde_json::from_str(json).expect("unknown fields must not cause parse failure");
     assert_eq!(v.id, "test-version");
 }
 
@@ -113,8 +154,14 @@ fn test_parse_snapshot_version_json() {
     let raw = include_str!("./fixtures/mojang/version_snapshot_pinned.json");
     let v: VersionJson = serde_json::from_str(raw).expect("snapshot fixture must parse");
     // VERS-02: the parser must accept a snapshot without filtering
-    assert_eq!(v.version_type, "snapshot", "pinned snapshot must have type == snapshot");
-    assert!(!v.main_class.is_empty(), "mainClass must be non-empty in snapshot");
+    assert_eq!(
+        v.version_type, "snapshot",
+        "pinned snapshot must have type == snapshot"
+    );
+    assert!(
+        !v.main_class.is_empty(),
+        "mainClass must be non-empty in snapshot"
+    );
     assert!(
         !v.asset_index
             .as_ref()
@@ -167,17 +214,28 @@ fn vjson_stub(id: &str) -> VersionJson {
 #[test]
 fn test_library_rules_empty_array() {
     let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-    assert!(evaluate_rules(&[], &ctx), "empty rules must return true (include)");
+    assert!(
+        evaluate_rules(&[], &ctx),
+        "empty rules must return true (include)"
+    );
 }
 
 // Test 9
 #[test]
 fn test_library_rules_allow_linux_only_on_linux() {
-    let rules = vec![rule_from_json(r#"{"action":"allow","os":{"name":"linux"}}"#)];
+    let rules = vec![rule_from_json(
+        r#"{"action":"allow","os":{"name":"linux"}}"#,
+    )];
     let linux_ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
     let windows_ctx = RuleContext::for_os_arch(OsName::Windows, Arch::X86_64);
-    assert!(evaluate_rules(&rules, &linux_ctx), "linux-only rule must be true on linux");
-    assert!(!evaluate_rules(&rules, &windows_ctx), "linux-only rule must be false on windows");
+    assert!(
+        evaluate_rules(&rules, &linux_ctx),
+        "linux-only rule must be true on linux"
+    );
+    assert!(
+        !evaluate_rules(&rules, &windows_ctx),
+        "linux-only rule must be false on windows"
+    );
 }
 
 // Test 10
@@ -226,7 +284,10 @@ fn test_needs_extraction_legacy_library() {
         "natives": { "linux": "natives-linux", "windows": "natives-windows" }
     }"#;
     let lib: Library = serde_json::from_str(lib_json).expect("legacy library must parse");
-    assert!(needs_native_extraction(&lib), "pre-1.19 library with natives+classifiers must need extraction");
+    assert!(
+        needs_native_extraction(&lib),
+        "pre-1.19 library with natives+classifiers must need extraction"
+    );
 }
 
 // Test 13
@@ -282,7 +343,11 @@ fn test_inherits_from_two_level_merge() {
 
     let merged = resolve_inherits(&child, &parents).expect("two-level merge must succeed");
     assert_eq!(merged.main_class, "B", "child mainClass must win");
-    assert_eq!(merged.libraries.len(), 2, "merged libraries must have both entries");
+    assert_eq!(
+        merged.libraries.len(),
+        2,
+        "merged libraries must have both entries"
+    );
     let game_args: Vec<String> = merged
         .arguments
         .unwrap()
@@ -296,7 +361,11 @@ fn test_inherits_from_two_level_merge() {
             }
         })
         .collect();
-    assert_eq!(game_args, vec!["-g0", "-g1"], "game args must be parent-first then child");
+    assert_eq!(
+        game_args,
+        vec!["-g0", "-g1"],
+        "game args must be parent-first then child"
+    );
 }
 
 // Test 15
@@ -316,7 +385,11 @@ fn test_inherits_from_library_dedup_by_group_artifact() {
     parents.insert("parent".to_string(), parent);
 
     let merged = resolve_inherits(&child, &parents).expect("dedup merge must succeed");
-    assert_eq!(merged.libraries.len(), 1, "dedup by group:artifact must yield exactly 1 library");
+    assert_eq!(
+        merged.libraries.len(),
+        1,
+        "dedup by group:artifact must yield exactly 1 library"
+    );
     assert!(
         merged.libraries[0].name.contains("2.0"),
         "child version (2.0) must survive dedup"
@@ -405,8 +478,7 @@ use mineltui::mojang::types::ResolvedVersion;
 /// downloads populated) and no inheritsFrom, so resolve produces a clean
 /// ResolvedVersion with `root_id == id`.
 fn resolved(v: &VersionJson) -> ResolvedVersion {
-    resolve_inherits(v, &HashMap::new())
-        .expect("vanilla-shape VersionJson must resolve cleanly")
+    resolve_inherits(v, &HashMap::new()).expect("vanilla-shape VersionJson must resolve cleanly")
 }
 
 // Test 20
@@ -421,7 +493,10 @@ fn test_resolve_game_args_1_21_4_flattens_structured_args() {
         result.contains(&"--username".to_string()),
         "result must contain --username; got: {result:?}"
     );
-    assert!(result.contains(&"--version".to_string()), "result must contain --version");
+    assert!(
+        result.contains(&"--version".to_string()),
+        "result must contain --version"
+    );
 }
 
 // Test 21
@@ -431,7 +506,11 @@ fn test_resolve_game_args_1_12_2_splits_minecraft_arguments_on_whitespace() {
     let v: VersionJson = serde_json::from_str(raw).unwrap();
     let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
     let result = resolve_game_args(&resolved(&v), &ctx);
-    assert!(result.len() > 10, "1.12.2 split args must have many tokens; got {}", result.len());
+    assert!(
+        result.len() > 10,
+        "1.12.2 split args must have many tokens; got {}",
+        result.len()
+    );
     assert!(
         result.iter().any(|s| s == "--username"),
         "result must contain --username; got: {result:?}"

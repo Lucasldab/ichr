@@ -12,8 +12,12 @@ use ratatui::Frame;
 use crate::tui::app::{Action, ActiveView, AppState};
 
 pub fn render_loader_switch_confirm(f: &mut Frame, area: Rect, state: &AppState) {
-    let ActiveView::LoaderSwitchConfirm { slug, from_loader, to_loader, type_switch } =
-        &state.active_view
+    let ActiveView::LoaderSwitchConfirm {
+        slug,
+        from_loader,
+        to_loader,
+        type_switch,
+    } = &state.active_view
     else {
         return;
     };
@@ -47,7 +51,11 @@ pub fn render_loader_switch_confirm(f: &mut Frame, area: Rect, state: &AppState)
         Style::default().add_modifier(Modifier::DIM),
     )));
 
-    let title = if to_loader == "none" { " Remove loader? " } else { " Switch loader? " };
+    let title = if to_loader == "none" {
+        " Remove loader? "
+    } else {
+        " Switch loader? "
+    };
     let para = Paragraph::new(lines)
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL).title(title));
@@ -57,10 +65,14 @@ pub fn render_loader_switch_confirm(f: &mut Frame, area: Rect, state: &AppState)
 pub fn map_loader_switch_confirm_event(ev: ratatui::crossterm::event::Event) -> Option<Action> {
     use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('y'), .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('Y'), .. }) => {
-            Some(Action::ConfirmLoaderSwitch)
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('y'),
+            ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('Y'),
+            ..
+        }) => Some(Action::ConfirmLoaderSwitch),
         CtEvent::Key(_) => Some(Action::CancelLoaderSwitch),
         _ => None,
     }

@@ -30,7 +30,12 @@ pub fn render_mod_version_picker_modal(f: &mut Frame, area: Rect, state: &AppSta
     let modal_h = (area.height.saturating_sub(4)).min(20);
     let x = area.x + area.width.saturating_sub(modal_w) / 2;
     let y = area.y + area.height.saturating_sub(modal_h) / 2;
-    let modal_area = Rect { x, y, width: modal_w, height: modal_h };
+    let modal_area = Rect {
+        x,
+        y,
+        width: modal_w,
+        height: modal_h,
+    };
 
     f.render_widget(Clear, modal_area);
 
@@ -42,10 +47,13 @@ pub fn render_mod_version_picker_modal(f: &mut Frame, area: Rect, state: &AppSta
     // ---- Version list ----
     let items: Vec<ListItem> = if versions.is_empty() {
         // UI-SPEC line 651 — empty/no-compatible-versions copy.
-        vec![ListItem::new(
-            "No versions match MC + loader — press Esc and adjust filters",
-        )
-        .style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM))]
+        vec![
+            ListItem::new("No versions match MC + loader — press Esc and adjust filters").style(
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
+            ),
+        ]
     } else {
         versions
             .iter()
@@ -57,7 +65,9 @@ pub fn render_mod_version_picker_modal(f: &mut Frame, area: Rect, state: &AppSta
                     // UI-SPEC line 650: "← latest" suffix on first stable row, DIM.
                     spans.push(Span::styled(
                         "   ← latest".to_string(),
-                        Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::DIM),
                     ));
                 }
                 let style = if i == *selected {
@@ -87,16 +97,28 @@ pub fn render_mod_version_picker_modal(f: &mut Frame, area: Rect, state: &AppSta
 
 pub fn map_mod_version_picker_event(ev: CtEvent) -> Option<Action> {
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Up, .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
-            Some(Action::ModVersionPickerMove(-1))
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Down, .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
-            Some(Action::ModVersionPickerMove(1))
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => Some(Action::ModVersionPickerSelect),
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::ModVersionPickerCancel),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Up, ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('k'),
+            ..
+        }) => Some(Action::ModVersionPickerMove(-1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Down,
+            ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('j'),
+            ..
+        }) => Some(Action::ModVersionPickerMove(1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        }) => Some(Action::ModVersionPickerSelect),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::ModVersionPickerCancel),
         _ => None,
     }
 }

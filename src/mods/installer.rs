@@ -26,8 +26,8 @@ use crate::mods::filter::{is_safe_mod_filename, pick_primary_file};
 use crate::mods::ledger::{per_instance_lock, upsert_mod};
 use crate::mods::modrinth::client::MAX_MOD_FILE_BYTES;
 use crate::mods::types::{
-    DepKind, HashAlgo, InstalledItemKind, InstalledModRow, ModSource, ModrinthFile, ModrinthVersion,
-    ResolvedDep,
+    DepKind, HashAlgo, InstalledItemKind, InstalledModRow, ModSource, ModrinthFile,
+    ModrinthVersion, ResolvedDep,
 };
 use crate::persistence::paths::AppPaths;
 use crate::tasks::{JobId, TaskEvent};
@@ -108,8 +108,7 @@ pub async fn download_and_verify(
         if token.is_cancelled() {
             return Err(ModrinthError::Cancelled);
         }
-        let chunk = chunk
-            .map_err(|e| ModrinthError::Http(format!("body {}: {e}", file.url)))?;
+        let chunk = chunk.map_err(|e| ModrinthError::Http(format!("body {}: {e}", file.url)))?;
         bytes_done += chunk.len() as u64;
         // Defense in depth -- abort if mid-stream bytes exceed cap (tampered Content-Length).
         if bytes_done > MAX_MOD_FILE_BYTES {
@@ -309,8 +308,7 @@ pub async fn download_one_with_hash_algo(
         if token.is_cancelled() {
             return Err(ModrinthError::Cancelled);
         }
-        let chunk = chunk
-            .map_err(|e| ModrinthError::Http(format!("body {url}: {e}")))?;
+        let chunk = chunk.map_err(|e| ModrinthError::Http(format!("body {url}: {e}")))?;
         bytes_done += chunk.len() as u64;
         if bytes_done > MAX_MOD_FILE_BYTES {
             return Err(ModrinthError::FileNotDownloadable {
@@ -536,14 +534,9 @@ pub async fn install_mods_into_instance(
         let token = token.clone();
 
         set.spawn(async move {
-            let _permit = sem
-                .acquire_owned()
-                .await
-                .map_err(|e| {
-                    ModrinthError::Io(std::io::Error::other(format!(
-                        "semaphore closed: {e}"
-                    )))
-                })?;
+            let _permit = sem.acquire_owned().await.map_err(|e| {
+                ModrinthError::Io(std::io::Error::other(format!("semaphore closed: {e}")))
+            })?;
             if token.is_cancelled() {
                 return Err(ModrinthError::Cancelled);
             }
@@ -666,9 +659,7 @@ mod tests {
 
     /// Spawn a background drain so the channel never fills during tests.
     fn drain(mut rx: mpsc::Receiver<TaskEvent>) {
-        tokio::spawn(async move {
-            while rx.recv().await.is_some() {}
-        });
+        tokio::spawn(async move { while rx.recv().await.is_some() {} });
     }
 
     #[tokio::test]
@@ -686,7 +677,10 @@ mod tests {
 
         let td = TempDir::new().unwrap();
         let dest = td.path().join("x.jar.tmp");
-        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let http = reqwest::Client::builder()
+            .user_agent("test")
+            .build()
+            .unwrap();
         let (tx, rx) = mpsc::channel(8);
         drain(rx);
         let token = CancellationToken::new();
@@ -713,7 +707,10 @@ mod tests {
         });
         let td = TempDir::new().unwrap();
         let dest = td.path().join("x.jar.tmp");
-        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let http = reqwest::Client::builder()
+            .user_agent("test")
+            .build()
+            .unwrap();
         let (tx, rx) = mpsc::channel(8);
         drain(rx);
         let token = CancellationToken::new();
@@ -750,7 +747,10 @@ mod tests {
 
         let td = TempDir::new().unwrap();
         let dest = td.path().join("x.jar.tmp");
-        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let http = reqwest::Client::builder()
+            .user_agent("test")
+            .build()
+            .unwrap();
         let (tx, rx) = mpsc::channel(8);
         drain(rx);
         let token = CancellationToken::new();
@@ -770,7 +770,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_max_mod_file_bytes_rejects_advertised_oversize() {
-        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let http = reqwest::Client::builder()
+            .user_agent("test")
+            .build()
+            .unwrap();
         let td = TempDir::new().unwrap();
         let dest = td.path().join("big.jar.tmp");
         let (tx, rx) = mpsc::channel(8);
@@ -783,12 +786,18 @@ mod tests {
             "https://example.invalid/big.jar".into(),
         );
         let r = download_and_verify(&http, &f, &dest, &tx, JobId(0), &token, 0, 1).await;
-        assert!(matches!(r, Err(ModrinthError::FileNotDownloadable { .. })), "got {r:?}");
+        assert!(
+            matches!(r, Err(ModrinthError::FileNotDownloadable { .. })),
+            "got {r:?}"
+        );
     }
 
     #[tokio::test]
     async fn test_rejects_unsafe_filename() {
-        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let http = reqwest::Client::builder()
+            .user_agent("test")
+            .build()
+            .unwrap();
         let td = TempDir::new().unwrap();
         let dest = td.path().join("x.tmp");
         let (tx, rx) = mpsc::channel(8);
@@ -806,25 +815,29 @@ mod tests {
 
     #[tokio::test]
     async fn test_rejects_non_https_url() {
-        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let http = reqwest::Client::builder()
+            .user_agent("test")
+            .build()
+            .unwrap();
         let td = TempDir::new().unwrap();
         let dest = td.path().join("x.tmp");
         let (tx, rx) = mpsc::channel(8);
         drain(rx);
         let token = CancellationToken::new();
-        let f = mk_file(
-            "x.jar",
-            10,
-            "0",
-            "http://insecure.example.com/x.jar".into(),
-        );
+        let f = mk_file("x.jar", 10, "0", "http://insecure.example.com/x.jar".into());
         let r = download_and_verify(&http, &f, &dest, &tx, JobId(0), &token, 0, 1).await;
-        assert!(matches!(r, Err(ModrinthError::FileNotDownloadable { .. })), "got {r:?}");
+        assert!(
+            matches!(r, Err(ModrinthError::FileNotDownloadable { .. })),
+            "got {r:?}"
+        );
     }
 
     #[tokio::test]
     async fn test_cancelled_before_send_returns_cancelled() {
-        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let http = reqwest::Client::builder()
+            .user_agent("test")
+            .build()
+            .unwrap();
         let td = TempDir::new().unwrap();
         let dest = td.path().join("x.jar.tmp");
         let (tx, rx) = mpsc::channel(8);
@@ -860,8 +873,7 @@ mod tests {
                 },
             }],
         };
-        let plan =
-            build_install_plan(&v, "rootslug", "Root Title", &[], || "now".into()).unwrap();
+        let plan = build_install_plan(&v, "rootslug", "Root Title", &[], || "now".into()).unwrap();
         assert_eq!(plan.len(), 1);
         assert_eq!(plan[0].row.mod_id, "rootp");
         assert_eq!(plan[0].row.project_slug, "rootslug");
@@ -1007,7 +1019,10 @@ mod tests {
             file,
         }];
 
-        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let http = reqwest::Client::builder()
+            .user_agent("test")
+            .build()
+            .unwrap();
         let (tx, rx) = mpsc::channel(16);
         drain(rx);
         let token = CancellationToken::new();
@@ -1034,7 +1049,9 @@ mod tests {
         );
 
         // Ledger has the row.
-        let l = crate::mods::ledger::read_ledger(&paths, "inst1").await.unwrap();
+        let l = crate::mods::ledger::read_ledger(&paths, "inst1")
+            .await
+            .unwrap();
         assert_eq!(l.mods.len(), 1);
         assert_eq!(l.mods[0].mod_id, "AANobbMI");
         assert!(l.mods[0].enabled);
@@ -1085,7 +1102,10 @@ mod tests {
             installed_at: "2026-01-01T00:00:00Z".into(),
         };
         let plan = vec![InstallStep { row, file }];
-        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let http = reqwest::Client::builder()
+            .user_agent("test")
+            .build()
+            .unwrap();
         let (tx, rx) = mpsc::channel(8);
         drain(rx);
         let token = CancellationToken::new();
@@ -1099,12 +1119,17 @@ mod tests {
             JobId(1),
         )
         .await;
-        assert!(matches!(r, Err(ModrinthError::Sha512Mismatch { .. })), "got {r:?}");
+        assert!(
+            matches!(r, Err(ModrinthError::Sha512Mismatch { .. })),
+            "got {r:?}"
+        );
 
         // Final jar must NOT exist; ledger must be empty.
         let final_path = paths.instance_mod_file("inst", "x.jar");
         assert!(!final_path.exists(), "no final jar on hash mismatch");
-        let l = crate::mods::ledger::read_ledger(&paths, "inst").await.unwrap();
+        let l = crate::mods::ledger::read_ledger(&paths, "inst")
+            .await
+            .unwrap();
         assert!(l.mods.is_empty(), "no ledger row on hash mismatch");
     }
 
@@ -1126,7 +1151,10 @@ mod tests {
 
         let td = TempDir::new().unwrap();
         let dest = td.path().join("x.jar.tmp");
-        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let http = reqwest::Client::builder()
+            .user_agent("test")
+            .build()
+            .unwrap();
         let (tx, rx) = mpsc::channel(64);
         drain(rx);
         let token = CancellationToken::new();
@@ -1161,7 +1189,10 @@ mod tests {
         });
         let td = TempDir::new().unwrap();
         let dest = td.path().join("x.jar.tmp");
-        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let http = reqwest::Client::builder()
+            .user_agent("test")
+            .build()
+            .unwrap();
         let (tx, rx) = mpsc::channel(64);
         drain(rx);
         let token = CancellationToken::new();
@@ -1204,7 +1235,10 @@ mod tests {
         });
         let td = TempDir::new().unwrap();
         let dest = td.path().join("x.jar.tmp");
-        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let http = reqwest::Client::builder()
+            .user_agent("test")
+            .build()
+            .unwrap();
         let (tx, rx) = mpsc::channel(64);
         drain(rx);
         let token = CancellationToken::new();
@@ -1243,7 +1277,10 @@ mod tests {
         });
         let td = TempDir::new().unwrap();
         let dest = td.path().join("x.jar.tmp");
-        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let http = reqwest::Client::builder()
+            .user_agent("test")
+            .build()
+            .unwrap();
         let (tx, rx) = mpsc::channel(64);
         drain(rx);
         let token = CancellationToken::new();
@@ -1302,21 +1339,16 @@ mod tests {
                 },
             },
         }];
-        let http = reqwest::Client::builder().user_agent("test").build().unwrap();
+        let http = reqwest::Client::builder()
+            .user_agent("test")
+            .build()
+            .unwrap();
         let (tx, rx) = mpsc::channel(8);
         drain(rx);
         let token = CancellationToken::new();
         token.cancel();
-        let r = install_mods_into_instance(
-            http,
-            paths,
-            "inst".into(),
-            plan,
-            tx,
-            token,
-            JobId(1),
-        )
-        .await;
+        let r =
+            install_mods_into_instance(http, paths, "inst".into(), plan, tx, token, JobId(1)).await;
         assert!(matches!(r, Err(ModrinthError::Cancelled)), "got {r:?}");
     }
 }

@@ -7,8 +7,12 @@ use ratatui::Frame;
 use crate::tui::app::{ActiveView, AppState, CreateStep, VersionFilter};
 
 pub fn render_version_picker(f: &mut Frame, area: Rect, state: &AppState) {
-    let ActiveView::CreateModal(CreateStep::VersionPicker { name, filter, search, error }) =
-        &state.active_view
+    let ActiveView::CreateModal(CreateStep::VersionPicker {
+        name,
+        filter,
+        search,
+        error,
+    }) = &state.active_view
     else {
         return;
     };
@@ -34,10 +38,16 @@ pub fn render_version_picker(f: &mut Frame, area: Rect, state: &AppState) {
     // Header
     let header_text = vec![
         Line::from(format!("Instance: {name}")),
-        Line::from(Span::styled(filter_label, Style::default().fg(Color::DarkGray))),
+        Line::from(Span::styled(
+            filter_label,
+            Style::default().fg(Color::DarkGray),
+        )),
     ];
-    let header = Paragraph::new(header_text)
-        .block(Block::default().borders(Borders::ALL).title("Select Version"));
+    let header = Paragraph::new(header_text).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Select Version"),
+    );
     f.render_widget(header, chunks[0]);
 
     // Search bar
@@ -74,7 +84,9 @@ pub fn render_version_picker(f: &mut Frame, area: Rect, state: &AppState) {
         })
         .collect();
 
-    let mut error_block = Block::default().borders(Borders::ALL).title("Versions (Enter / Esc)");
+    let mut error_block = Block::default()
+        .borders(Borders::ALL)
+        .title("Versions (Enter / Esc)");
     if let Some(err) = error {
         error_block = error_block.title(format!("Versions — {err}"));
     }

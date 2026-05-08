@@ -11,9 +11,9 @@ use crate::tui::app::{ActiveView, AppState};
 
 pub fn render_accounts_list(f: &mut Frame, area: Rect, state: &AppState) {
     let chunks = Layout::vertical([
-        Constraint::Length(3),  // header
-        Constraint::Min(5),     // table
-        Constraint::Length(3),  // keybind hint
+        Constraint::Length(3), // header
+        Constraint::Min(5),    // table
+        Constraint::Length(3), // keybind hint
     ])
     .split(area);
 
@@ -67,10 +67,8 @@ pub fn render_accounts_list(f: &mut Frame, area: Rect, state: &AppState) {
         f.render_widget(table, chunks[1]);
     }
 
-    let hint = Paragraph::new(Line::from(
-        "a add  x remove  Enter activate  Esc close",
-    ))
-    .block(Block::default().borders(Borders::ALL));
+    let hint = Paragraph::new(Line::from("a add  x remove  Enter activate  Esc close"))
+        .block(Block::default().borders(Borders::ALL));
     f.render_widget(hint, chunks[2]);
 }
 

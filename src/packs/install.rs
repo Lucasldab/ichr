@@ -74,30 +74,41 @@ pub async fn drop_pack_from_path(
     // ── (1) file_name extraction (path-traversal guard — Pitfall 4) ──────────
     // Path::file_name() is called BEFORE any .join(); the raw source_path
     // string is NEVER concatenated into the dest path.
-    let dest_filename_os = source_path
-        .file_name()
-        .ok_or_else(|| PackError::NotFound { path: source_path.display().to_string() })?;
+    let dest_filename_os = source_path.file_name().ok_or_else(|| PackError::NotFound {
+        path: source_path.display().to_string(),
+    })?;
     let dest_filename = dest_filename_os.to_string_lossy().into_owned();
 
     // ── (2) Extension check (case-insensitive — Windows NTFS) ────────────────
     if !dest_filename.to_ascii_lowercase().ends_with(".zip") {
-        return Err(PackError::NotAZip { path: dest_filename });
+        return Err(PackError::NotAZip {
+            path: dest_filename,
+        });
     }
 
     // ── (3) is_safe_pack_filename allowlist ───────────────────────────────────
     if !is_safe_pack_filename(&dest_filename) {
-        return Err(PackError::UnsafeFilename { filename: dest_filename });
+        return Err(PackError::UnsafeFilename {
+            filename: dest_filename,
+        });
     }
 
     // ── (4) metadata + size cap ───────────────────────────────────────────────
     let meta = tokio::fs::metadata(source_path)
         .await
-        .map_err(|_| PackError::NotFound { path: source_path.display().to_string() })?;
+        .map_err(|_| PackError::NotFound {
+            path: source_path.display().to_string(),
+        })?;
     if !meta.is_file() {
-        return Err(PackError::NotFound { path: source_path.display().to_string() });
+        return Err(PackError::NotFound {
+            path: source_path.display().to_string(),
+        });
     }
     if meta.len() > MAX_PACK_FILE_BYTES {
-        return Err(PackError::FileTooLarge { bytes: meta.len(), cap: MAX_PACK_FILE_BYTES });
+        return Err(PackError::FileTooLarge {
+            bytes: meta.len(),
+            cap: MAX_PACK_FILE_BYTES,
+        });
     }
 
     // ── (5) Collision check (D-LOCK refuse — 1:1 ledger/disk invariant) ──────
@@ -113,12 +124,12 @@ pub async fn drop_pack_from_path(
     }
 
     // ── (7) Defensive create_dir_all (Pitfall 3 — old instances) ─────────────
-    tokio::fs::create_dir_all(&dest_dir)
-        .await
-        .map_err(|e| PackError::Io(std::io::Error::other(format!(
+    tokio::fs::create_dir_all(&dest_dir).await.map_err(|e| {
+        PackError::Io(std::io::Error::other(format!(
             "create_dir_all {}: {e}",
             dest_dir.display()
-        ))))?;
+        )))
+    })?;
 
     // ── (8) Cancel-aware read + write ─────────────────────────────────────────
     // We read the entire source file into memory (up to 500 MB at v1 scale;
@@ -160,9 +171,12 @@ pub async fn drop_pack_from_path(
         }
         res = write_fut => res,
     };
-    write_result.map_err(|e| PackError::Io(std::io::Error::other(
-        format!("write dest {}: {e}", dest_path.display())
-    )))?;
+    write_result.map_err(|e| {
+        PackError::Io(std::io::Error::other(format!(
+            "write dest {}: {e}",
+            dest_path.display()
+        )))
+    })?;
 
     // ── (9) Build ledger row ──────────────────────────────────────────────────
     // mod_id convention for local packs: "local:{first-16-chars-of-sha1-hex}"
@@ -192,7 +206,10 @@ pub async fn drop_pack_from_path(
         .await
         .map_err(PackError::Modrinth)?;
 
-    Ok(DropPackOutcome { row, dest: dest_path })
+    Ok(DropPackOutcome {
+        row,
+        dest: dest_path,
+    })
 }
 
 /// Strip the `.zip` suffix case-insensitively from a filename.
@@ -275,9 +292,13 @@ mod tests {
         let paths = test_paths(&td);
         let nonexistent = td.path().join("does_not_exist.zip");
         let res = drop_pack_from_path(
-            &paths, "my-instance", PackKind::Resource,
-            &nonexistent, &fresh_token(),
-        ).await;
+            &paths,
+            "my-instance",
+            PackKind::Resource,
+            &nonexistent,
+            &fresh_token(),
+        )
+        .await;
         match res {
             Err(PackError::NotFound { path }) => {
                 assert!(path.contains("does_not_exist.zip"), "path missing: {path}");
@@ -292,9 +313,13 @@ mod tests {
         let paths = test_paths(&td);
         let src = write_file(td.path(), "pack.tar.gz", b"not a zip");
         let res = drop_pack_from_path(
-            &paths, "my-instance", PackKind::Resource,
-            &src, &fresh_token(),
-        ).await;
+            &paths,
+            "my-instance",
+            PackKind::Resource,
+            &src,
+            &fresh_token(),
+        )
+        .await;
         assert!(
             matches!(res, Err(PackError::NotAZip { .. })),
             "expected NotAZip, got: {res:?}"
@@ -308,9 +333,13 @@ mod tests {
         let src_td = TempDir::new().unwrap();
         let src = write_file(src_td.path(), "Pack.ZIP", b"fake zip bytes");
         let res = drop_pack_from_path(
-            &paths, "my-instance", PackKind::Resource,
-            &src, &fresh_token(),
-        ).await;
+            &paths,
+            "my-instance",
+            PackKind::Resource,
+            &src,
+            &fresh_token(),
+        )
+        .await;
         // Should succeed (not fail with NotAZip or UnsafeFilename).
         // The result may be Ok or fail on something else (not NotAZip).
         assert!(
@@ -335,9 +364,13 @@ mod tests {
             f.set_len(MAX_PACK_FILE_BYTES + 1).unwrap();
         }
         let res = drop_pack_from_path(
-            &paths, "my-instance", PackKind::Resource,
-            &src_path, &fresh_token(),
-        ).await;
+            &paths,
+            "my-instance",
+            PackKind::Resource,
+            &src_path,
+            &fresh_token(),
+        )
+        .await;
         match res {
             Err(PackError::FileTooLarge { bytes, cap }) => {
                 assert_eq!(bytes, MAX_PACK_FILE_BYTES + 1);
@@ -355,9 +388,13 @@ mod tests {
         // .hidden.zip starts with '.' — is_safe_pack_filename rejects it.
         let src = write_file(src_td.path(), ".hidden.zip", b"data");
         let res = drop_pack_from_path(
-            &paths, "my-instance", PackKind::Resource,
-            &src, &fresh_token(),
-        ).await;
+            &paths,
+            "my-instance",
+            PackKind::Resource,
+            &src,
+            &fresh_token(),
+        )
+        .await;
         assert!(
             matches!(res, Err(PackError::UnsafeFilename { .. })),
             "expected UnsafeFilename, got: {res:?}"
@@ -378,9 +415,13 @@ mod tests {
         let td = TempDir::new().unwrap();
         let paths = test_paths(&td);
         let res = drop_pack_from_path(
-            &paths, "my-instance", PackKind::Resource,
-            path_with_trailing_dotdot, &fresh_token(),
-        ).await;
+            &paths,
+            "my-instance",
+            PackKind::Resource,
+            path_with_trailing_dotdot,
+            &fresh_token(),
+        )
+        .await;
         assert!(
             matches!(res, Err(PackError::NotFound { .. })),
             "expected NotFound for path traversal input, got: {res:?}"
@@ -402,9 +443,13 @@ mod tests {
 
         // Should succeed (creates the dir and writes the file).
         let res = drop_pack_from_path(
-            &paths, "my-instance", PackKind::Resource,
-            &src, &fresh_token(),
-        ).await;
+            &paths,
+            "my-instance",
+            PackKind::Resource,
+            &src,
+            &fresh_token(),
+        )
+        .await;
         assert!(res.is_ok(), "expected Ok, got: {res:?}");
         assert!(packs_dir.exists(), "packs dir should have been created");
     }
@@ -420,9 +465,14 @@ mod tests {
         let src = write_file(src_td.path(), "Faithful32x.zip", content);
 
         let outcome = drop_pack_from_path(
-            &paths, "my-instance", PackKind::Resource,
-            &src, &fresh_token(),
-        ).await.expect("drop should succeed");
+            &paths,
+            "my-instance",
+            PackKind::Resource,
+            &src,
+            &fresh_token(),
+        )
+        .await
+        .expect("drop should succeed");
 
         // Dest file present with correct bytes.
         let dest_bytes = std::fs::read(&outcome.dest).unwrap();
@@ -452,13 +502,21 @@ mod tests {
         let src = write_file(src_td.path(), "BSL_Shaders.zip", b"shader pack data");
 
         let outcome = drop_pack_from_path(
-            &paths, "my-instance", PackKind::Shader,
-            &src, &fresh_token(),
-        ).await.expect("drop should succeed for shader");
+            &paths,
+            "my-instance",
+            PackKind::Shader,
+            &src,
+            &fresh_token(),
+        )
+        .await
+        .expect("drop should succeed for shader");
 
         assert_eq!(outcome.row.kind, InstalledItemKind::Shader);
-        assert!(outcome.dest.to_string_lossy().contains("shaderpacks"),
-            "dest should be in shaderpacks, got: {}", outcome.dest.display());
+        assert!(
+            outcome.dest.to_string_lossy().contains("shaderpacks"),
+            "dest should be in shaderpacks, got: {}",
+            outcome.dest.display()
+        );
     }
 
     #[tokio::test]
@@ -470,16 +528,24 @@ mod tests {
 
         // First install succeeds.
         let first = drop_pack_from_path(
-            &paths, "my-instance", PackKind::Resource,
-            &src, &fresh_token(),
-        ).await;
+            &paths,
+            "my-instance",
+            PackKind::Resource,
+            &src,
+            &fresh_token(),
+        )
+        .await;
         assert!(first.is_ok(), "first install should succeed");
 
         // Second install with same filename → FilenameCollision.
         let second = drop_pack_from_path(
-            &paths, "my-instance", PackKind::Resource,
-            &src, &fresh_token(),
-        ).await;
+            &paths,
+            "my-instance",
+            PackKind::Resource,
+            &src,
+            &fresh_token(),
+        )
+        .await;
         assert!(
             matches!(second, Err(PackError::FilenameCollision)),
             "second install should fail with FilenameCollision, got: {second:?}"
@@ -496,17 +562,18 @@ mod tests {
         let token = CancellationToken::new();
         token.cancel(); // Pre-cancel.
 
-        let res = drop_pack_from_path(
-            &paths, "my-instance", PackKind::Resource,
-            &src, &token,
-        ).await;
+        let res =
+            drop_pack_from_path(&paths, "my-instance", PackKind::Resource, &src, &token).await;
         assert!(
             matches!(res, Err(PackError::Cancelled)),
             "expected Cancelled, got: {res:?}"
         );
         // Dest file must NOT exist.
         let dest_path = paths.instance_pack_file("my-instance", PackKind::Resource, "Faithful.zip");
-        assert!(!dest_path.exists(), "dest should not exist after pre-cancel");
+        assert!(
+            !dest_path.exists(),
+            "dest should not exist after pre-cancel"
+        );
     }
 
     #[tokio::test]
@@ -525,9 +592,13 @@ mod tests {
         let paths_clone = paths.clone();
         let handle = tokio::spawn(async move {
             drop_pack_from_path(
-                &paths_clone, "my-instance", PackKind::Resource,
-                &src, &token_clone,
-            ).await
+                &paths_clone,
+                "my-instance",
+                PackKind::Resource,
+                &src,
+                &token_clone,
+            )
+            .await
         });
 
         // Cancel after a brief delay to allow the task to start.
@@ -539,9 +610,8 @@ mod tests {
         // before cancel fired) — both are valid. What matters is that if the
         // result is Cancelled, the partial dest file must not exist.
         if matches!(res, Err(PackError::Cancelled)) {
-            let dest_path = paths.instance_pack_file(
-                "my-instance", PackKind::Resource, "BigPack.zip"
-            );
+            let dest_path =
+                paths.instance_pack_file("my-instance", PackKind::Resource, "BigPack.zip");
             assert!(
                 !tokio::fs::try_exists(&dest_path).await.unwrap_or(true),
                 "partial file should be cleaned up after cancel"
@@ -558,9 +628,14 @@ mod tests {
         let src = write_file(src_td.path(), "TestPack.zip", b"test data");
 
         let outcome = drop_pack_from_path(
-            &paths, "my-instance", PackKind::Resource,
-            &src, &fresh_token(),
-        ).await.unwrap();
+            &paths,
+            "my-instance",
+            PackKind::Resource,
+            &src,
+            &fresh_token(),
+        )
+        .await
+        .unwrap();
 
         // mod_id must match ^local:[0-9a-f]{16}$
         let mod_id = &outcome.row.mod_id;
@@ -581,9 +656,14 @@ mod tests {
         let src = write_file(src_td.path(), "AnyPack.zip", b"bytes");
 
         let outcome = drop_pack_from_path(
-            &paths, "my-instance", PackKind::Resource,
-            &src, &fresh_token(),
-        ).await.unwrap();
+            &paths,
+            "my-instance",
+            PackKind::Resource,
+            &src,
+            &fresh_token(),
+        )
+        .await
+        .unwrap();
 
         assert_eq!(outcome.row.source, ModSource::Local);
     }
@@ -597,9 +677,13 @@ mod tests {
         let src = write_file(src_td.path(), "Faithful 32x.zip", b"pack data");
 
         let res = drop_pack_from_path(
-            &paths, "my-instance", PackKind::Resource,
-            &src, &fresh_token(),
-        ).await;
+            &paths,
+            "my-instance",
+            PackKind::Resource,
+            &src,
+            &fresh_token(),
+        )
+        .await;
         assert!(res.is_ok(), "filename with space should succeed: {res:?}");
         let outcome = res.unwrap();
         assert_eq!(outcome.row.file_name, "Faithful 32x.zip");
@@ -609,7 +693,10 @@ mod tests {
 
     #[test]
     fn test_strip_zip_suffix_lowercase() {
-        assert_eq!(strip_zip_suffix_case_insensitive("Faithful.zip"), "Faithful");
+        assert_eq!(
+            strip_zip_suffix_case_insensitive("Faithful.zip"),
+            "Faithful"
+        );
     }
 
     #[test]
@@ -619,6 +706,9 @@ mod tests {
 
     #[test]
     fn test_strip_zip_suffix_no_zip() {
-        assert_eq!(strip_zip_suffix_case_insensitive("file.tar.gz"), "file.tar.gz");
+        assert_eq!(
+            strip_zip_suffix_case_insensitive("file.tar.gz"),
+            "file.tar.gz"
+        );
     }
 }

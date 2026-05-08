@@ -187,7 +187,10 @@ mod tests {
         ctx.assets_root = PathBuf::new();
         ctx.natives_directory = PathBuf::new();
         ctx.library_directory = PathBuf::new();
-        let result = substitute("${game_directory}|${assets_root}|${natives_directory}|${library_directory}", &ctx);
+        let result = substitute(
+            "${game_directory}|${assets_root}|${natives_directory}|${library_directory}",
+            &ctx,
+        );
         assert_eq!(result, "|||");
     }
 

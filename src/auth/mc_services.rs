@@ -17,12 +17,9 @@ use serde::Deserialize;
 
 use crate::auth::AuthError;
 
-pub const MC_AUTH_URL: &str =
-    "https://api.minecraftservices.com/authentication/login_with_xbox";
-pub const MC_ENTITLEMENT_URL: &str =
-    "https://api.minecraftservices.com/entitlements/mcstore";
-pub const MC_PROFILE_URL: &str =
-    "https://api.minecraftservices.com/minecraft/profile";
+pub const MC_AUTH_URL: &str = "https://api.minecraftservices.com/authentication/login_with_xbox";
+pub const MC_ENTITLEMENT_URL: &str = "https://api.minecraftservices.com/entitlements/mcstore";
+pub const MC_PROFILE_URL: &str = "https://api.minecraftservices.com/minecraft/profile";
 
 /// Parsed MC services login response.
 #[derive(Debug, Clone, Deserialize)]
@@ -355,9 +352,8 @@ mod tests {
                 when.method(GET)
                     .path("/minecraft/profile")
                     .header("authorization", "Bearer mc-tok");
-                then.status(200).body(
-                    r#"{"id":"c6bf819300004000800000000000abcd","name":"PlayerOne"}"#,
-                );
+                then.status(200)
+                    .body(r#"{"id":"c6bf819300004000800000000000abcd","name":"PlayerOne"}"#);
             })
             .await;
         let got = fetch_profile(&http_client(), &server.base_url(), "mc-tok")
@@ -379,6 +375,9 @@ mod tests {
         let err = fetch_profile(&http_client(), &server.base_url(), "mc-tok")
             .await
             .unwrap_err();
-        assert!(matches!(err, AuthError::MalformedResponse(_)), "got {err:?}");
+        assert!(
+            matches!(err, AuthError::MalformedResponse(_)),
+            "got {err:?}"
+        );
     }
 }

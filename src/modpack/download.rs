@@ -83,10 +83,12 @@ pub fn is_url_allowlisted(url: &str, path: &str) -> Result<(), ModpackError> {
         host: "<unparseable>".to_string(),
         path: path.to_string(),
     })?;
-    let host = parsed.host_str().ok_or_else(|| ModpackError::DisallowedSource {
-        host: "<no-host>".to_string(),
-        path: path.to_string(),
-    })?;
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| ModpackError::DisallowedSource {
+            host: "<no-host>".to_string(),
+            path: path.to_string(),
+        })?;
     if !MODPACK_ALLOWLIST.contains(&host) {
         return Err(ModpackError::DisallowedSource {
             host: host.to_string(),
@@ -106,7 +108,10 @@ pub fn is_url_allowlisted(url: &str, path: &str) -> Result<(), ModpackError> {
 ///
 /// Returns borrowed references into the input slice — no allocation of file data.
 pub fn filter_files_for_client(files: &[MrpackFile]) -> Vec<&MrpackFile> {
-    files.iter().filter(|f| should_download_for_client(f.env.as_ref())).collect()
+    files
+        .iter()
+        .filter(|f| should_download_for_client(f.env.as_ref()))
+        .collect()
 }
 
 /// Map a `ModrinthError` returned by `download_one_with_hash_algo` to a
@@ -148,7 +153,9 @@ fn build_mod_row(file: &MrpackFile, file_name: &str, size: u64) -> InstalledModR
         enabled: true,
         installed_at: {
             use time::format_description::well_known::Rfc3339;
-            time::OffsetDateTime::now_utc().format(&Rfc3339).unwrap_or_default()
+            time::OffsetDateTime::now_utc()
+                .format(&Rfc3339)
+                .unwrap_or_default()
         },
     }
 }
@@ -250,7 +257,10 @@ pub async fn download_files(
 
             // 4c. Try each download URL in order.
             if file.downloads.is_empty() {
-                return Err(ModpackError::Http(format!("no download URLs for {}", file.path)));
+                return Err(ModpackError::Http(format!(
+                    "no download URLs for {}",
+                    file.path
+                )));
             }
 
             let mut last_err: Option<ModpackError> = None;
@@ -374,7 +384,10 @@ mod tests {
     fn mk_file(path: &str, hex_sha512: &str, size: u64, url: &str) -> MrpackFile {
         MrpackFile {
             path: path.to_string(),
-            hashes: MrpackHashes { sha1: "aabb".to_string(), sha512: hex_sha512.to_string() },
+            hashes: MrpackHashes {
+                sha1: "aabb".to_string(),
+                sha512: hex_sha512.to_string(),
+            },
             env: None,
             downloads: vec![url.to_string()],
             file_size: size,
@@ -391,8 +404,14 @@ mod tests {
     ) -> MrpackFile {
         MrpackFile {
             path: path.to_string(),
-            hashes: MrpackHashes { sha1: "aabb".to_string(), sha512: hex_sha512.to_string() },
-            env: Some(MrpackEnv { client, server: EnvRequirement::Required }),
+            hashes: MrpackHashes {
+                sha1: "aabb".to_string(),
+                sha512: hex_sha512.to_string(),
+            },
+            env: Some(MrpackEnv {
+                client,
+                server: EnvRequirement::Required,
+            }),
             downloads: vec![url.to_string()],
             file_size: size,
         }
@@ -413,7 +432,11 @@ mod tests {
     #[test]
     fn test_allowlist_accepts_github_releases() {
         assert!(
-            is_url_allowlisted("https://github.com/x/y/releases/download/foo.jar", "mods/foo.jar").is_ok(),
+            is_url_allowlisted(
+                "https://github.com/x/y/releases/download/foo.jar",
+                "mods/foo.jar"
+            )
+            .is_ok(),
             "github.com must be accepted"
         );
     }
@@ -452,11 +475,14 @@ mod tests {
 
     #[test]
     fn test_allowlist_rejects_unparseable_url() {
-        let err =
-            is_url_allowlisted("not a url", "mods/foo.jar").expect_err("unparseable URL must be rejected");
+        let err = is_url_allowlisted("not a url", "mods/foo.jar")
+            .expect_err("unparseable URL must be rejected");
         match err {
             ModpackError::DisallowedSource { host, .. } => {
-                assert_eq!(host, "<unparseable>", "host must be <unparseable> for bad URL");
+                assert_eq!(
+                    host, "<unparseable>",
+                    "host must be <unparseable> for bad URL"
+                );
             }
             other => panic!("expected DisallowedSource, got {other:?}"),
         }
@@ -469,27 +495,51 @@ mod tests {
     #[test]
     fn test_filter_skips_unsupported_client() {
         let files = vec![
-            mk_file_with_env("mods/a.jar", "aa00", 10, "https://cdn.modrinth.com/a.jar",
-                EnvRequirement::Required),
-            mk_file_with_env("mods/b.jar", "bb00", 10, "https://cdn.modrinth.com/b.jar",
-                EnvRequirement::Unsupported),
-            mk_file_with_env("mods/c.jar", "cc00", 10, "https://cdn.modrinth.com/c.jar",
-                EnvRequirement::Optional),
+            mk_file_with_env(
+                "mods/a.jar",
+                "aa00",
+                10,
+                "https://cdn.modrinth.com/a.jar",
+                EnvRequirement::Required,
+            ),
+            mk_file_with_env(
+                "mods/b.jar",
+                "bb00",
+                10,
+                "https://cdn.modrinth.com/b.jar",
+                EnvRequirement::Unsupported,
+            ),
+            mk_file_with_env(
+                "mods/c.jar",
+                "cc00",
+                10,
+                "https://cdn.modrinth.com/c.jar",
+                EnvRequirement::Optional,
+            ),
         ];
         let filtered = filter_files_for_client(&files);
         assert_eq!(filtered.len(), 2, "Unsupported entry must be excluded");
-        assert!(filtered.iter().all(|f| f.path != "mods/b.jar"),
-            "b.jar (Unsupported) must not appear in filtered list");
+        assert!(
+            filtered.iter().all(|f| f.path != "mods/b.jar"),
+            "b.jar (Unsupported) must not appear in filtered list"
+        );
     }
 
     #[test]
     fn test_filter_keeps_missing_env() {
-        let files = vec![
-            mk_file("mods/no-env.jar", "dd00", 10, "https://cdn.modrinth.com/no-env.jar"),
-        ];
+        let files = vec![mk_file(
+            "mods/no-env.jar",
+            "dd00",
+            10,
+            "https://cdn.modrinth.com/no-env.jar",
+        )];
         // env field is None → should be treated as Required → kept
         let filtered = filter_files_for_client(&files);
-        assert_eq!(filtered.len(), 1, "File with missing env must be kept (Pitfall 3)");
+        assert_eq!(
+            filtered.len(),
+            1,
+            "File with missing env must be kept (Pitfall 3)"
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -501,11 +551,13 @@ mod tests {
         use sha2::{Digest, Sha512};
         let mut h = Sha512::new();
         h.update(data);
-        h.finalize().iter().fold(String::with_capacity(128), |mut s, b| {
-            use std::fmt::Write as _;
-            write!(s, "{b:02x}").unwrap();
-            s
-        })
+        h.finalize()
+            .iter()
+            .fold(String::with_capacity(128), |mut s, b| {
+                use std::fmt::Write as _;
+                write!(s, "{b:02x}").unwrap();
+                s
+            })
     }
 
     fn make_http_client() -> reqwest::Client {
@@ -546,30 +598,55 @@ mod tests {
         let slug = "test-pack";
 
         let files = vec![
-            mk_file("mods/mod-a.jar", &sha_a, body_a.len() as u64,
-                &server.url("/mod-a.jar")),
-            mk_file("mods/mod-b.jar", &sha_b, body_b.len() as u64,
-                &server.url("/mod-b.jar")),
+            mk_file(
+                "mods/mod-a.jar",
+                &sha_a,
+                body_a.len() as u64,
+                &server.url("/mod-a.jar"),
+            ),
+            mk_file(
+                "mods/mod-b.jar",
+                &sha_b,
+                body_b.len() as u64,
+                &server.url("/mod-b.jar"),
+            ),
         ];
 
         let (tx, _rx) = mpsc::channel(64);
         let token = CancellationToken::new();
         let job_id = JobId(1);
 
-        let result = download_files(&make_http_client(), &paths, slug, files, tx, token, job_id).await;
+        let result =
+            download_files(&make_http_client(), &paths, slug, files, tx, token, job_id).await;
 
         assert!(result.is_ok(), "happy path must succeed: {result:?}");
         let rows = result.unwrap();
         assert_eq!(rows.len(), 2, "must return 2 InstalledModRow entries");
         for row in &rows {
-            assert_eq!(row.source, ModSource::Modpack, "source must be ModSource::Modpack");
+            assert_eq!(
+                row.source,
+                ModSource::Modpack,
+                "source must be ModSource::Modpack"
+            );
         }
 
         // Both .tmp files must exist on disk.
-        let tmp_a = paths.instance_minecraft_dir(slug).join("mods/mod-a.jar.tmp");
-        let tmp_b = paths.instance_minecraft_dir(slug).join("mods/mod-b.jar.tmp");
-        assert!(tmp_a.exists(), "mod-a.jar.tmp must exist: {}", tmp_a.display());
-        assert!(tmp_b.exists(), "mod-b.jar.tmp must exist: {}", tmp_b.display());
+        let tmp_a = paths
+            .instance_minecraft_dir(slug)
+            .join("mods/mod-a.jar.tmp");
+        let tmp_b = paths
+            .instance_minecraft_dir(slug)
+            .join("mods/mod-b.jar.tmp");
+        assert!(
+            tmp_a.exists(),
+            "mod-a.jar.tmp must exist: {}",
+            tmp_a.display()
+        );
+        assert!(
+            tmp_b.exists(),
+            "mod-b.jar.tmp must exist: {}",
+            tmp_b.display()
+        );
 
         mock_a.assert();
         mock_b.assert();
@@ -602,22 +679,42 @@ mod tests {
         let slug = "test-pack";
 
         let files = vec![
-            mk_file_with_env("mods/required.jar", &sha, body.len() as u64,
-                &server.url("/required.jar"), EnvRequirement::Required),
-            mk_file_with_env("mods/optional.jar", &sha, body.len() as u64,
-                &server.url("/optional.jar"), EnvRequirement::Optional),
-            mk_file_with_env("mods/server-only.jar", "deadbeef", body.len() as u64,
-                &server.url("/server-only.jar"), EnvRequirement::Unsupported),
+            mk_file_with_env(
+                "mods/required.jar",
+                &sha,
+                body.len() as u64,
+                &server.url("/required.jar"),
+                EnvRequirement::Required,
+            ),
+            mk_file_with_env(
+                "mods/optional.jar",
+                &sha,
+                body.len() as u64,
+                &server.url("/optional.jar"),
+                EnvRequirement::Optional,
+            ),
+            mk_file_with_env(
+                "mods/server-only.jar",
+                "deadbeef",
+                body.len() as u64,
+                &server.url("/server-only.jar"),
+                EnvRequirement::Unsupported,
+            ),
         ];
 
         let (tx, _rx) = mpsc::channel(64);
         let token = CancellationToken::new();
         let job_id = JobId(2);
 
-        let result = download_files(&make_http_client(), &paths, slug, files, tx, token, job_id).await;
+        let result =
+            download_files(&make_http_client(), &paths, slug, files, tx, token, job_id).await;
         assert!(result.is_ok(), "must succeed: {result:?}");
         let rows = result.unwrap();
-        assert_eq!(rows.len(), 2, "only 2 client-applicable files must be downloaded");
+        assert_eq!(
+            rows.len(),
+            2,
+            "only 2 client-applicable files must be downloaded"
+        );
 
         // The server-only mock must never have been hit.
         mock_server_only.assert_calls(0);
@@ -656,7 +753,8 @@ mod tests {
         let token = CancellationToken::new();
         let job_id = JobId(3);
 
-        let result = download_files(&make_http_client(), &paths, slug, files, tx, token, job_id).await;
+        let result =
+            download_files(&make_http_client(), &paths, slug, files, tx, token, job_id).await;
 
         assert!(result.is_err(), "disallowed URL must return Err");
         match result.unwrap_err() {
@@ -686,19 +784,27 @@ mod tests {
         let paths = make_paths(&tmp);
         let slug = "test-pack";
 
-        let files = vec![mk_file("mods/mod.jar", &wrong_sha, actual_body.len() as u64,
-            &server.url("/mod.jar"))];
+        let files = vec![mk_file(
+            "mods/mod.jar",
+            &wrong_sha,
+            actual_body.len() as u64,
+            &server.url("/mod.jar"),
+        )];
 
         let (tx, _rx) = mpsc::channel(64);
         let token = CancellationToken::new();
         let job_id = JobId(4);
 
-        let result = download_files(&make_http_client(), &paths, slug, files, tx, token, job_id).await;
+        let result =
+            download_files(&make_http_client(), &paths, slug, files, tx, token, job_id).await;
 
         assert!(result.is_err(), "hash mismatch must return Err");
         match result.unwrap_err() {
             ModpackError::HashMismatch { path, .. } => {
-                assert_eq!(path, "mods/mod.jar", "path in error must be the manifest path");
+                assert_eq!(
+                    path, "mods/mod.jar",
+                    "path in error must be the manifest path"
+                );
             }
             other => panic!("expected HashMismatch, got {other:?}"),
         }
@@ -710,15 +816,20 @@ mod tests {
         let paths = make_paths(&tmp);
         let slug = "test-pack";
 
-        let files = vec![mk_file("mods/mod.jar", &"a".repeat(128), 10,
-            "https://cdn.modrinth.com/this-will-not-be-fetched.jar")];
+        let files = vec![mk_file(
+            "mods/mod.jar",
+            &"a".repeat(128),
+            10,
+            "https://cdn.modrinth.com/this-will-not-be-fetched.jar",
+        )];
 
         let (tx, _rx) = mpsc::channel(64);
         let token = CancellationToken::new();
         token.cancel(); // Cancel BEFORE calling download_files
         let job_id = JobId(5);
 
-        let result = download_files(&make_http_client(), &paths, slug, files, tx, token, job_id).await;
+        let result =
+            download_files(&make_http_client(), &paths, slug, files, tx, token, job_id).await;
 
         assert!(result.is_err(), "pre-cancelled token must return Err");
         match result.unwrap_err() {
@@ -730,7 +841,10 @@ mod tests {
         let mods_dir = paths.instance_minecraft_dir(slug).join("mods");
         if mods_dir.exists() {
             let entries: Vec<_> = std::fs::read_dir(&mods_dir).unwrap().collect();
-            assert!(entries.is_empty(), "no .tmp files should exist after pre-cancel");
+            assert!(
+                entries.is_empty(),
+                "no .tmp files should exist after pre-cancel"
+            );
         }
     }
 

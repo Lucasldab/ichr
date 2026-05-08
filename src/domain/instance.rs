@@ -141,25 +141,35 @@ mod tests {
             "total_play_time_ms": 0
         }"#;
         let m: InstanceManifest = serde_json::from_str(json).unwrap();
-        assert!(m.java_override.is_none(), "legacy instance should have None java_override");
+        assert!(
+            m.java_override.is_none(),
+            "legacy instance should have None java_override"
+        );
     }
 
     #[test]
     fn test_java_override_none_not_serialized() {
         let m = InstanceManifest::new("Test".into(), "test".into(), "1.21.4".into());
         let json = serde_json::to_string(&m).unwrap();
-        assert!(!json.contains("java_override"), "None override must not appear in JSON: {json}");
+        assert!(
+            !json.contains("java_override"),
+            "None override must not appear in JSON: {json}"
+        );
     }
 
     #[test]
     fn test_java_override_roundtrip_mojang() {
         let mut m = InstanceManifest::new("Test".into(), "test".into(), "1.21.4".into());
-        m.java_override = Some(JavaRuntimeId::Mojang { variant: "java-runtime-delta".into() });
+        m.java_override = Some(JavaRuntimeId::Mojang {
+            variant: "java-runtime-delta".into(),
+        });
         let json = serde_json::to_string(&m).unwrap();
         let parsed: InstanceManifest = serde_json::from_str(&json).unwrap();
         assert_eq!(
             parsed.java_override,
-            Some(JavaRuntimeId::Mojang { variant: "java-runtime-delta".into() })
+            Some(JavaRuntimeId::Mojang {
+                variant: "java-runtime-delta".into()
+            })
         );
     }
 
@@ -175,14 +185,20 @@ mod tests {
             "total_play_time_ms": 0
         }"#;
         let m: InstanceManifest = serde_json::from_str(json).unwrap();
-        assert!(m.loader.is_none(), "legacy instance should have None loader");
+        assert!(
+            m.loader.is_none(),
+            "legacy instance should have None loader"
+        );
     }
 
     #[test]
     fn test_loader_none_not_serialized() {
         let m = InstanceManifest::new("Test".into(), "test".into(), "1.21.4".into());
         let json = serde_json::to_string(&m).unwrap();
-        assert!(!json.contains("loader"), "None loader must not appear in JSON: {json}");
+        assert!(
+            !json.contains("loader"),
+            "None loader must not appear in JSON: {json}"
+        );
     }
 
     #[test]
@@ -194,8 +210,14 @@ mod tests {
             version_id: "fabric-loader-0.16.9-1.21.4".into(),
         });
         let json = serde_json::to_string(&m).unwrap();
-        assert!(json.contains("\"kind\":\"fabric\""), "fabric kind should serialize snake_case: {json}");
-        assert!(json.contains("\"version_id\":\"fabric-loader-0.16.9-1.21.4\""), "version_id missing: {json}");
+        assert!(
+            json.contains("\"kind\":\"fabric\""),
+            "fabric kind should serialize snake_case: {json}"
+        );
+        assert!(
+            json.contains("\"version_id\":\"fabric-loader-0.16.9-1.21.4\""),
+            "version_id missing: {json}"
+        );
         let parsed: InstanceManifest = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.loader, m.loader);
     }
@@ -211,6 +233,9 @@ mod tests {
         let json = serde_json::to_string(&m).unwrap();
         let parsed: InstanceManifest = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.loader, m.loader);
-        assert!(json.contains("\"kind\":\"quilt\""), "quilt kind missing: {json}");
+        assert!(
+            json.contains("\"kind\":\"quilt\""),
+            "quilt kind missing: {json}"
+        );
     }
 }

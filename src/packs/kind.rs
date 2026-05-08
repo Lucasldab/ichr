@@ -92,10 +92,17 @@ mod tests {
         // TOML can't serialize a bare enum at root level; wrap in a struct.
         // Verify the wire form is snake_case "resource".
         #[derive(serde::Serialize, serde::Deserialize)]
-        struct W { kind: PackKind }
-        let w = W { kind: PackKind::Resource };
+        struct W {
+            kind: PackKind,
+        }
+        let w = W {
+            kind: PackKind::Resource,
+        };
         let s = toml::to_string(&w).unwrap();
-        assert!(s.contains("kind = \"resource\""), "expected snake_case wire form, got: {s}");
+        assert!(
+            s.contains("kind = \"resource\""),
+            "expected snake_case wire form, got: {s}"
+        );
         let parsed: W = toml::from_str(&s).unwrap();
         assert_eq!(parsed.kind, PackKind::Resource);
     }
@@ -123,10 +130,17 @@ mod tests {
         // TOML can't serialize a bare enum at root level; wrap in a struct.
         // Verify the wire form is snake_case "shader".
         #[derive(serde::Serialize, serde::Deserialize)]
-        struct W { kind: PackKind }
-        let w = W { kind: PackKind::Shader };
+        struct W {
+            kind: PackKind,
+        }
+        let w = W {
+            kind: PackKind::Shader,
+        };
         let s = toml::to_string(&w).unwrap();
-        assert!(s.contains("kind = \"shader\""), "expected snake_case wire form, got: {s}");
+        assert!(
+            s.contains("kind = \"shader\""),
+            "expected snake_case wire form, got: {s}"
+        );
         let parsed: W = toml::from_str(&s).unwrap();
         assert_eq!(parsed.kind, PackKind::Shader);
     }

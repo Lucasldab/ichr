@@ -28,16 +28,17 @@ pub fn render_create_modal(f: &mut Frame, area: Rect, state: &AppState) {
             ];
             if let Some(err) = error {
                 lines.push(Line::from(""));
-                lines.push(Line::from(Span::styled(err.clone(), Style::default().fg(Color::Red))));
+                lines.push(Line::from(Span::styled(
+                    err.clone(),
+                    Style::default().fg(Color::Red),
+                )));
             }
 
-            let para = Paragraph::new(lines)
-                .alignment(Alignment::Left)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title("Create Instance (Enter / Esc)"),
-                );
+            let para = Paragraph::new(lines).alignment(Alignment::Left).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Create Instance (Enter / Esc)"),
+            );
             f.render_widget(para, chunks[0]);
         }
         ActiveView::RenameInline { current, .. } => {
@@ -55,13 +56,11 @@ pub fn render_create_modal(f: &mut Frame, area: Rect, state: &AppState) {
                 )),
             ];
 
-            let para = Paragraph::new(lines)
-                .alignment(Alignment::Left)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title("Rename Instance (Enter / Esc)"),
-                );
+            let para = Paragraph::new(lines).alignment(Alignment::Left).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Rename Instance (Enter / Esc)"),
+            );
             f.render_widget(para, chunks[0]);
         }
         _ => {}

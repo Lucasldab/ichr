@@ -97,9 +97,8 @@ async fn live_import_pinned_modpack() {
     }
 
     // ── Step 2: download the .mrpack from Modrinth CDN ───────────────────────
-    let mrpack_url = format!(
-        "https://cdn.modrinth.com/data/{PROJECT_ID}/versions/{VERSION_ID}/{FILENAME}"
-    );
+    let mrpack_url =
+        format!("https://cdn.modrinth.com/data/{PROJECT_ID}/versions/{VERSION_ID}/{FILENAME}");
     let mrpack_path = td.path().join("adrenaline.mrpack");
 
     let resp = http
@@ -129,12 +128,9 @@ async fn live_import_pinned_modpack() {
             .expect("build svc client"),
     );
 
-    let loader_svc =
-        mineltui::loader::service::LoaderService::new().expect("LoaderService::new");
-    let java_svc =
-        mineltui::java::service::JavaService::new().expect("JavaService::new");
-    let mojang_svc =
-        mineltui::mojang::client::MojangClient::new().expect("MojangClient::new");
+    let loader_svc = mineltui::loader::service::LoaderService::new().expect("LoaderService::new");
+    let java_svc = mineltui::java::service::JavaService::new().expect("JavaService::new");
+    let mojang_svc = mineltui::mojang::client::MojangClient::new().expect("MojangClient::new");
 
     let (tx, mut rx) = mpsc::channel::<mineltui::tasks::TaskEvent>(256);
 

@@ -36,9 +36,7 @@ fn skip_if_no_api_key(test_name: &str) -> bool {
     match std::env::var("CURSEFORGE_API_KEY") {
         Ok(v) if !v.is_empty() => false,
         _ => {
-            eprintln!(
-                "[curseforge_live] SKIPPED {test_name} — CURSEFORGE_API_KEY not set"
-            );
+            eprintln!("[curseforge_live] SKIPPED {test_name} — CURSEFORGE_API_KEY not set");
             true
         }
     }
@@ -117,7 +115,12 @@ async fn live_install_downloadable_mod_fabric_1_20_4() {
     assert!(!files.is_empty(), "no Sodium files for 1.20.4 + Fabric");
     let chosen = files
         .iter()
-        .find(|f| f.download_url.as_deref().filter(|u| !u.is_empty()).is_some())
+        .find(|f| {
+            f.download_url
+                .as_deref()
+                .filter(|u| !u.is_empty())
+                .is_some()
+        })
         .expect("expected at least one file with non-null download_url for Sodium");
     println!(
         "[curseforge_live] picked file id={}, name={}, sha1_present={}",
@@ -146,7 +149,11 @@ async fn live_install_downloadable_mod_fabric_1_20_4() {
     let ledger: mineltui::mods::types::Ledger = toml::from_str(&ledger_raw).unwrap();
     assert_eq!(ledger.mods.len(), 1, "expected exactly 1 ledger row");
     let row = &ledger.mods[0];
-    assert_eq!(row.source, ModSource::CurseForge, "source must be CurseForge");
+    assert_eq!(
+        row.source,
+        ModSource::CurseForge,
+        "source must be CurseForge"
+    );
     assert_eq!(row.hash_algo, HashAlgo::Sha1, "hash_algo must be Sha1");
     assert_eq!(row.mod_id, sodium.id.to_string());
     assert_eq!(row.version_id, chosen.id.to_string());

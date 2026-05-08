@@ -29,7 +29,12 @@ pub fn render_loader_picker_modal(f: &mut Frame, area: Rect, state: &AppState) {
     let modal_h = 11u16.min(area.height.saturating_sub(4));
     let x = area.x + area.width.saturating_sub(modal_w) / 2;
     let y = area.y + area.height.saturating_sub(modal_h) / 2;
-    let modal_area = Rect { x, y, width: modal_w, height: modal_h };
+    let modal_area = Rect {
+        x,
+        y,
+        width: modal_w,
+        height: modal_h,
+    };
 
     f.render_widget(Clear, modal_area);
 
@@ -67,16 +72,28 @@ pub fn render_loader_picker_modal(f: &mut Frame, area: Rect, state: &AppState) {
 pub fn map_loader_picker_event(ev: ratatui::crossterm::event::Event) -> Option<Action> {
     use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Up, .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
-            Some(Action::LoaderPickerMove(-1))
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Down, .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
-            Some(Action::LoaderPickerMove(1))
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => Some(Action::LoaderPickerSelect),
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::LoaderPickerCancel),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Up, ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('k'),
+            ..
+        }) => Some(Action::LoaderPickerMove(-1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Down,
+            ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('j'),
+            ..
+        }) => Some(Action::LoaderPickerMove(1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        }) => Some(Action::LoaderPickerSelect),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::LoaderPickerCancel),
         _ => None,
     }
 }

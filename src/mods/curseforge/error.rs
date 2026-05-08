@@ -34,7 +34,9 @@ pub enum CurseForgeError {
     /// Carries the constructed CurseForge web URL so the failed-install modal
     /// can show a copy-paste-able link directing the user to the browser.
     /// Per 09-RESEARCH.md §"downloadUrl null UX" lines 252-289.
-    #[error("Mod file is not downloadable from CurseForge ({mod_slug}, file {file_id}): {web_url}")]
+    #[error(
+        "Mod file is not downloadable from CurseForge ({mod_slug}, file {file_id}): {web_url}"
+    )]
     FileNotDownloadable {
         web_url: String,
         mod_slug: String,
@@ -107,8 +109,9 @@ mod tests {
     #[test]
     fn test_file_not_downloadable_carries_web_url() {
         let e = CurseForgeError::FileNotDownloadable {
-            web_url: "https://www.curseforge.com/minecraft/mc-mods/wonderful-world-mod/files/4567890"
-                .into(),
+            web_url:
+                "https://www.curseforge.com/minecraft/mc-mods/wonderful-world-mod/files/4567890"
+                    .into(),
             mod_slug: "wonderful-world-mod".into(),
             file_id: 4567890,
         };
@@ -134,13 +137,21 @@ mod tests {
     fn test_no_api_key_display_lists_overrides() {
         let e = CurseForgeError::NoApiKey;
         let s = e.to_string();
-        assert!(s.contains("CURSEFORGE_API_KEY"), "env var name missing: {s}");
-        assert!(s.contains("config.toml"), "config file mention missing: {s}");
+        assert!(
+            s.contains("CURSEFORGE_API_KEY"),
+            "env var name missing: {s}"
+        );
+        assert!(
+            s.contains("config.toml"),
+            "config file mention missing: {s}"
+        );
     }
 
     #[test]
     fn test_rate_limited_display() {
-        let e = CurseForgeError::RateLimited { retry_after_secs: 60 };
+        let e = CurseForgeError::RateLimited {
+            retry_after_secs: 60,
+        };
         let s = e.to_string();
         assert!(s.contains("60"), "retry_after missing: {s}");
         assert!(s.contains("rate limit"), "headline missing: {s}");

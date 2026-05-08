@@ -106,8 +106,7 @@ pub enum EnvRequirement {
 /// - [`ModpackError::UnsupportedGame`] — `game` != `"minecraft"`
 /// - [`ModpackError::MissingMinecraftDependency`] — no `"minecraft"` key in `dependencies`
 pub fn parse_index(json: &str) -> Result<MrpackIndex, ModpackError> {
-    let idx: MrpackIndex =
-        serde_json::from_str(json).map_err(ModpackError::ManifestParse)?;
+    let idx: MrpackIndex = serde_json::from_str(json).map_err(ModpackError::ManifestParse)?;
 
     if idx.format_version != 1 {
         return Err(ModpackError::UnsupportedFormat {
@@ -247,9 +246,18 @@ mod tests {
         assert_eq!(idx.game, "minecraft");
         assert_eq!(idx.version_id, "0.1.0");
         assert_eq!(idx.name, "Minimal Test Pack");
-        assert_eq!(idx.summary.as_deref(), Some("Minimal fixture for unit tests"));
-        assert_eq!(idx.dependencies.get("minecraft").map(String::as_str), Some("1.20.4"));
-        assert_eq!(idx.dependencies.get("fabric-loader").map(String::as_str), Some("0.16.9"));
+        assert_eq!(
+            idx.summary.as_deref(),
+            Some("Minimal fixture for unit tests")
+        );
+        assert_eq!(
+            idx.dependencies.get("minecraft").map(String::as_str),
+            Some("1.20.4")
+        );
+        assert_eq!(
+            idx.dependencies.get("fabric-loader").map(String::as_str),
+            Some("0.16.9")
+        );
         assert_eq!(idx.files.len(), 4);
 
         // First file: required client, unsupported server
@@ -262,7 +270,10 @@ mod tests {
 
         // Fourth file: no env field at all
         let f3 = &idx.files[3];
-        assert!(f3.env.is_none(), "absent env field should deserialize as None");
+        assert!(
+            f3.env.is_none(),
+            "absent env field should deserialize as None"
+        );
     }
 
     // 2. Validation rejections ───────────────────────────────────────────────
@@ -348,7 +359,10 @@ mod tests {
     // 4. detect_loader ────────────────────────────────────────────────────────
 
     fn deps(pairs: &[(&str, &str)]) -> HashMap<String, String> {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     #[test]

@@ -15,7 +15,13 @@ use crate::packs::kind::PackKind;
 use crate::tui::app::{Action, ActiveView, AppState};
 
 pub fn render_pack_drop_path_modal(f: &mut Frame, area: Rect, state: &AppState) {
-    let ActiveView::PackDropPathInput { kind, buffer, error, .. } = &state.active_view else {
+    let ActiveView::PackDropPathInput {
+        kind,
+        buffer,
+        error,
+        ..
+    } = &state.active_view
+    else {
         return;
     };
 
@@ -46,7 +52,10 @@ pub fn render_pack_drop_path_modal(f: &mut Frame, area: Rect, state: &AppState) 
     ];
     if let Some(err) = error {
         lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(err.clone(), Style::default().fg(Color::Red))));
+        lines.push(Line::from(Span::styled(
+            err.clone(),
+            Style::default().fg(Color::Red),
+        )));
     }
 
     let para = Paragraph::new(lines)
@@ -58,16 +67,22 @@ pub fn render_pack_drop_path_modal(f: &mut Frame, area: Rect, state: &AppState) 
 pub fn map_pack_drop_path_event(ev: ratatui::crossterm::event::Event) -> Option<Action> {
     use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::PackDropPathCancel),
-        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => Some(Action::PackDropPathSubmit),
-        CtEvent::Key(KeyEvent { code: KeyCode::Backspace, .. }) => {
-            Some(Action::PackDropPathBackspace)
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char(c), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
-            Some(Action::PackDropPathType(c))
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::PackDropPathCancel),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        }) => Some(Action::PackDropPathSubmit),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        }) => Some(Action::PackDropPathBackspace),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::PackDropPathType(c)),
         CtEvent::Paste(s) => Some(Action::PackDropPathPaste(s)),
         _ => None,
     }

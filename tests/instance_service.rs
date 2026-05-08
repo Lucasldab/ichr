@@ -31,7 +31,10 @@ async fn test_create_instance_basic() {
     assert_eq!(m.mc_version_id, "1.21.4");
     assert!(paths.instance_dir("my-first").exists());
     assert!(paths.instance_manifest("my-first").exists());
-    assert!(paths.instance_minecraft_dir("my-first").join("mods").exists());
+    assert!(paths
+        .instance_minecraft_dir("my-first")
+        .join("mods")
+        .exists());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -66,7 +69,9 @@ async fn test_create_instance_rejects_whitespace_only() {
 async fn test_create_instance_rejects_name_longer_than_128() {
     let (_td, paths) = make_paths();
     let long_name: String = "a".repeat(129);
-    let err = create_instance(&paths, &long_name, "1.21.4").await.unwrap_err();
+    let err = create_instance(&paths, &long_name, "1.21.4")
+        .await
+        .unwrap_err();
     assert!(
         matches!(err, AppError::InvalidInstanceName { .. }),
         "expected InvalidInstanceName, got {err:?}"
@@ -143,7 +148,9 @@ async fn test_set_group_updates_group_field() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_set_group_none_clears_group() {
     let (_td, paths) = make_paths();
-    let m = create_instance(&paths, "Clearable", "1.21.4").await.unwrap();
+    let m = create_instance(&paths, "Clearable", "1.21.4")
+        .await
+        .unwrap();
     set_group(&paths, &m.slug, Some("favorites".to_string()))
         .await
         .unwrap();
@@ -228,7 +235,11 @@ async fn test_clone_copies_mods_and_config_not_saves() {
 
     // saves and natives MUST NOT be copied
     assert!(
-        !dst_mc.join("saves").join("world").join("level.dat").exists(),
+        !dst_mc
+            .join("saves")
+            .join("world")
+            .join("level.dat")
+            .exists(),
         "saves should not be cloned"
     );
     assert!(
@@ -257,12 +268,17 @@ async fn test_clone_resets_timestamps_and_play_time() {
         .unwrap();
 
     let cloned = clone_instance(&paths, "src", "Src Copy").await.unwrap();
-    assert_eq!(cloned.last_played_at, None, "last_played_at should be reset");
-    assert_eq!(cloned.total_play_time_ms, 0, "total_play_time_ms should be reset");
+    assert_eq!(
+        cloned.last_played_at, None,
+        "last_played_at should be reset"
+    );
+    assert_eq!(
+        cloned.total_play_time_ms, 0,
+        "total_play_time_ms should be reset"
+    );
     // created_at on the clone must not carry over the source's last_played_at
     assert_ne!(
-        cloned.created_at,
-        "2026-01-01T00:00:00Z",
+        cloned.created_at, "2026-01-01T00:00:00Z",
         "created_at should be a fresh timestamp, not the source's last_played_at value"
     );
 }

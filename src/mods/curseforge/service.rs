@@ -167,10 +167,7 @@ impl CurseForgeService {
 
     /// Fetch full mod detail by id.
     #[tracing::instrument(skip_all, fields(mod_id))]
-    pub async fn get_mod(
-        &self,
-        mod_id: u64,
-    ) -> Result<CurseForgeProjectDetail, CurseForgeError> {
+    pub async fn get_mod(&self, mod_id: u64) -> Result<CurseForgeProjectDetail, CurseForgeError> {
         let client = self.client.as_ref().ok_or(CurseForgeError::NoApiKey)?;
         client.get_mod(mod_id).await
     }
@@ -242,10 +239,7 @@ impl CurseForgeService {
             .find(|h| h.algo == 1)
             .map(|h| h.value.clone())
             .ok_or_else(|| {
-                CurseForgeError::Http(format!(
-                    "no SHA-1 hash on file {}",
-                    file.file_name
-                ))
+                CurseForgeError::Http(format!("no SHA-1 hash on file {}", file.file_name))
             })?;
 
         // 3. Build dest paths.
@@ -275,14 +269,12 @@ impl CurseForgeService {
         .await
         .map_err(|e| match e {
             ModrinthError::Cancelled => CurseForgeError::Cancelled,
-            ModrinthError::Sha512Mismatch { url, expected, got } => {
-                CurseForgeError::ShaMismatch {
-                    algo: "sha1",
-                    url,
-                    expected,
-                    got,
-                }
-            }
+            ModrinthError::Sha512Mismatch { url, expected, got } => CurseForgeError::ShaMismatch {
+                algo: "sha1",
+                url,
+                expected,
+                got,
+            },
             ModrinthError::FileNotDownloadable { project_slug: _ } => {
                 CurseForgeError::FileNotDownloadable {
                     web_url: crate::mods::curseforge::url::web_url_for_file(
@@ -319,14 +311,16 @@ impl CurseForgeService {
         })?;
 
         // 6. Atomic rename .tmp → final.jar.
-        tokio::fs::rename(&dest_tmp, &dest_final).await.map_err(|e| {
-            let _ = std::fs::remove_file(&dest_tmp);
-            CurseForgeError::Io(std::io::Error::other(format!(
-                "rename {} -> {}: {e}",
-                dest_tmp.display(),
-                dest_final.display(),
-            )))
-        })?;
+        tokio::fs::rename(&dest_tmp, &dest_final)
+            .await
+            .map_err(|e| {
+                let _ = std::fs::remove_file(&dest_tmp);
+                CurseForgeError::Io(std::io::Error::other(format!(
+                    "rename {} -> {}: {e}",
+                    dest_tmp.display(),
+                    dest_final.display(),
+                )))
+            })?;
 
         // 7. Terminal progress event.
         let _ = progress_tx
@@ -347,9 +341,7 @@ impl CurseForgeService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mods::curseforge::types::{
-        CurseForgeAuthor, CurseForgeHash, CurseForgeLinks,
-    };
+    use crate::mods::curseforge::types::{CurseForgeAuthor, CurseForgeHash, CurseForgeLinks};
     use httpmock::prelude::*;
     use tempfile::TempDir;
 
@@ -381,8 +373,7 @@ mod tests {
     #[test]
     fn test_with_client_sets_api_key_present_true() {
         let server = MockServer::start();
-        let client =
-            CurseForgeClient::new_with_base_url("test-key", server.base_url()).unwrap();
+        let client = CurseForgeClient::new_with_base_url("test-key", server.base_url()).unwrap();
         let svc = CurseForgeService::with_client(client);
         assert!(svc.api_key_present());
     }
@@ -412,8 +403,7 @@ mod tests {
             then.status(200).body(body.clone());
         });
 
-        let client =
-            CurseForgeClient::new_with_base_url("test-key", server.base_url()).unwrap();
+        let client = CurseForgeClient::new_with_base_url("test-key", server.base_url()).unwrap();
         let svc = CurseForgeService::with_client(client);
 
         let td = TempDir::new().unwrap();
@@ -456,8 +446,9 @@ mod tests {
             .await
             .expect("install");
 
-        let ledger_raw =
-            tokio::fs::read_to_string(paths.instance_mod_ledger(slug)).await.unwrap();
+        let ledger_raw = tokio::fs::read_to_string(paths.instance_mod_ledger(slug))
+            .await
+            .unwrap();
         let ledger: crate::mods::types::Ledger = toml::from_str(&ledger_raw).unwrap();
         assert_eq!(ledger.mods.len(), 1);
         let row = &ledger.mods[0];
@@ -488,8 +479,7 @@ mod tests {
             then.status(404).body(r#"{"error":"restricted"}"#);
         });
 
-        let client =
-            CurseForgeClient::new_with_base_url("test-key", server.base_url()).unwrap();
+        let client = CurseForgeClient::new_with_base_url("test-key", server.base_url()).unwrap();
         let svc = CurseForgeService::with_client(client);
 
         let td = TempDir::new().unwrap();
@@ -542,9 +532,11 @@ mod tests {
         let ledger_path = paths.instance_mod_ledger(slug);
         if ledger_path.exists() {
             let raw = tokio::fs::read_to_string(&ledger_path).await.unwrap();
-            let ledger: crate::mods::types::Ledger =
-                toml::from_str(&raw).unwrap_or_default();
-            assert!(ledger.mods.is_empty(), "no ledger row on FileNotDownloadable");
+            let ledger: crate::mods::types::Ledger = toml::from_str(&raw).unwrap_or_default();
+            assert!(
+                ledger.mods.is_empty(),
+                "no ledger row on FileNotDownloadable"
+            );
         }
         // No orphan tmp file at the final destination.
         let final_path = paths.instance_mod_file(slug, "wwm.jar");

@@ -22,8 +22,11 @@ pub fn render_download_pane(f: &mut Frame, area: Rect, state: &AppState) {
         (inner_height / job_count as u16).max(1)
     };
 
-    let constraints: Vec<Constraint> =
-        state.active_jobs.iter().map(|_| Constraint::Length(row_height)).collect();
+    let constraints: Vec<Constraint> = state
+        .active_jobs
+        .iter()
+        .map(|_| Constraint::Length(row_height))
+        .collect();
 
     let block = Block::default().borders(Borders::ALL).title("Downloads");
     let inner = block.inner(area);

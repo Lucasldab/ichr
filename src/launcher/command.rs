@@ -202,7 +202,15 @@ mod tests {
         let v = load("tests/fixtures/mojang/version_1_21_4.json");
         let auth = offline_auth("TestUser");
         let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-        let cmd = compose(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+        let cmd = compose(
+            &v,
+            &auth,
+            &fixture_paths(),
+            "myslug",
+            &ctx,
+            Path::new("java"),
+        )
+        .unwrap();
 
         // main_class must match the version JSON field
         assert_eq!(cmd.main_class, v.main_class);
@@ -224,14 +232,18 @@ mod tests {
 
         // game args: --username TestUser
         assert!(
-            cmd.game_args.windows(2).any(|w| w[0] == "--username" && w[1] == "TestUser"),
+            cmd.game_args
+                .windows(2)
+                .any(|w| w[0] == "--username" && w[1] == "TestUser"),
             "game_args must contain --username TestUser; got {:?}",
             cmd.game_args
         );
 
         // game args: --uuid <offline uuid>
         assert!(
-            cmd.game_args.windows(2).any(|w| w[0] == "--uuid" && w[1] == auth.uuid),
+            cmd.game_args
+                .windows(2)
+                .any(|w| w[0] == "--uuid" && w[1] == auth.uuid),
             "game_args must contain --uuid {}; got {:?}",
             auth.uuid,
             cmd.game_args
@@ -251,11 +263,21 @@ mod tests {
         let v = load("tests/fixtures/mojang/version_1_12_2.json");
         let auth = offline_auth("TestUser");
         let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-        let cmd = compose(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+        let cmd = compose(
+            &v,
+            &auth,
+            &fixture_paths(),
+            "myslug",
+            &ctx,
+            Path::new("java"),
+        )
+        .unwrap();
 
         // Pre-1.13: arguments.jvm absent → LEGACY_JVM_ARGS baseline used
         assert!(
-            cmd.jvm_args.iter().any(|a| a.starts_with("-Djava.library.path=")),
+            cmd.jvm_args
+                .iter()
+                .any(|a| a.starts_with("-Djava.library.path=")),
             "legacy versions need -Djava.library.path; got {:?}",
             cmd.jvm_args
         );
@@ -279,7 +301,15 @@ mod tests {
         let v = load("tests/fixtures/mojang/version_1_21_4.json");
         let auth = offline_auth("TestUser");
         let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-        let cmd = compose(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+        let cmd = compose(
+            &v,
+            &auth,
+            &fixture_paths(),
+            "myslug",
+            &ctx,
+            Path::new("java"),
+        )
+        .unwrap();
 
         // offline_auth always has access_token = "0"
         let has_token = cmd
@@ -308,7 +338,15 @@ mod tests {
         let v = load("tests/fixtures/mojang/version_1_12_2.json");
         let auth = offline_auth("TestUser");
         let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-        let cmd = compose(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+        let cmd = compose(
+            &v,
+            &auth,
+            &fixture_paths(),
+            "myslug",
+            &ctx,
+            Path::new("java"),
+        )
+        .unwrap();
         assert_eq!(cmd.main_class, v.main_class);
     }
 
@@ -331,7 +369,15 @@ mod tests {
         let v = load("tests/fixtures/mojang/version_1_21_4.json");
         let auth = msa_auth_fixture();
         let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-        let cmd = compose_msa(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+        let cmd = compose_msa(
+            &v,
+            &auth,
+            &fixture_paths(),
+            "myslug",
+            &ctx,
+            Path::new("java"),
+        )
+        .unwrap();
 
         assert!(
             cmd.game_args.iter().any(|a| a == "mc-tok"),
@@ -345,7 +391,15 @@ mod tests {
         let v = load("tests/fixtures/mojang/version_1_21_4.json");
         let auth = msa_auth_fixture();
         let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-        let cmd = compose_msa(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+        let cmd = compose_msa(
+            &v,
+            &auth,
+            &fixture_paths(),
+            "myslug",
+            &ctx,
+            Path::new("java"),
+        )
+        .unwrap();
 
         assert!(
             cmd.game_args.iter().any(|a| a == "msa"),
@@ -359,7 +413,15 @@ mod tests {
         let v = load("tests/fixtures/mojang/version_1_21_4.json");
         let auth = msa_auth_fixture();
         let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-        let cmd = compose_msa(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+        let cmd = compose_msa(
+            &v,
+            &auth,
+            &fixture_paths(),
+            "myslug",
+            &ctx,
+            Path::new("java"),
+        )
+        .unwrap();
 
         assert!(
             cmd.game_args.iter().any(|a| a == "PlayerOne"),
@@ -373,10 +435,20 @@ mod tests {
         let v = load("tests/fixtures/mojang/version_1_21_4.json");
         let auth = msa_auth_fixture();
         let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-        let cmd = compose_msa(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+        let cmd = compose_msa(
+            &v,
+            &auth,
+            &fixture_paths(),
+            "myslug",
+            &ctx,
+            Path::new("java"),
+        )
+        .unwrap();
 
         assert!(
-            cmd.game_args.iter().any(|a| a == "11111111-1111-4111-8111-111111111111"),
+            cmd.game_args
+                .iter()
+                .any(|a| a == "11111111-1111-4111-8111-111111111111"),
             "game_args must contain the MSA UUID; got {:?}",
             cmd.game_args
         );
@@ -387,7 +459,15 @@ mod tests {
         let v = load("tests/fixtures/mojang/version_1_21_4.json");
         let auth = msa_auth_fixture();
         let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-        let cmd = compose_msa(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+        let cmd = compose_msa(
+            &v,
+            &auth,
+            &fixture_paths(),
+            "myslug",
+            &ctx,
+            Path::new("java"),
+        )
+        .unwrap();
 
         assert!(
             cmd.game_args.iter().any(|a| a == "uhs-1")
@@ -403,7 +483,15 @@ mod tests {
         let v = load("tests/fixtures/mojang/version_1_21_4.json");
         let auth = msa_auth_fixture();
         let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-        let cmd = compose_msa(&v, &auth, &fixture_paths(), "myslug", &ctx, Path::new("java")).unwrap();
+        let cmd = compose_msa(
+            &v,
+            &auth,
+            &fixture_paths(),
+            "myslug",
+            &ctx,
+            Path::new("java"),
+        )
+        .unwrap();
 
         for arg in cmd.jvm_args.iter().chain(cmd.game_args.iter()) {
             assert!(

@@ -210,10 +210,11 @@ impl PackService {
         job_id: JobId,
     ) -> Result<InstalledModRow, PackError> {
         // Step 1: pick primary file.
-        let file = pick_primary_file(&version.files)
-            .ok_or_else(|| PackError::Modrinth(ModrinthError::FileNotDownloadable {
+        let file = pick_primary_file(&version.files).ok_or_else(|| {
+            PackError::Modrinth(ModrinthError::FileNotDownloadable {
                 project_slug: project_slug.to_string(),
-            }))?;
+            })
+        })?;
 
         // Step 2 (T-11-02-01): validate filename BEFORE any HTTP call.
         if !is_safe_pack_filename(&file.filename) {
@@ -264,9 +265,13 @@ impl PackService {
             .get(&file.url)
             .send()
             .await
-            .map_err(|e| PackError::Modrinth(ModrinthError::Http(format!("GET {}: {e}", file.url))))?
+            .map_err(|e| {
+                PackError::Modrinth(ModrinthError::Http(format!("GET {}: {e}", file.url)))
+            })?
             .error_for_status()
-            .map_err(|e| PackError::Modrinth(ModrinthError::Http(format!("status {}: {e}", file.url))))?;
+            .map_err(|e| {
+                PackError::Modrinth(ModrinthError::Http(format!("status {}: {e}", file.url)))
+            })?;
 
         let mut buf: Vec<u8> = Vec::with_capacity(file.size as usize);
         let mut bytes_done: u64 = 0;
@@ -276,8 +281,9 @@ impl PackService {
             if token.is_cancelled() {
                 return Err(PackError::Cancelled);
             }
-            let chunk = chunk
-                .map_err(|e| PackError::Modrinth(ModrinthError::Http(format!("body {}: {e}", file.url))))?;
+            let chunk = chunk.map_err(|e| {
+                PackError::Modrinth(ModrinthError::Http(format!("body {}: {e}", file.url)))
+            })?;
             bytes_done += chunk.len() as u64;
             // T-11-02-03: mid-stream cap (defense in depth against tampered Content-Length).
             if bytes_done > MAX_PACK_FILE_BYTES {
@@ -320,12 +326,12 @@ impl PackService {
         }
 
         // Step 10: write to .tmp file.
-        tokio::fs::write(&tmp_path, &buf)
-            .await
-            .map_err(|e| PackError::Io(std::io::Error::other(format!(
+        tokio::fs::write(&tmp_path, &buf).await.map_err(|e| {
+            PackError::Io(std::io::Error::other(format!(
                 "write {}: {e}",
                 tmp_path.display()
-            ))))?;
+            )))
+        })?;
 
         // Step 11: build ledger row.
         let installed_at = crate::domain::instance::now_iso8601_utc();
@@ -525,10 +531,7 @@ impl PackService {
     /// tests can resolve the full version object from a pinned version_id
     /// without going through the search → list_versions → select flow.
     #[tracing::instrument(skip_all, fields(version_id = %version_id))]
-    pub async fn get_version(
-        &self,
-        version_id: &str,
-    ) -> Result<ModrinthVersion, PackError> {
+    pub async fn get_version(&self, version_id: &str) -> Result<ModrinthVersion, PackError> {
         Ok(self.client.get_version(version_id).await?)
     }
 }
@@ -546,8 +549,7 @@ mod tests {
     use tempfile::TempDir;
 
     fn make_client(server: &MockServer) -> ModrinthClient {
-        ModrinthClient::new_with_base_url(server.base_url())
-            .expect("client::new_with_base_url")
+        ModrinthClient::new_with_base_url(server.base_url()).expect("client::new_with_base_url")
     }
 
     fn test_paths(td: &TempDir) -> AppPaths {
@@ -635,17 +637,15 @@ mod tests {
     async fn test_search_shader_pack_uses_shader_project_type() {
         let server = MockServer::start();
         let m = server.mock(|when, then| {
-            when.method(GET)
-                .path("/v2/search")
-                .is_true(|req| {
-                    let facets = req
-                        .query_params()
-                        .iter()
-                        .find(|(k, _)| k == "facets")
-                        .map(|(_, v)| urlencoding::decode(v).unwrap_or_default().into_owned())
-                        .unwrap_or_default();
-                    facets.contains("project_type:shader")
-                });
+            when.method(GET).path("/v2/search").is_true(|req| {
+                let facets = req
+                    .query_params()
+                    .iter()
+                    .find(|(k, _)| k == "facets")
+                    .map(|(_, v)| urlencoding::decode(v).unwrap_or_default().into_owned())
+                    .unwrap_or_default();
+                facets.contains("project_type:shader")
+            });
             then.status(200).body(
                 json!({
                     "hits": [
@@ -673,19 +673,16 @@ mod tests {
         // if a loader filter was added.
         let server = MockServer::start();
         let m = server.mock(|when, then| {
-            when.method(GET)
-                .path("/v2/search")
-                .is_true(|req| {
-                    let facets = req
-                        .query_params()
-                        .iter()
-                        .find(|(k, _)| k == "facets")
-                        .map(|(_, v)| urlencoding::decode(v).unwrap_or_default().into_owned())
-                        .unwrap_or_default();
-                    // Must have project_type but NO categories group (D-LOCK no loader)
-                    facets.contains("project_type:resourcepack")
-                        && !facets.contains("categories:")
-                });
+            when.method(GET).path("/v2/search").is_true(|req| {
+                let facets = req
+                    .query_params()
+                    .iter()
+                    .find(|(k, _)| k == "facets")
+                    .map(|(_, v)| urlencoding::decode(v).unwrap_or_default().into_owned())
+                    .unwrap_or_default();
+                // Must have project_type but NO categories group (D-LOCK no loader)
+                facets.contains("project_type:resourcepack") && !facets.contains("categories:")
+            });
             then.status(200)
                 .body(json!({"hits":[], "offset":0,"limit":20,"total_hits":0}).to_string());
         });
@@ -723,7 +720,12 @@ mod tests {
         upsert_pack(
             &paths,
             "inst",
-            pack_row("RPID1", "faithful-32x.zip", InstalledItemKind::ResourcePack, true),
+            pack_row(
+                "RPID1",
+                "faithful-32x.zip",
+                InstalledItemKind::ResourcePack,
+                true,
+            ),
         )
         .await
         .unwrap();
@@ -740,7 +742,13 @@ mod tests {
 
         // Search for Resource packs — RPID1 should be already_installed.
         let hits = svc
-            .search("faithful", PackKind::Resource, None, Some(&paths), Some("inst"))
+            .search(
+                "faithful",
+                PackKind::Resource,
+                None,
+                Some(&paths),
+                Some("inst"),
+            )
             .await
             .unwrap();
         assert_eq!(hits.len(), 1);
@@ -753,7 +761,13 @@ mod tests {
         // Even though the search returns the same hit (mock always returns RPID1),
         // the kind filter must prevent the ResourcePack row from marking it as installed.
         let hits2 = svc
-            .search("faithful", PackKind::Shader, None, Some(&paths), Some("inst"))
+            .search(
+                "faithful",
+                PackKind::Shader,
+                None,
+                Some(&paths),
+                Some("inst"),
+            )
             .await
             .unwrap();
         assert_eq!(hits2.len(), 1);
@@ -787,7 +801,10 @@ mod tests {
             );
         });
         let svc = PackService::with_client(make_client(&server));
-        let entries = svc.list_versions("RPID1", Some("1.21.4"), PackKind::Resource).await.unwrap();
+        let entries = svc
+            .list_versions("RPID1", Some("1.21.4"), PackKind::Resource)
+            .await
+            .unwrap();
         m.assert();
         assert_eq!(entries.len(), 1);
         assert!(entries[0].is_latest_stable);
@@ -896,8 +913,13 @@ mod tests {
             .unwrap();
 
         // File written to resourcepacks dir.
-        let expected = paths.instance_pack_file("test-instance", PackKind::Resource, "faithful-32x.zip");
-        assert!(expected.exists(), "file should exist at {}", expected.display());
+        let expected =
+            paths.instance_pack_file("test-instance", PackKind::Resource, "faithful-32x.zip");
+        assert!(
+            expected.exists(),
+            "file should exist at {}",
+            expected.display()
+        );
         assert_eq!(row.kind, InstalledItemKind::ResourcePack);
         assert_eq!(row.source, ModSource::Modrinth);
         assert_eq!(row.hash_algo, HashAlgo::Sha1);
@@ -937,8 +959,13 @@ mod tests {
             .await
             .unwrap();
 
-        let expected = paths.instance_pack_file("test-instance", PackKind::Shader, "bsl-shaders.zip");
-        assert!(expected.exists(), "file should exist at {}", expected.display());
+        let expected =
+            paths.instance_pack_file("test-instance", PackKind::Shader, "bsl-shaders.zip");
+        assert!(
+            expected.exists(),
+            "file should exist at {}",
+            expected.display()
+        );
         assert_eq!(row.kind, InstalledItemKind::Shader);
     }
 
@@ -963,14 +990,25 @@ mod tests {
         let (tx, _rx) = make_progress();
         let result = svc
             .install_modrinth(
-                &paths, "inst", PackKind::Resource, &version,
-                "p", "PID", "P", tx, make_token(), JobId(1),
+                &paths,
+                "inst",
+                PackKind::Resource,
+                &version,
+                "p",
+                "PID",
+                "P",
+                tx,
+                make_token(),
+                JobId(1),
             )
             .await;
 
         // Should fail with Sha512Mismatch (variant name preserved, Phase 9 carve-out).
         assert!(
-            matches!(result, Err(PackError::Modrinth(ModrinthError::Sha512Mismatch { .. }))),
+            matches!(
+                result,
+                Err(PackError::Modrinth(ModrinthError::Sha512Mismatch { .. }))
+            ),
             "expected Sha512Mismatch, got {result:?}"
         );
 
@@ -986,8 +1024,16 @@ mod tests {
         let (tx2, _rx2) = make_progress();
         let row = svc2
             .install_modrinth(
-                &paths, "inst2", PackKind::Resource, &version2,
-                "p", "PID", "P", tx2, make_token(), JobId(2),
+                &paths,
+                "inst2",
+                PackKind::Resource,
+                &version2,
+                "p",
+                "PID",
+                "P",
+                tx2,
+                make_token(),
+                JobId(2),
             )
             .await
             .unwrap();
@@ -1014,8 +1060,16 @@ mod tests {
         let (tx, _rx) = make_progress();
         let result = svc
             .install_modrinth(
-                &paths, "inst", PackKind::Resource, &version,
-                "p", "PID", "P", tx, make_token(), JobId(1),
+                &paths,
+                "inst",
+                PackKind::Resource,
+                &version,
+                "p",
+                "PID",
+                "P",
+                tx,
+                make_token(),
+                JobId(1),
             )
             .await;
 
@@ -1043,22 +1097,29 @@ mod tests {
         let td = TempDir::new().unwrap();
         // Use a sub-path that doesn't exist yet.
         let base = td.path().join("nested").join("dirs");
-        let paths = AppPaths::with_roots(
-            base.clone(),
-            base.clone(),
-            base,
-        );
+        let paths = AppPaths::with_roots(base.clone(), base.clone(), base);
         let svc = PackService::with_client(make_client(&server));
         let version = make_version("new-pack.zip", &sha1, &url, body.len() as u64);
 
         let (tx, _rx) = make_progress();
         let result = svc
             .install_modrinth(
-                &paths, "inst", PackKind::Resource, &version,
-                "p", "PID", "P", tx, make_token(), JobId(1),
+                &paths,
+                "inst",
+                PackKind::Resource,
+                &version,
+                "p",
+                "PID",
+                "P",
+                tx,
+                make_token(),
+                JobId(1),
             )
             .await;
-        assert!(result.is_ok(), "should succeed despite missing dir: {result:?}");
+        assert!(
+            result.is_ok(),
+            "should succeed despite missing dir: {result:?}"
+        );
     }
 
     #[tokio::test]
@@ -1089,8 +1150,16 @@ mod tests {
         let (tx, _rx) = make_progress();
         let result = svc
             .install_modrinth(
-                &paths, "inst", PackKind::Resource, &version,
-                "conflict-pack", "CONFLICT-PID", "Conflict Pack", tx, make_token(), JobId(1),
+                &paths,
+                "inst",
+                PackKind::Resource,
+                &version,
+                "conflict-pack",
+                "CONFLICT-PID",
+                "Conflict Pack",
+                tx,
+                make_token(),
+                JobId(1),
             )
             .await;
 
@@ -1099,7 +1168,9 @@ mod tests {
 
         // But ledger row MUST be present (upsert happened before rename).
         // project_id passed is "CONFLICT-PID" — that becomes row.mod_id.
-        let ledger = crate::mods::ledger::read_ledger(&paths, "inst").await.unwrap();
+        let ledger = crate::mods::ledger::read_ledger(&paths, "inst")
+            .await
+            .unwrap();
         assert!(
             ledger.mods.iter().any(|r| r.mod_id == "CONFLICT-PID"),
             "ledger row must be present even after rename failure (Pitfall 8)"
@@ -1112,7 +1183,10 @@ mod tests {
             let parent = p.parent().unwrap().to_path_buf();
             parent.join("conflict.zip.tmp")
         };
-        assert!(!tmp_path.exists(), ".tmp file should be cleaned up after rename failure");
+        assert!(
+            !tmp_path.exists(),
+            ".tmp file should be cleaned up after rename failure"
+        );
     }
 
     // --- list_installed tests ------------------------------------------------
@@ -1161,11 +1235,17 @@ mod tests {
         .await
         .unwrap();
 
-        let rp_rows = svc.list_installed(&paths, "inst", PackKind::Resource).await.unwrap();
+        let rp_rows = svc
+            .list_installed(&paths, "inst", PackKind::Resource)
+            .await
+            .unwrap();
         assert_eq!(rp_rows.len(), 1, "should return only resource pack rows");
         assert_eq!(rp_rows[0].mod_id, "RP1");
 
-        let sh_rows = svc.list_installed(&paths, "inst", PackKind::Shader).await.unwrap();
+        let sh_rows = svc
+            .list_installed(&paths, "inst", PackKind::Shader)
+            .await
+            .unwrap();
         assert_eq!(sh_rows.len(), 1, "should return only shader rows");
         assert_eq!(sh_rows[0].mod_id, "SH1");
     }
@@ -1245,7 +1325,9 @@ mod tests {
         // Create file + ledger row.
         let packs_dir = paths.instance_packs_dir("inst", PackKind::Resource);
         tokio::fs::create_dir_all(&packs_dir).await.unwrap();
-        tokio::fs::write(packs_dir.join("pack.zip"), b"data").await.unwrap();
+        tokio::fs::write(packs_dir.join("pack.zip"), b"data")
+            .await
+            .unwrap();
 
         upsert_pack(
             &paths,
@@ -1259,8 +1341,13 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(!packs_dir.join("pack.zip").exists(), "file should be removed");
-        let ledger = crate::mods::ledger::read_ledger(&paths, "inst").await.unwrap();
+        assert!(
+            !packs_dir.join("pack.zip").exists(),
+            "file should be removed"
+        );
+        let ledger = crate::mods::ledger::read_ledger(&paths, "inst")
+            .await
+            .unwrap();
         assert!(ledger.mods.is_empty(), "ledger row should be dropped");
     }
 
@@ -1285,7 +1372,12 @@ mod tests {
             .await
             .unwrap();
 
-        let ledger = crate::mods::ledger::read_ledger(&paths, "inst").await.unwrap();
-        assert!(ledger.mods.is_empty(), "ledger row should be dropped even if file missing");
+        let ledger = crate::mods::ledger::read_ledger(&paths, "inst")
+            .await
+            .unwrap();
+        assert!(
+            ledger.mods.is_empty(),
+            "ledger row should be dropped even if file missing"
+        );
     }
 }

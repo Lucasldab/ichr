@@ -150,10 +150,7 @@ pub async fn request_device_code(
     base_url: &str,
 ) -> Result<DeviceCodeStart, AuthError> {
     let url = format!("{}{DEVICE_CODE_PATH}", base_url.trim_end_matches('/'));
-    let form = [
-        ("client_id", client_id()),
-        ("scope", MSA_SCOPE.to_string()),
-    ];
+    let form = [("client_id", client_id()), ("scope", MSA_SCOPE.to_string())];
 
     let resp = client
         .post(&url)
@@ -438,8 +435,7 @@ mod tests {
         let server = MockServer::start_async().await;
         let _m = server
             .mock_async(|when, then| {
-                when.method(POST)
-                    .path("/consumers/oauth2/v2.0/devicecode");
+                when.method(POST).path("/consumers/oauth2/v2.0/devicecode");
                 then.status(400).body(r#"{"error":"invalid_client"}"#);
             })
             .await;
@@ -530,7 +526,10 @@ mod tests {
                 saw_pending = true;
             }
         }
-        assert!(saw_pending, "expected at least one AuthorizationPending event");
+        assert!(
+            saw_pending,
+            "expected at least one AuthorizationPending event"
+        );
     }
 
     // ------------------------------------------------------------------

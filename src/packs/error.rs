@@ -54,14 +54,18 @@ mod tests {
 
     #[test]
     fn test_not_found_display_contains_path() {
-        let e = PackError::NotFound { path: "/tmp/Faithful.zip".into() };
+        let e = PackError::NotFound {
+            path: "/tmp/Faithful.zip".into(),
+        };
         let s = e.to_string();
         assert!(s.contains("/tmp/Faithful.zip"), "path missing: {s}");
     }
 
     #[test]
     fn test_not_a_zip_display_contains_path() {
-        let e = PackError::NotAZip { path: "pack.tar.gz".into() };
+        let e = PackError::NotAZip {
+            path: "pack.tar.gz".into(),
+        };
         let s = e.to_string();
         assert!(s.contains("pack.tar.gz"), "path missing: {s}");
     }
@@ -74,8 +78,14 @@ mod tests {
         };
         let s = e.to_string();
         // Both byte values appear in the message.
-        assert!(s.contains("629145600") || s.contains("600"), "file size missing: {s}");
-        assert!(s.contains("524288000") || s.contains("500"), "cap missing: {s}");
+        assert!(
+            s.contains("629145600") || s.contains("600"),
+            "file size missing: {s}"
+        );
+        assert!(
+            s.contains("524288000") || s.contains("500"),
+            "cap missing: {s}"
+        );
     }
 
     #[test]
@@ -87,7 +97,9 @@ mod tests {
 
     #[test]
     fn test_unsafe_filename_display_contains_filename() {
-        let e = PackError::UnsafeFilename { filename: "../etc/passwd.zip".into() };
+        let e = PackError::UnsafeFilename {
+            filename: "../etc/passwd.zip".into(),
+        };
         let s = e.to_string();
         assert!(s.contains("../etc/passwd.zip"), "filename missing: {s}");
     }
@@ -97,7 +109,10 @@ mod tests {
         let inner = crate::mods::error::ModrinthError::Http("connect timeout".into());
         let e: PackError = inner.into();
         let s = e.to_string();
-        assert!(s.contains("Modrinth error"), "Modrinth wrapper missing: {s}");
+        assert!(
+            s.contains("Modrinth error"),
+            "Modrinth wrapper missing: {s}"
+        );
         assert!(s.contains("connect timeout"), "inner message missing: {s}");
     }
 
@@ -126,9 +141,6 @@ mod tests {
             s.contains("Shader"),
             "kind name should appear in message: {s}"
         );
-        assert!(
-            s.contains("toggle not supported"),
-            "headline missing: {s}"
-        );
+        assert!(s.contains("toggle not supported"), "headline missing: {s}");
     }
 }

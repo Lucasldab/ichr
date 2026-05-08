@@ -22,7 +22,11 @@ use crate::persistence::paths::AppPaths;
 /// This is the single authoritative source of the separator throughout the
 /// launcher. Never use `std::path::MAIN_SEPARATOR` for this purpose.
 pub fn classpath_separator() -> char {
-    if cfg!(target_os = "windows") { ';' } else { ':' }
+    if cfg!(target_os = "windows") {
+        ';'
+    } else {
+        ':'
+    }
 }
 
 /// Build the colon/semicolon-separated classpath string for `version`.
@@ -147,9 +151,15 @@ mod tests {
         let v = load_resolved("tests/fixtures/mojang/version_1_21_4.json");
         let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
         let cp = build_classpath(&v, &ctx, &paths_for_test()).unwrap();
-        assert!(!cp.is_empty(), "classpath must not be empty for a real version");
+        assert!(
+            !cp.is_empty(),
+            "classpath must not be empty for a real version"
+        );
         // Must contain at least the version jar entry (root_id == id for vanilla).
-        assert!(cp.contains(&v.root_id), "classpath must include the version id in the jar path");
+        assert!(
+            cp.contains(&v.root_id),
+            "classpath must include the version id in the jar path"
+        );
     }
 
     #[test]
@@ -157,7 +167,13 @@ mod tests {
         let v = load_resolved("tests/fixtures/mojang/version_1_12_2.json");
         let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
         let cp = build_classpath(&v, &ctx, &paths_for_test()).unwrap();
-        assert!(!cp.is_empty(), "classpath must not be empty for a legacy version");
-        assert!(cp.contains(&v.root_id), "classpath must include the version id in the jar path");
+        assert!(
+            !cp.is_empty(),
+            "classpath must not be empty for a legacy version"
+        );
+        assert!(
+            cp.contains(&v.root_id),
+            "classpath must include the version id in the jar path"
+        );
     }
 }

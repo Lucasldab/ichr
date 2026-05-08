@@ -11,6 +11,6 @@ pub mod store;
 
 pub use slug::{slugify, unique_slug};
 pub use store::{
-    list_instance_manifests, mark_launch_started, read_instance_manifest,
-    update_play_time, write_instance_manifest,
+    list_instance_manifests, mark_launch_started, read_instance_manifest, update_play_time,
+    write_instance_manifest,
 };

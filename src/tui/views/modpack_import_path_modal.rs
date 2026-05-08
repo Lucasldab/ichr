@@ -35,32 +35,39 @@ pub fn render_modpack_import_path_modal(f: &mut Frame, area: Rect, state: &AppSt
     ];
     if let Some(err) = error {
         lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(err.clone(), Style::default().fg(Color::Red))));
+        lines.push(Line::from(Span::styled(
+            err.clone(),
+            Style::default().fg(Color::Red),
+        )));
     }
 
-    let para = Paragraph::new(lines)
-        .alignment(Alignment::Left)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Import Modpack (Enter to import / Esc to cancel)"),
-        );
+    let para = Paragraph::new(lines).alignment(Alignment::Left).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Import Modpack (Enter to import / Esc to cancel)"),
+    );
     f.render_widget(para, chunks[0]);
 }
 
 pub fn map_modpack_import_path_event(ev: ratatui::crossterm::event::Event) -> Option<Action> {
     use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::ImportPathCancel),
-        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => Some(Action::ImportPathSubmit),
-        CtEvent::Key(KeyEvent { code: KeyCode::Backspace, .. }) => {
-            Some(Action::ImportPathBackspaceSearch)
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char(c), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
-            Some(Action::ImportPathTypeSearch(c))
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::ImportPathCancel),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        }) => Some(Action::ImportPathSubmit),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        }) => Some(Action::ImportPathBackspaceSearch),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::ImportPathTypeSearch(c)),
         CtEvent::Paste(s) => Some(Action::ImportPathPasteSearch(s)),
         _ => None,
     }

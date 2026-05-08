@@ -107,7 +107,10 @@ impl AdoptiumClient {
             .connect_timeout(Duration::from_secs(10))
             .build()
             .map_err(|e| AppError::Http(format!("reqwest build (adoptium): {e}")))?;
-        Ok(Self { http, base_url: base_url.into() })
+        Ok(Self {
+            http,
+            base_url: base_url.into(),
+        })
     }
 
     /// Fetch the latest Adoptium JRE release for `(major, arch, os)`.
@@ -145,10 +148,13 @@ impl AdoptiumClient {
 
         let releases: Vec<AdoptiumRelease> = serde_json::from_slice(&bytes)?;
 
-        releases.into_iter().next().ok_or_else(|| AppError::JavaDownloadFailed {
-            variant: format!("adoptium-{major}"),
-            reason: "no release found for this platform".into(),
-        })
+        releases
+            .into_iter()
+            .next()
+            .ok_or_else(|| AppError::JavaDownloadFailed {
+                variant: format!("adoptium-{major}"),
+                reason: "no release found for this platform".into(),
+            })
     }
 
     /// Download `url` and verify its SHA-256 against `expected_sha256`.
@@ -182,9 +188,7 @@ impl AdoptiumClient {
         if !got.eq_ignore_ascii_case(expected_sha256) {
             return Err(AppError::JavaDownloadFailed {
                 variant: variant_id.to_string(),
-                reason: format!(
-                    "sha256 mismatch: expected {expected_sha256} got {got}"
-                ),
+                reason: format!("sha256 mismatch: expected {expected_sha256} got {got}"),
             });
         }
 
@@ -234,29 +238,28 @@ impl AdoptiumClient {
         tokio::fs::create_dir_all(&tmp_dir).await?;
 
         let tmp_for_task = tmp_dir.clone();
-        let extract_result =
-            tokio::task::spawn_blocking(move || -> Result<(), AppError> {
-                #[cfg(unix)]
-                {
-                    extract_tar_gz_blocking(bytes, &tmp_for_task)
-                }
-                #[cfg(windows)]
-                {
-                    extract_zip_blocking(bytes, &tmp_for_task)
-                }
-                #[cfg(not(any(unix, windows)))]
-                {
-                    Err(AppError::JavaExtractFailed {
-                        dest: tmp_for_task,
-                        reason: "unsupported OS for JRE extraction".into(),
-                    })
-                }
-            })
-            .await
-            .map_err(|e| AppError::JavaExtractFailed {
-                dest: tmp_dir.clone(),
-                reason: format!("spawn_blocking join error: {e}"),
-            })?;
+        let extract_result = tokio::task::spawn_blocking(move || -> Result<(), AppError> {
+            #[cfg(unix)]
+            {
+                extract_tar_gz_blocking(bytes, &tmp_for_task)
+            }
+            #[cfg(windows)]
+            {
+                extract_zip_blocking(bytes, &tmp_for_task)
+            }
+            #[cfg(not(any(unix, windows)))]
+            {
+                Err(AppError::JavaExtractFailed {
+                    dest: tmp_for_task,
+                    reason: "unsupported OS for JRE extraction".into(),
+                })
+            }
+        })
+        .await
+        .map_err(|e| AppError::JavaExtractFailed {
+            dest: tmp_dir.clone(),
+            reason: format!("spawn_blocking join error: {e}"),
+        })?;
 
         if let Err(e) = extract_result {
             let _ = tokio::fs::remove_dir_all(&tmp_dir).await;
@@ -288,7 +291,11 @@ fn strip_top_prefix(p: &Path) -> Option<PathBuf> {
     let mut comps = p.components();
     let _first = comps.next()?; // skip the top-level dir (e.g. `jdk-21.0.10+7-jre/`)
     let rest: PathBuf = comps.collect();
-    if rest.as_os_str().is_empty() { None } else { Some(rest) }
+    if rest.as_os_str().is_empty() {
+        None
+    } else {
+        Some(rest)
+    }
 }
 
 /// Extract a `.tar.gz` byte slice into `dest_dir`, stripping the top-level
@@ -324,7 +331,10 @@ fn extract_tar_gz_blocking(bytes: Vec<u8>, dest_dir: &Path) -> Result<(), AppErr
             .to_path_buf();
 
         // Path-traversal guard: every component must be Normal (no `..`, no absolute)
-        if !raw_path.components().all(|c| matches!(c, Component::Normal(_))) {
+        if !raw_path
+            .components()
+            .all(|c| matches!(c, Component::Normal(_)))
+        {
             tracing::warn!(path = ?raw_path, "tar: skipping path-traversal entry");
             continue;
         }
@@ -342,10 +352,12 @@ fn extract_tar_gz_blocking(bytes: Vec<u8>, dest_dir: &Path) -> Result<(), AppErr
         }
 
         // Unpack preserves mode bits from the archive when set_preserve_permissions(true)
-        entry.unpack(&dest).map_err(|e| AppError::JavaExtractFailed {
-            dest: dest.clone(),
-            reason: format!("tar unpack: {e}"),
-        })?;
+        entry
+            .unpack(&dest)
+            .map_err(|e| AppError::JavaExtractFailed {
+                dest: dest.clone(),
+                reason: format!("tar unpack: {e}"),
+            })?;
     }
 
     Ok(())
@@ -365,10 +377,12 @@ fn extract_zip_blocking(bytes: Vec<u8>, dest_dir: &Path) -> Result<(), AppError>
     })?;
 
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i).map_err(|e| AppError::JavaExtractFailed {
-            dest: dest_dir.to_path_buf(),
-            reason: format!("zip entry {i}: {e}"),
-        })?;
+        let mut file = archive
+            .by_index(i)
+            .map_err(|e| AppError::JavaExtractFailed {
+                dest: dest_dir.to_path_buf(),
+                reason: format!("zip entry {i}: {e}"),
+            })?;
 
         let name = match file.enclosed_name() {
             Some(p) => p.to_path_buf(),
@@ -436,8 +450,7 @@ mod tests {
     /// Build a client pointed at the given mock server base URL.
     /// Does NOT touch env vars — avoids races between parallel tests.
     fn make_client(server: &MockServer) -> AdoptiumClient {
-        AdoptiumClient::new_with_base_url(server.base_url())
-            .expect("client build")
+        AdoptiumClient::new_with_base_url(server.base_url()).expect("client build")
     }
 
     fn make_paths(td: &TempDir) -> AppPaths {
@@ -570,7 +583,8 @@ mod tests {
         zip.add_directory("fixture-jdk-21-jre/", opts).unwrap();
         zip.add_directory("fixture-jdk-21-jre/bin/", opts).unwrap();
 
-        zip.start_file("fixture-jdk-21-jre/bin/java.exe", opts).unwrap();
+        zip.start_file("fixture-jdk-21-jre/bin/java.exe", opts)
+            .unwrap();
         zip.write_all(b"fake-java\n").unwrap();
 
         zip.finish().unwrap().into_inner()
@@ -777,7 +791,10 @@ mod tests {
         // Must be at {jre_dir}/bin/java, NOT {jre_dir}/fixture-jdk-21-jre/bin/java
         let jre_dir = paths.jre_dir("adoptium-21");
         let java_path = jre_dir.join("bin/java");
-        assert!(java_path.exists(), "bin/java should exist (prefix stripped)");
+        assert!(
+            java_path.exists(),
+            "bin/java should exist (prefix stripped)"
+        );
 
         let content = std::fs::read(&java_path).unwrap();
         assert_eq!(content, b"fake-java\n", "content must match fixture");
@@ -861,7 +878,10 @@ mod tests {
         // No .tmp dir should be left (download failed before extraction started)
         let jre_dir = paths.jre_dir("adoptium-21");
         let tmp_dir = jre_dir.with_extension("tmp");
-        assert!(!tmp_dir.exists(), ".tmp must not exist after sha256 mismatch");
+        assert!(
+            !tmp_dir.exists(),
+            ".tmp must not exist after sha256 mismatch"
+        );
     }
 
     /// Path-traversal in tar archive must be rejected silently (entry skipped).
@@ -882,10 +902,16 @@ mod tests {
         let result = extract_tar_gz_blocking(archive_bytes, &dest);
 
         // Should succeed — the bad entry is silently skipped
-        assert!(result.is_ok(), "traversal entry should be skipped, not errored: {result:?}");
+        assert!(
+            result.is_ok(),
+            "traversal entry should be skipped, not errored: {result:?}"
+        );
 
         // The evil file must NOT exist outside dest
         let evil_path = td.path().join("evil/x");
-        assert!(!evil_path.exists(), "traversal file must not be created: {evil_path:?}");
+        assert!(
+            !evil_path.exists(),
+            "traversal file must not be created: {evil_path:?}"
+        );
     }
 }

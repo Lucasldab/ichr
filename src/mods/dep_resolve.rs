@@ -147,7 +147,12 @@ where
         }
     }
 
-    Ok(ResolvedDepGraph { root, deps, total_new_bytes, total_new_files })
+    Ok(ResolvedDepGraph {
+        root,
+        deps,
+        total_new_bytes,
+        total_new_files,
+    })
 }
 
 /// Inner per-dep processing -- extracted to keep the BFS loop readable.
@@ -219,12 +224,9 @@ where
                 return Ok(());
             }
             seen.insert(project_id.clone());
-            let chosen = fetch_latest_for_project(
-                project_id.clone(),
-                mc.to_string(),
-                loaders.to_vec(),
-            )
-            .await?;
+            let chosen =
+                fetch_latest_for_project(project_id.clone(), mc.to_string(), loaders.to_vec())
+                    .await?;
             let Some(version) = chosen else {
                 return Err(ModrinthError::NoCompatibleVersion {
                     project_id,
@@ -260,11 +262,19 @@ mod tests {
             filename: name.to_string(),
             primary: true,
             size,
-            hashes: ModrinthHashes { sha1: "a".into(), sha512: "b".into() },
+            hashes: ModrinthHashes {
+                sha1: "a".into(),
+                sha512: "b".into(),
+            },
         }
     }
 
-    fn mk_version(id: &str, project_id: &str, file_size: u64, deps: Vec<ModrinthDep>) -> ModrinthVersion {
+    fn mk_version(
+        id: &str,
+        project_id: &str,
+        file_size: u64,
+        deps: Vec<ModrinthDep>,
+    ) -> ModrinthVersion {
         ModrinthVersion {
             id: id.into(),
             project_id: project_id.into(),
@@ -311,16 +321,25 @@ mod tests {
 
         let installed = HashMap::<String, String>::new();
         let g = resolve_required_deps(
-            root, "1.20.4", &["fabric".into()], &installed,
+            root,
+            "1.20.4",
+            &["fabric".into()],
+            &installed,
             |pid, _mc, _l| {
                 let b = b.clone();
                 async move {
-                    if pid == "B" { Ok(Some(b)) } else { Ok(None) }
+                    if pid == "B" {
+                        Ok(Some(b))
+                    } else {
+                        Ok(None)
+                    }
                 }
             },
             never_fetch_by_id,
             no_titles_async,
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
 
         assert_eq!(g.deps.len(), 1);
         assert_eq!(g.deps[0].project_id, "B");
@@ -336,11 +355,19 @@ mod tests {
         let d = mk_version("d1", "D", 50, vec![]);
         let b = mk_version("b1", "B", 100, vec![dep("D", DepKind::Required)]);
         let c = mk_version("c1", "C", 200, vec![dep("D", DepKind::Required)]);
-        let root = mk_version("a1", "A", 300, vec![dep("B", DepKind::Required), dep("C", DepKind::Required)]);
+        let root = mk_version(
+            "a1",
+            "A",
+            300,
+            vec![dep("B", DepKind::Required), dep("C", DepKind::Required)],
+        );
 
         let installed = HashMap::<String, String>::new();
         let g = resolve_required_deps(
-            root, "1.20.4", &["fabric".into()], &installed,
+            root,
+            "1.20.4",
+            &["fabric".into()],
+            &installed,
             |pid, _mc, _l| {
                 let (b, c, d) = (b.clone(), c.clone(), d.clone());
                 async move {
@@ -354,10 +381,14 @@ mod tests {
             },
             never_fetch_by_id,
             no_titles_async,
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
 
         // BFS layer order: root visits B and C; then B visits D (new) then C visits D (already seen).
-        let new_pids: Vec<&str> = g.deps.iter()
+        let new_pids: Vec<&str> = g
+            .deps
+            .iter()
             .filter(|d| d.is_new_download)
             .map(|d| d.project_id.as_str())
             .collect();
@@ -374,7 +405,10 @@ mod tests {
 
         let installed = HashMap::<String, String>::new();
         let g = resolve_required_deps(
-            root.clone(), "1.20.4", &["fabric".into()], &installed,
+            root.clone(),
+            "1.20.4",
+            &["fabric".into()],
+            &installed,
             |pid, _mc, _l| {
                 let (b, root_) = (b.clone(), root.clone());
                 async move {
@@ -387,10 +421,16 @@ mod tests {
             },
             never_fetch_by_id,
             no_titles_async,
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
 
         // Critical invariant: the function returns. Bounded by `seen` so cycles cannot diverge.
-        assert!(g.deps.len() <= 4, "should terminate without exploding: got {} deps", g.deps.len());
+        assert!(
+            g.deps.len() <= 4,
+            "should terminate without exploding: got {} deps",
+            g.deps.len()
+        );
     }
 
     // 4. Incompatible-with-installed: A -> incompatible(B), B in ledger -> DependencyConflict.
@@ -401,14 +441,21 @@ mod tests {
         installed.insert("B".to_string(), "old-version".to_string());
 
         let r = resolve_required_deps(
-            root, "1.20.4", &["fabric".into()], &installed,
+            root,
+            "1.20.4",
+            &["fabric".into()],
+            &installed,
             |_pid, _mc, _l| async { Ok(None) },
             never_fetch_by_id,
             no_titles_async,
-        ).await;
+        )
+        .await;
 
         match r {
-            Err(ModrinthError::DependencyConflict { conflicting_project_id, requested_by }) => {
+            Err(ModrinthError::DependencyConflict {
+                conflicting_project_id,
+                requested_by,
+            }) => {
                 assert_eq!(conflicting_project_id, "B");
                 assert_eq!(requested_by, "A");
             }
@@ -422,11 +469,16 @@ mod tests {
         let root = mk_version("a1", "A", 100, vec![dep("C", DepKind::Optional)]);
         let installed = HashMap::<String, String>::new();
         let g = resolve_required_deps(
-            root, "1.20.4", &["fabric".into()], &installed,
+            root,
+            "1.20.4",
+            &["fabric".into()],
+            &installed,
             |_pid, _mc, _l| async { panic!("fetch_latest must not be called for optional deps") },
             never_fetch_by_id,
             no_titles_async,
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
 
         assert_eq!(g.deps.len(), 1);
         assert_eq!(g.deps[0].kind, DepKind::Optional);
@@ -440,11 +492,16 @@ mod tests {
         let root = mk_version("a1", "A", 100, vec![dep("E", DepKind::Embedded)]);
         let installed = HashMap::<String, String>::new();
         let g = resolve_required_deps(
-            root, "1.20.4", &["fabric".into()], &installed,
+            root,
+            "1.20.4",
+            &["fabric".into()],
+            &installed,
             |_pid, _mc, _l| async { panic!("fetch_latest must not be called for embedded deps") },
             never_fetch_by_id,
             no_titles_async,
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
 
         assert_eq!(g.deps.len(), 1);
         assert_eq!(g.deps[0].kind, DepKind::Embedded);
@@ -460,11 +517,16 @@ mod tests {
         installed.insert("B".to_string(), "v-old".to_string());
 
         let g = resolve_required_deps(
-            root, "1.20.4", &["fabric".into()], &installed,
+            root,
+            "1.20.4",
+            &["fabric".into()],
+            &installed,
             |_pid, _mc, _l| async { panic!("must not fetch already-installed dep") },
             never_fetch_by_id,
             no_titles_async,
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
 
         assert_eq!(g.deps.len(), 1);
         assert_eq!(g.deps[0].project_id, "B");
@@ -479,12 +541,19 @@ mod tests {
         let root = mk_version("a1", "A", 100, vec![dep("B", DepKind::Required)]);
         let installed = HashMap::<String, String>::new();
         let r = resolve_required_deps(
-            root, "1.20.4", &["fabric".into()], &installed,
+            root,
+            "1.20.4",
+            &["fabric".into()],
+            &installed,
             |_pid, _mc, _l| async { Ok(None) },
             never_fetch_by_id,
             no_titles_async,
-        ).await;
-        assert!(matches!(r, Err(ModrinthError::NoCompatibleVersion { .. })), "got {r:?}");
+        )
+        .await;
+        assert!(
+            matches!(r, Err(ModrinthError::NoCompatibleVersion { .. })),
+            "got {r:?}"
+        );
     }
 
     // GAP-8-D: project_title must be populated by post-BFS title hydration so the
@@ -495,10 +564,19 @@ mod tests {
         let root = mk_version("a1", "A", 200, vec![dep("B", DepKind::Required)]);
         let installed = HashMap::<String, String>::new();
         let g = resolve_required_deps(
-            root, "1.20.4", &["fabric".into()], &installed,
+            root,
+            "1.20.4",
+            &["fabric".into()],
+            &installed,
             |pid, _mc, _l| {
                 let b = b.clone();
-                async move { if pid == "B" { Ok(Some(b)) } else { Ok(None) } }
+                async move {
+                    if pid == "B" {
+                        Ok(Some(b))
+                    } else {
+                        Ok(None)
+                    }
+                }
             },
             never_fetch_by_id,
             |ids| async move {
@@ -522,18 +600,32 @@ mod tests {
     #[tokio::test]
     async fn test_q2_version_id_only_dep() {
         let b_version = mk_version("v-pinned", "B", 100, vec![]);
-        let root = mk_version("a1", "A", 200, vec![ModrinthDep {
-            project_id: None,
-            version_id: Some("v-pinned".into()),
-            file_name: None,
-            dependency_type: DepKind::Required,
-        }]);
+        let root = mk_version(
+            "a1",
+            "A",
+            200,
+            vec![ModrinthDep {
+                project_id: None,
+                version_id: Some("v-pinned".into()),
+                file_name: None,
+                dependency_type: DepKind::Required,
+            }],
+        );
         let installed = HashMap::<String, String>::new();
         let g = resolve_required_deps(
-            root, "1.20.4", &["fabric".into()], &installed,
+            root,
+            "1.20.4",
+            &["fabric".into()],
+            &installed,
             |pid, _mc, _l| {
                 let b = b_version.clone();
-                async move { if pid == "B" { Ok(Some(b)) } else { Ok(None) } }
+                async move {
+                    if pid == "B" {
+                        Ok(Some(b))
+                    } else {
+                        Ok(None)
+                    }
+                }
             },
             |vid| {
                 let b = b_version.clone();
@@ -543,7 +635,9 @@ mod tests {
                 }
             },
             no_titles_async,
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
 
         assert_eq!(g.deps.len(), 1);
         assert_eq!(g.deps[0].project_id, "B");

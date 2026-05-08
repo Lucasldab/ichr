@@ -27,8 +27,8 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
 use ratatui::Frame;
 
-use crate::tui::app::{Action, ActiveView, AppState};
 use crate::mods::types::{ModBrowserFetchState, ModrinthSearchHit};
+use crate::tui::app::{Action, ActiveView, AppState};
 
 pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
     let ActiveView::ModBrowser {
@@ -67,7 +67,11 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
         .instances
         .iter()
         .find(|m| m.slug == *slug)
-        .and_then(|m| m.loader.as_ref().map(|l| loader_kind_str(l.kind).to_string()))
+        .and_then(|m| {
+            m.loader
+                .as_ref()
+                .map(|l| loader_kind_str(l.kind).to_string())
+        })
         .unwrap_or_else(|| "vanilla".to_string());
 
     // Chip text + style depend on whether the user has overridden the default.
@@ -76,7 +80,9 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
         Some(_) => "MC: any (v=any)".to_string(),
     };
     let mc_chip_style = if mc_filter_override.is_none() {
-        Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
+        Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::DIM)
     } else {
         Style::default().fg(Color::Yellow)
     };
@@ -85,7 +91,9 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
         Some(_) => "Loader: any (l=any)".to_string(),
     };
     let loader_chip_style = if loader_filter_override.is_none() {
-        Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
+        Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::DIM)
     } else {
         Style::default().fg(Color::Yellow)
     };
@@ -96,8 +104,11 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
         Span::raw("  "),
         Span::styled(format!("[{loader_chip_text}]"), loader_chip_style),
     ]);
-    let header_para = Paragraph::new(header_line)
-        .block(Block::default().borders(Borders::ALL).title(format!(" Mods — {slug} ")));
+    let header_para = Paragraph::new(header_line).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" Mods — {slug} ")),
+    );
     f.render_widget(header_para, chunks[0]);
 
     // ---- Search bar (always-focused, single-line, Yellow when non-empty) ----
@@ -109,7 +120,9 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
         format!("search: {search}_")
     };
     let search_style = if search.is_empty() {
-        Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
+        Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::DIM)
     } else {
         Style::default().fg(Color::Yellow)
     };
@@ -118,14 +131,12 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
     // surrounding panes (header / results / detail / footer) regardless of
     // whether the buffer is empty. Mirrors the established Yellow=active
     // palette already used by the chip styles and the inner Paragraph.
-    let search_para = Paragraph::new(search_display)
-        .style(search_style)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Search")
-                .border_style(Style::default().fg(Color::Yellow)),
-        );
+    let search_para = Paragraph::new(search_display).style(search_style).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Search")
+            .border_style(Style::default().fg(Color::Yellow)),
+    );
     f.render_widget(search_para, chunks[1]);
 
     // ---- Body: 40/60 horizontal split (results / detail) ----
@@ -137,7 +148,13 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
     let detail_area = body_split[1];
 
     render_results_pane(f, results_area, results, *selected, fetch_state);
-    render_detail_pane(f, detail_area, results.get(*selected), selected_detail.as_ref(), fetch_state);
+    render_detail_pane(
+        f,
+        detail_area,
+        results.get(*selected),
+        selected_detail.as_ref(),
+        fetch_state,
+    );
 
     // ---- Footer hint (DIM) ----
     // UI-SPEC §"Mod Browser" line 249 — extended with `Backspace clear` when search non-empty.
@@ -171,9 +188,9 @@ fn render_results_pane(
     };
     if let Some(text) = placeholder {
         let style = match fetch_state {
-            ModBrowserFetchState::Loading | ModBrowserFetchState::Ready => {
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
-            }
+            ModBrowserFetchState::Loading | ModBrowserFetchState::Ready => Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
             // Network-error per UI-SPEC line 231: body style, no Red.
             ModBrowserFetchState::Error(_) => Style::default(),
         };
@@ -189,16 +206,22 @@ fn render_results_pane(
         .iter()
         .enumerate()
         .map(|(i, hit)| {
-            let installed_suffix = if hit.already_installed { "   ✓ installed" } else { "" };
+            let installed_suffix = if hit.already_installed {
+                "   ✓ installed"
+            } else {
+                ""
+            };
             let cursor_glyph = if i == selected { " ▶" } else { "" };
             // Truncate name to width − suffix-length − cursor-glyph-length − 1 (left pad).
-            let max_name_w =
-                width.saturating_sub(installed_suffix.len() + cursor_glyph.len() + 1);
+            let max_name_w = width.saturating_sub(installed_suffix.len() + cursor_glyph.len() + 1);
             let name = truncate(&hit.title, max_name_w);
             let line1 = if hit.already_installed {
                 Line::from(vec![
                     Span::raw(name),
-                    Span::styled(installed_suffix.to_string(), Style::default().fg(Color::Green)),
+                    Span::styled(
+                        installed_suffix.to_string(),
+                        Style::default().fg(Color::Green),
+                    ),
                     Span::raw(cursor_glyph.to_string()),
                 ])
             } else {
@@ -208,7 +231,9 @@ fn render_results_pane(
             let desc = truncate(&hit.description, width.saturating_sub(3));
             let line2 = Line::from(Span::styled(
                 format!("  {desc}"),
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
             ));
 
             let style = if i == selected {
@@ -239,8 +264,11 @@ fn render_detail_pane(
 
     // Empty state (no hit selected) — UI-SPEC line 244-246.
     if selected_hit.is_none() {
-        let p = Paragraph::new("Select a mod to see details")
-            .style(Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM));
+        let p = Paragraph::new("Select a mod to see details").style(
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
+        );
         f.render_widget(p, inner);
         return;
     }
@@ -253,12 +281,17 @@ fn render_detail_pane(
     // Build vertical metadata stack from search-hit + optional detail.
     let mut lines: Vec<Line> = Vec::new();
     let hit = selected_hit.expect("checked above");
-    lines.push(Line::from(Span::styled(hit.title.clone(), Style::default().add_modifier(Modifier::BOLD))));
+    lines.push(Line::from(Span::styled(
+        hit.title.clone(),
+        Style::default().add_modifier(Modifier::BOLD),
+    )));
 
     if let Some(d) = selected_detail {
         lines.push(Line::from(Span::styled(
             format!("by {}", d.author),
-            Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
         )));
         lines.push(divider_line(inner.width));
         // Wrap the body across multiple lines via Paragraph::wrap() applied
@@ -271,19 +304,27 @@ fn render_detail_pane(
             d.latest_version_label, d.latest_version_channel
         )));
         lines.push(Line::raw(format!("License: {}", d.license_id)));
-        lines.push(Line::raw(format!("Categories: {}", d.categories.join(", "))));
+        lines.push(Line::raw(format!(
+            "Categories: {}",
+            d.categories.join(", ")
+        )));
     } else {
         // Summary-only fallback (Q4 lock-in: detail pane stays summary-only).
         lines.push(divider_line(inner.width));
         lines.push(Line::raw(hit.description.clone()));
         lines.push(Line::raw(""));
-        lines.push(Line::raw(format!("Downloads: {}", thousands(hit.downloads))));
+        lines.push(Line::raw(format!(
+            "Downloads: {}",
+            thousands(hit.downloads)
+        )));
         // Network-error state surfaced if any (UI-SPEC line 646).
         if let ModBrowserFetchState::Error(_) = fetch_state {
             lines.push(Line::raw(""));
             lines.push(Line::from(Span::styled(
                 "Could not load details — check network".to_string(),
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
             )));
         }
     }
@@ -329,7 +370,9 @@ fn divider_line(width: u16) -> Line<'static> {
     let s: String = "─".repeat(n);
     Line::from(Span::styled(
         s,
-        Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+        Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::DIM),
     ))
 }
 
@@ -362,38 +405,57 @@ pub fn map_mod_browser_event(ev: CtEvent, state: &AppState) -> Option<Action> {
     };
     match ev {
         // Up/Down arrows always navigate (per UI-SPEC line 742).
-        CtEvent::Key(KeyEvent { code: KeyCode::Up, .. }) => Some(Action::ModBrowserMove(-1)),
-        CtEvent::Key(KeyEvent { code: KeyCode::Down, .. }) => Some(Action::ModBrowserMove(1)),
-        CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::ModBrowserCancel),
-        CtEvent::Key(KeyEvent { code: KeyCode::Backspace, .. }) => {
-            Some(Action::ModBrowserBackspaceSearch)
-        }
-        CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => Some(Action::ModBrowserOpenVersions),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Up, ..
+        }) => Some(Action::ModBrowserMove(-1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Down,
+            ..
+        }) => Some(Action::ModBrowserMove(1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(Action::ModBrowserCancel),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        }) => Some(Action::ModBrowserBackspaceSearch),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        }) => Some(Action::ModBrowserOpenVersions),
         // Filter chip toggles (only fire when search is empty, otherwise letters
         // type into the search input — matches UI-SPEC §Keybind Contract).
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('v'), modifiers, .. })
-            if search_empty && !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('v'),
+            modifiers,
+            ..
+        }) if search_empty && !modifiers.contains(KeyModifiers::CONTROL) => {
             Some(Action::ToggleModMcFilter)
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('l'), modifiers, .. })
-            if search_empty && !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('l'),
+            modifiers,
+            ..
+        }) if search_empty && !modifiers.contains(KeyModifiers::CONTROL) => {
             Some(Action::ToggleModLoaderFilter)
         }
         // j/k disambiguation: navigate when search empty, otherwise type.
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('k'), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('k'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
             if search_empty {
                 Some(Action::ModBrowserMove(-1))
             } else {
                 Some(Action::ModBrowserTypeSearch('k'))
             }
         }
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('j'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
             if search_empty {
                 Some(Action::ModBrowserMove(1))
             } else {
@@ -401,11 +463,11 @@ pub fn map_mod_browser_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             }
         }
         // All other printable chars → search input.
-        CtEvent::Key(KeyEvent { code: KeyCode::Char(c), modifiers, .. })
-            if !modifiers.contains(KeyModifiers::CONTROL) =>
-        {
-            Some(Action::ModBrowserTypeSearch(c))
-        }
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::ModBrowserTypeSearch(c)),
         // Bracketed-paste payload (08.1-04 / GAP-8-C): the terminal delivers
         // pasted text as a single `Event::Paste(String)` when bracketed paste
         // is enabled at terminal init. Route the whole payload through one

@@ -61,9 +61,8 @@ async fn register_all_mocks(server: &MockServer) {
             when.method(POST)
                 .path("/user/authenticate")
                 .body_includes("\"RpsTicket\":\"d=");
-            then.status(200).body(
-                r#"{"Token":"xbl","DisplayClaims":{"xui":[{"uhs":"uhs-42"}]}}"#,
-            );
+            then.status(200)
+                .body(r#"{"Token":"xbl","DisplayClaims":{"xui":[{"uhs":"uhs-42"}]}}"#);
         })
         .await;
     // 4. XSTS
@@ -72,9 +71,8 @@ async fn register_all_mocks(server: &MockServer) {
             when.method(POST)
                 .path("/xsts/authorize")
                 .body_includes("\"SandboxId\":\"RETAIL\"");
-            then.status(200).body(
-                r#"{"Token":"xsts","DisplayClaims":{"xui":[{"uhs":"uhs-42"}]}}"#,
-            );
+            then.status(200)
+                .body(r#"{"Token":"xsts","DisplayClaims":{"xui":[{"uhs":"uhs-42"}]}}"#);
         })
         .await;
     // 5. MC login
@@ -99,9 +97,8 @@ async fn register_all_mocks(server: &MockServer) {
     server
         .mock_async(|when, then| {
             when.method(GET).path("/minecraft/profile");
-            then.status(200).body(
-                r#"{"id":"c6bf819300004000800000000000abcd","name":"PlayerOne"}"#,
-            );
+            then.status(200)
+                .body(r#"{"id":"c6bf819300004000800000000000abcd","name":"PlayerOne"}"#);
         })
         .await;
 }
@@ -149,7 +146,10 @@ async fn test_auth_chain_end_to_end_add_then_resolve_for_launch() {
     assert!(list[0].is_active);
 
     // 4) resolve auth context for launch → Msa
-    let ctx = svc.resolve_auth_context_for_launch("fallback").await.unwrap();
+    let ctx = svc
+        .resolve_auth_context_for_launch("fallback")
+        .await
+        .unwrap();
     match ctx {
         AuthContext::Msa { account_id } => {
             assert_eq!(account_id, "c6bf819300004000800000000000abcd");
@@ -194,9 +194,8 @@ async fn test_auth_chain_xsts_error_surfaces_readable_message() {
     server
         .mock_async(|when, then| {
             when.method(POST).path("/user/authenticate");
-            then.status(200).body(
-                r#"{"Token":"x","DisplayClaims":{"xui":[{"uhs":"u"}]}}"#,
-            );
+            then.status(200)
+                .body(r#"{"Token":"x","DisplayClaims":{"xui":[{"uhs":"u"}]}}"#);
         })
         .await;
     // XSTS 401 — no Xbox profile

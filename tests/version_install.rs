@@ -13,8 +13,8 @@ use tempfile::tempdir;
 fn build_test_jar(dest: &std::path::Path, entries: &[(&str, &[u8])]) {
     let file = std::fs::File::create(dest).unwrap();
     let mut zw = zip::ZipWriter::new(file);
-    let opts = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Stored);
+    let opts =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     for (name, bytes) in entries {
         zw.start_file(*name, opts).unwrap();
         zw.write_all(bytes).unwrap();
@@ -42,7 +42,10 @@ async fn test_extract_native_jar_basic() {
         .unwrap();
 
     // lwjgl.dll should be extracted
-    assert!(dest.join("lwjgl.dll").exists(), "lwjgl.dll should be extracted");
+    assert!(
+        dest.join("lwjgl.dll").exists(),
+        "lwjgl.dll should be extracted"
+    );
     let extracted = std::fs::read(dest.join("lwjgl.dll")).unwrap();
     assert_eq!(&extracted, dll_bytes, "extracted bytes should match");
 
@@ -72,7 +75,10 @@ async fn test_extract_native_jar_rejects_path_traversal() {
 
     // dest dir should be empty — traversal entry was skipped
     let entries: Vec<_> = std::fs::read_dir(&dest).unwrap().collect();
-    assert!(entries.is_empty(), "dest should remain clean after traversal attempt");
+    assert!(
+        entries.is_empty(),
+        "dest should remain clean after traversal attempt"
+    );
 
     // The passwd file should NOT exist outside dest
     let victim = std::path::PathBuf::from("/etc/passwd_mineltui_test");
@@ -86,21 +92,21 @@ async fn test_extract_native_jar_skips_directories() {
     let dest = td.path().join("out");
 
     // Directory entry (trailing slash) plus a real file inside it
-    build_test_jar(
-        &jar,
-        &[
-            ("subdir/", b""),
-            ("subdir/real.so", b"elf binary"),
-        ],
-    );
+    build_test_jar(&jar, &[("subdir/", b""), ("subdir/real.so", b"elf binary")]);
 
     extract_native_jar(&jar, &dest, &[]).await.unwrap();
 
     // The file inside subdir should be extracted
-    assert!(dest.join("subdir").join("real.so").exists(), "real.so should be extracted");
+    assert!(
+        dest.join("subdir").join("real.so").exists(),
+        "real.so should be extracted"
+    );
 
     // The directory entry itself did not create a phantom entry
-    assert!(dest.join("subdir").is_dir(), "subdir should exist as a directory");
+    assert!(
+        dest.join("subdir").is_dir(),
+        "subdir should exist as a directory"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -113,7 +119,11 @@ fn test_pick_libraries_filters_by_rules_on_linux_x86_64() {
     let v: VersionJson = serde_json::from_str(json_str).expect("parse version_1_21_4.json");
     let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
 
-    let selected: Vec<_> = v.libraries.iter().filter(|lib| evaluate_rules(&lib.rules, &ctx)).collect();
+    let selected: Vec<_> = v
+        .libraries
+        .iter()
+        .filter(|lib| evaluate_rules(&lib.rules, &ctx))
+        .collect();
 
     // Some libraries are rule-excluded on linux/x86_64
     assert!(
@@ -124,8 +134,13 @@ fn test_pick_libraries_filters_by_rules_on_linux_x86_64() {
     );
 
     // The osx-only library (ca.weblite:java-objc-bridge) should NOT appear
-    let has_objc = selected.iter().any(|lib| lib.name.contains("java-objc-bridge"));
-    assert!(!has_objc, "osx-only library should be excluded on linux/x86_64");
+    let has_objc = selected
+        .iter()
+        .any(|lib| lib.name.contains("java-objc-bridge"));
+    assert!(
+        !has_objc,
+        "osx-only library should be excluded on linux/x86_64"
+    );
 }
 
 #[test]
@@ -135,8 +150,15 @@ fn test_pick_libraries_includes_rule_free_library() {
     let ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
 
     // A library with no rules must always be included.
-    let rule_free: Vec<_> = v.libraries.iter().filter(|lib| lib.rules.is_empty()).collect();
-    assert!(!rule_free.is_empty(), "fixture should have at least one rule-free library");
+    let rule_free: Vec<_> = v
+        .libraries
+        .iter()
+        .filter(|lib| lib.rules.is_empty())
+        .collect();
+    assert!(
+        !rule_free.is_empty(),
+        "fixture should have at least one rule-free library"
+    );
 
     for lib in &rule_free {
         assert!(
@@ -198,9 +220,9 @@ fn test_concurrency_bounds_are_distinct_constants() {
 
 #[test]
 fn test_resolve_inherits_with_no_parent_is_noop() {
-    use std::collections::HashMap;
     use mineltui::mojang::inherits::resolve_inherits;
     use mineltui::mojang::types::{AssetIndex, VersionDownloads};
+    use std::collections::HashMap;
 
     // Synthesize a VersionJson with no inheritsFrom.
     let version = VersionJson {
@@ -292,6 +314,12 @@ async fn test_install_version_live_1_20_4() {
         progress_count >= 4,
         "expected >= 4 progress events, got {progress_count}"
     );
-    assert!(paths.version_jar("1.20.4").exists(), "client.jar should exist");
-    assert!(paths.version_json("1.20.4").exists(), "version.json should exist");
+    assert!(
+        paths.version_jar("1.20.4").exists(),
+        "client.jar should exist"
+    );
+    assert!(
+        paths.version_json("1.20.4").exists(),
+        "version.json should exist"
+    );
 }

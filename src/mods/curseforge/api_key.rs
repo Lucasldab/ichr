@@ -26,8 +26,7 @@ use thiserror::Error;
 /// before `cargo build`; local builds without the env var get `None` and the
 /// user must supply the key via runtime sources.
 /// Per 09-RESEARCH.md §"API Key Strategy" line 186.
-pub const COMPILED_IN_DEFAULT: Option<&str> =
-    option_env!("MINELTUI_CURSEFORGE_API_KEY_DEFAULT");
+pub const COMPILED_IN_DEFAULT: Option<&str> = option_env!("MINELTUI_CURSEFORGE_API_KEY_DEFAULT");
 
 /// API-key resolution failure. Single variant — the caller surfaces it as
 /// `api_key_present=false` rather than crashing the launcher.
@@ -45,10 +44,22 @@ pub fn resolve_api_key(
     config_value: Option<&str>,
     compiled_in_default: Option<&str>,
 ) -> Result<String, ApiKeyError> {
-    let pick = |s: &str| if s.is_empty() { None } else { Some(s.to_string()) };
-    if let Some(k) = env_var.and_then(pick)             { return Ok(k); }
-    if let Some(k) = config_value.and_then(pick)        { return Ok(k); }
-    if let Some(k) = compiled_in_default.and_then(pick) { return Ok(k); }
+    let pick = |s: &str| {
+        if s.is_empty() {
+            None
+        } else {
+            Some(s.to_string())
+        }
+    };
+    if let Some(k) = env_var.and_then(pick) {
+        return Ok(k);
+    }
+    if let Some(k) = config_value.and_then(pick) {
+        return Ok(k);
+    }
+    if let Some(k) = compiled_in_default.and_then(pick) {
+        return Ok(k);
+    }
     Err(ApiKeyError::NoApiKey)
 }
 
@@ -116,7 +127,13 @@ mod tests {
     #[test]
     fn test_no_api_key_error_message_names_env_var_and_config() {
         let s = ApiKeyError::NoApiKey.to_string();
-        assert!(s.contains("CURSEFORGE_API_KEY"), "env var name in message: {s}");
-        assert!(s.contains("config.toml"), "config file mention in message: {s}");
+        assert!(
+            s.contains("CURSEFORGE_API_KEY"),
+            "env var name in message: {s}"
+        );
+        assert!(
+            s.contains("config.toml"),
+            "config file mention in message: {s}"
+        );
     }
 }

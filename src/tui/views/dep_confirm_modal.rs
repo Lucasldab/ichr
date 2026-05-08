@@ -36,7 +36,12 @@ pub fn render_dep_confirm_modal(f: &mut Frame, area: Rect, state: &AppState) {
     let h = area.height.min(20);
     let x = area.x + (area.width.saturating_sub(w)) / 2;
     let y = area.y + (area.height.saturating_sub(h)) / 2;
-    let rect = Rect { x, y, width: w, height: h };
+    let rect = Rect {
+        x,
+        y,
+        width: w,
+        height: h,
+    };
 
     f.render_widget(Clear, rect);
     let outer = Block::default()
@@ -96,11 +101,15 @@ pub fn render_dep_confirm_modal(f: &mut Frame, area: Rect, state: &AppState) {
             let (prefix_text, prefix_style) = match d.kind {
                 DepKind::Required => (
                     "  required  ",
-                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::DIM),
                 ),
                 DepKind::Optional => (
                     "  optional  ",
-                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::DIM),
                 ),
                 DepKind::Incompatible => (
                     "  incompatible",
@@ -126,7 +135,9 @@ pub fn render_dep_confirm_modal(f: &mut Frame, area: Rect, state: &AppState) {
             if d.already_satisfied {
                 spans.push(Span::styled(
                     " (already satisfied)".to_string(),
-                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::DIM),
                 ));
             }
             Line::from(spans)
@@ -167,7 +178,9 @@ pub fn render_dep_confirm_modal(f: &mut Frame, area: Rect, state: &AppState) {
         let n = chunks[4].width.max(1) as usize;
         let divider = Paragraph::new(Line::from(Span::styled(
             "─".repeat(n),
-            Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
         )));
         f.render_widget(divider, chunks[4]);
     }
@@ -204,11 +217,20 @@ fn format_bytes(bytes: u64) -> String {
 pub fn map_dep_confirm_event(ev: CtEvent, state: &AppState) -> Option<Action> {
     let has_conflict = matches!(
         &state.active_view,
-        ActiveView::DepConfirmModal { has_conflict: true, .. }
+        ActiveView::DepConfirmModal {
+            has_conflict: true,
+            ..
+        }
     );
     match ev {
-        CtEvent::Key(KeyEvent { code: KeyCode::Char('y'), .. })
-        | CtEvent::Key(KeyEvent { code: KeyCode::Char('Y'), .. }) => {
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('y'),
+            ..
+        })
+        | CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('Y'),
+            ..
+        }) => {
             // y is a no-op when there is a conflict (UI-SPEC line 596).
             if has_conflict {
                 Some(Action::CancelModInstall)

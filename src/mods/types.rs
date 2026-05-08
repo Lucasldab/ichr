@@ -121,7 +121,7 @@ pub struct ProjectIdTitle {
 pub struct ModrinthVersionEntry {
     pub version_id: String,
     pub version_label: String, // "0.92.0+1.20.4"
-    pub channel: String, // "release" | "beta" | "alpha"
+    pub channel: String,       // "release" | "beta" | "alpha"
     pub is_latest_stable: bool,
 }
 
@@ -212,7 +212,7 @@ pub enum HashAlgo {
 /// Full shape per 08-RESEARCH.md §Pattern 3 lines 535-549.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InstalledModRow {
-    pub mod_id: String,        // Modrinth project_id (or "manual:{sha512_short}")
+    pub mod_id: String, // Modrinth project_id (or "manual:{sha512_short}")
     pub project_slug: String,
     pub display_name: String,
     pub version_id: String,    // Modrinth version_id
@@ -236,8 +236,8 @@ pub struct InstalledModRow {
     #[serde(default)]
     pub kind: InstalledItemKind,
     pub source: ModSource,
-    pub enabled: bool,         // false → file is "{file_name}.disabled"
-    pub installed_at: String,  // RFC3339
+    pub enabled: bool,        // false → file is "{file_name}.disabled"
+    pub installed_at: String, // RFC3339
 }
 
 /// Schema for `instance_dir/installed-mods.toml`.
@@ -250,7 +250,10 @@ pub struct Ledger {
 
 impl Default for Ledger {
     fn default() -> Self {
-        Self { schema_version: 1, mods: Vec::new() }
+        Self {
+            schema_version: 1,
+            mods: Vec::new(),
+        }
     }
 }
 
@@ -264,10 +267,22 @@ mod tests {
 
     #[test]
     fn test_dep_kind_serde_snake_case() {
-        assert_eq!(serde_json::to_string(&DepKind::Required).unwrap(), "\"required\"");
-        assert_eq!(serde_json::to_string(&DepKind::Optional).unwrap(), "\"optional\"");
-        assert_eq!(serde_json::to_string(&DepKind::Incompatible).unwrap(), "\"incompatible\"");
-        assert_eq!(serde_json::to_string(&DepKind::Embedded).unwrap(), "\"embedded\"");
+        assert_eq!(
+            serde_json::to_string(&DepKind::Required).unwrap(),
+            "\"required\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DepKind::Optional).unwrap(),
+            "\"optional\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DepKind::Incompatible).unwrap(),
+            "\"incompatible\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DepKind::Embedded).unwrap(),
+            "\"embedded\""
+        );
         // Roundtrip
         let parsed: DepKind = serde_json::from_str("\"required\"").unwrap();
         assert_eq!(parsed, DepKind::Required);
@@ -275,10 +290,22 @@ mod tests {
 
     #[test]
     fn test_mod_source_serde_snake_case() {
-        assert_eq!(serde_json::to_string(&ModSource::Modrinth).unwrap(), "\"modrinth\"");
-        assert_eq!(serde_json::to_string(&ModSource::CurseForge).unwrap(), "\"curseforge\"");
-        assert_eq!(serde_json::to_string(&ModSource::Manual).unwrap(), "\"manual\"");
-        assert_eq!(serde_json::to_string(&ModSource::Modpack).unwrap(), "\"modpack\"");
+        assert_eq!(
+            serde_json::to_string(&ModSource::Modrinth).unwrap(),
+            "\"modrinth\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ModSource::CurseForge).unwrap(),
+            "\"curseforge\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ModSource::Manual).unwrap(),
+            "\"manual\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ModSource::Modpack).unwrap(),
+            "\"modpack\""
+        );
         let parsed: ModSource = serde_json::from_str("\"modrinth\"").unwrap();
         assert_eq!(parsed, ModSource::Modrinth);
     }
@@ -341,7 +368,10 @@ mod tests {
         let parsed: InstalledModRow = toml::from_str(&s).unwrap();
         assert_eq!(parsed, row);
         // ModSource serializes as snake_case in TOML too.
-        assert!(s.contains("source = \"modrinth\""), "snake_case ModSource: {s}");
+        assert!(
+            s.contains("source = \"modrinth\""),
+            "snake_case ModSource: {s}"
+        );
     }
 
     #[test]
@@ -419,9 +449,15 @@ installed_at = "2026-01-01T00:00:00Z"
 
     #[test]
     fn test_hash_algo_serde_snake_case() {
-        assert_eq!(serde_json::to_string(&HashAlgo::Sha512).unwrap(), "\"sha512\"");
+        assert_eq!(
+            serde_json::to_string(&HashAlgo::Sha512).unwrap(),
+            "\"sha512\""
+        );
         assert_eq!(serde_json::to_string(&HashAlgo::Sha1).unwrap(), "\"sha1\"");
-        assert_eq!(serde_json::to_string(&HashAlgo::Sha256).unwrap(), "\"sha256\"");
+        assert_eq!(
+            serde_json::to_string(&HashAlgo::Sha256).unwrap(),
+            "\"sha256\""
+        );
         let parsed: HashAlgo = serde_json::from_str("\"sha1\"").unwrap();
         assert_eq!(parsed, HashAlgo::Sha1);
         assert_eq!(HashAlgo::default(), HashAlgo::Sha512);
@@ -445,7 +481,10 @@ installed_at = "2026-01-01T00:00:00Z"
             is_new_download: false,
         };
         let json = serde_json::to_string(&rd).unwrap();
-        assert!(!json.contains("version"), "None version should be omitted: {json}");
+        assert!(
+            !json.contains("version"),
+            "None version should be omitted: {json}"
+        );
         let parsed: ResolvedDep = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, rd);
     }

@@ -22,13 +22,12 @@ async fn main() -> anyhow::Result<()> {
     let _ = dotenvy::dotenv();
 
     // 1. Paths — must succeed before any terminal manipulation.
-    let paths = AppPaths::resolve()
-        .context("resolving platform paths (no home directory available)")?;
+    let paths =
+        AppPaths::resolve().context("resolving platform paths (no home directory available)")?;
 
     // 2. Logging — must live until the end of main.
     //    Bound as `_log_guard` (not `_`) so Rust does not drop it immediately.
-    let _log_guard = logging::init(&paths)
-        .context("initializing file logging")?;
+    let _log_guard = logging::init(&paths).context("initializing file logging")?;
     tracing::info!(
         data_dir = %paths.data_dir.display(),
         config_dir = %paths.config_dir.display(),

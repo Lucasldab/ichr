@@ -33,7 +33,9 @@ use std::time::{Duration, Instant};
 
 use httpmock::prelude::*;
 use mineltui::mods::error::ModrinthError;
-use mineltui::mods::installer::{install_mods_into_instance, InstallStep, MOD_DOWNLOAD_CONCURRENCY};
+use mineltui::mods::installer::{
+    install_mods_into_instance, InstallStep, MOD_DOWNLOAD_CONCURRENCY,
+};
 use mineltui::mods::modrinth::ModrinthClient;
 use mineltui::mods::service::ModrinthService;
 use mineltui::mods::types::{
@@ -116,12 +118,8 @@ async fn test_install_respects_concurrency_cap() {
                     let cur = inf2.fetch_add(1, Ordering::SeqCst) + 1;
                     let mut prev = maxs2.load(Ordering::SeqCst);
                     while cur > prev {
-                        match maxs2.compare_exchange(
-                            prev,
-                            cur,
-                            Ordering::SeqCst,
-                            Ordering::SeqCst,
-                        ) {
+                        match maxs2.compare_exchange(prev, cur, Ordering::SeqCst, Ordering::SeqCst)
+                        {
                             Ok(_) => break,
                             Err(actual) => prev = actual,
                         }
@@ -191,17 +189,9 @@ async fn test_install_respects_concurrency_cap() {
     let token = CancellationToken::new();
 
     let started = Instant::now();
-    install_mods_into_instance(
-        http,
-        paths.clone(),
-        slug.into(),
-        plan,
-        tx,
-        token,
-        JobId(0),
-    )
-    .await
-    .expect("install");
+    install_mods_into_instance(http, paths.clone(), slug.into(), plan, tx, token, JobId(0))
+        .await
+        .expect("install");
     let elapsed = started.elapsed();
 
     // Load-bearing assertion: with 3 batches of `delay_ms`, total must be at
@@ -260,9 +250,7 @@ async fn test_cancel_aborts_install_no_ledger_write() {
         let body = body.clone();
         server.mock(move |when, then| {
             when.method(GET).path(format!("/cdn/slow-{i}.jar"));
-            then.status(200)
-                .delay(Duration::from_secs(2))
-                .body(body);
+            then.status(200).delay(Duration::from_secs(2)).body(body);
         });
     }
 
@@ -545,7 +533,8 @@ async fn test_dep_resolve_titles_propagate_to_ledger_display_name() {
         let fabric_sha_for_dep = fabric_sha.clone();
         let fabric_size = fabric_body.len() as u64;
         server.mock(move |when, then| {
-            when.method(GET).path(format!("/v2/project/{dep_pid}/version"));
+            when.method(GET)
+                .path(format!("/v2/project/{dep_pid}/version"));
             then.status(200).body(
                 serde_json::json!([{
                     "id": "v-fabric-1",
@@ -605,8 +594,8 @@ async fn test_dep_resolve_titles_propagate_to_ledger_display_name() {
         });
     }
 
-    let client = ModrinthClient::new_with_base_url(server.base_url())
-        .expect("client::new_with_base_url");
+    let client =
+        ModrinthClient::new_with_base_url(server.base_url()).expect("client::new_with_base_url");
     let svc = ModrinthService::with_client(client);
 
     let td = TempDir::new().unwrap();

@@ -5,8 +5,7 @@ use std::path::{Path, PathBuf};
 use crate::domain::InstanceManifest;
 use crate::error::AppError;
 use crate::instance::{
-    list_instance_manifests, read_instance_manifest, slugify, unique_slug,
-    write_instance_manifest,
+    list_instance_manifests, read_instance_manifest, slugify, unique_slug, write_instance_manifest,
 };
 use crate::persistence::paths::AppPaths;
 
@@ -44,11 +43,7 @@ pub async fn create_instance(
     }
     let base = slugify(trimmed);
     let slug = unique_slug(&base, &paths.instances_dir()).await;
-    let manifest = InstanceManifest::new(
-        trimmed.to_string(),
-        slug,
-        mc_version_id.to_string(),
-    );
+    let manifest = InstanceManifest::new(trimmed.to_string(), slug, mc_version_id.to_string());
     write_instance_manifest(paths, &manifest).await?;
     Ok(manifest)
 }
@@ -90,7 +85,9 @@ pub async fn set_group(
     group: Option<String>,
 ) -> Result<InstanceManifest, AppError> {
     let mut m = read_or_not_found(paths, slug).await?;
-    m.group = group.map(|g| g.trim().to_string()).filter(|s| !s.is_empty());
+    m.group = group
+        .map(|g| g.trim().to_string())
+        .filter(|s| !s.is_empty());
     write_instance_manifest(paths, &m).await?;
     Ok(m)
 }
@@ -159,10 +156,7 @@ pub async fn clone_instance(
 
 // ---- helpers ----------------------------------------------------------------
 
-async fn read_or_not_found(
-    paths: &AppPaths,
-    slug: &str,
-) -> Result<InstanceManifest, AppError> {
+async fn read_or_not_found(paths: &AppPaths, slug: &str) -> Result<InstanceManifest, AppError> {
     if !tokio::fs::try_exists(&paths.instance_manifest(slug)).await? {
         return Err(AppError::InstanceNotFound { slug: slug.into() });
     }
