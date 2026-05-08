@@ -5,6 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::mods::types::InstalledItemKind;
+
 /// Discriminates a resource pack from a shader pack.
 ///
 /// `Default` is intentionally NOT derived — every call site must name a kind
@@ -46,6 +48,19 @@ impl PackKind {
             PackKind::Shader => "shader",
         }
     }
+
+    /// Maps `PackKind` → `InstalledItemKind` for ledger rows.
+    ///
+    /// Canonical definition lives here (not in service.rs or install.rs)
+    /// so all callers share one definition. Previously `pack_kind_to_item_kind`
+    /// in `service.rs` was a free function; install.rs uses this method instead
+    /// to avoid duplication.
+    pub fn into_installed_item_kind(self) -> InstalledItemKind {
+        match self {
+            PackKind::Resource => InstalledItemKind::ResourcePack,
+            PackKind::Shader => InstalledItemKind::Shader,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -83,6 +98,24 @@ mod tests {
         assert!(s.contains("kind = \"resource\""), "expected snake_case wire form, got: {s}");
         let parsed: W = toml::from_str(&s).unwrap();
         assert_eq!(parsed.kind, PackKind::Resource);
+    }
+
+    #[test]
+    fn test_into_installed_item_kind_resource() {
+        use crate::mods::types::InstalledItemKind;
+        assert_eq!(
+            PackKind::Resource.into_installed_item_kind(),
+            InstalledItemKind::ResourcePack
+        );
+    }
+
+    #[test]
+    fn test_into_installed_item_kind_shader() {
+        use crate::mods::types::InstalledItemKind;
+        assert_eq!(
+            PackKind::Shader.into_installed_item_kind(),
+            InstalledItemKind::Shader
+        );
     }
 
     #[test]
