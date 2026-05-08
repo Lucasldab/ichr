@@ -390,11 +390,7 @@ mod instance_pack_paths_tests {
         let suffix = PathBuf::from(".minecraft")
             .join("resourcepacks")
             .join("Faithful.zip");
-        assert!(
-            file.ends_with(&suffix),
-            "got: {}",
-            file.display()
-        );
+        assert!(file.ends_with(&suffix), "got: {}", file.display());
     }
 }
 
