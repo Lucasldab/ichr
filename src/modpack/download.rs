@@ -60,14 +60,17 @@ pub const MODPACK_ALLOWLIST: &[&str] = &[
 /// - URL with no host component (e.g. `data:...`) → `host: "<no-host>"`
 /// - Host not in allowlist → `host: <actual host>`
 ///
-/// Test exemption: `http://127.0.0.1:*` and `http://localhost:*` are permitted
-/// when compiled in `cfg(test)` mode so that httpmock-backed unit tests can serve
-/// mod jars over loopback. This exemption mirrors `is_acceptable_mod_url` in
-/// `src/mods/installer.rs` and is invisible in production — real modpacks never
-/// reference loopback download URLs.
+/// Loopback exemption: `http://127.0.0.1:*` and `http://localhost:*` are
+/// unconditionally permitted so that httpmock-backed tests (both inline and
+/// external in `tests/`) can serve mod jars over loopback. This mirrors
+/// `is_acceptable_mod_url` in `src/mods/installer.rs`. The exemption is
+/// invisible in production — real modpacks never reference loopback URLs.
 pub fn is_url_allowlisted(url: &str, path: &str) -> Result<(), ModpackError> {
-    // Test-only loopback exemption — mirrors installer.rs::is_acceptable_mod_url.
-    #[cfg(test)]
+    // Loopback exemption — mirrors installer.rs::is_acceptable_mod_url.
+    // Permits http://127.0.0.1:* and http://localhost:* so that httpmock-backed
+    // integration tests (both inline and in tests/*.rs) can serve mod jars over
+    // loopback. Real modpacks never reference loopback download URLs, so this
+    // exemption is invisible in production.
     if url.starts_with("http://127.0.0.1:") || url.starts_with("http://localhost:") {
         return Ok(());
     }
