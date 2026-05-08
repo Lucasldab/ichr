@@ -29,6 +29,7 @@ use crate::mods::types::{
     ModrinthVersion, ModrinthVersionEntry, ResolvedDep,
 };
 use crate::mojang::types::VersionEntry;
+use crate::packs::kind::PackKind;
 use crate::tasks::{JobId, TaskEvent};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
@@ -260,6 +261,42 @@ pub enum ActiveView {
         error: String,
         log_tail: String,
     },
+
+    // ── Phase 11 (11-04): Resource + Shader pack views ───────────────────────
+    /// Full-screen Modrinth pack browser parameterised by kind.
+    PackBrowser {
+        slug: String,
+        kind: PackKind,
+        search: String,
+        fetch_state: ModBrowserFetchState,
+        results: Vec<ModrinthSearchHit>,
+        selected: usize,
+    },
+    /// Full-screen installed-packs list (Resource or Shader).
+    /// The `m` keybind opens `InstalledModsList` (Mod kind); Tab cycles to this view.
+    InstalledPacksList {
+        slug: String,
+        kind: PackKind,
+        packs: Vec<InstalledModRow>,
+        selected: usize,
+        /// Transient single-line status shown below the list.
+        /// Set by ShaderToggleNotice; cleared on next move / Tab / key.
+        transient_status: Option<String>,
+    },
+    /// Text-entry modal for drop-from-path install.
+    PackDropPathInput {
+        slug: String,
+        kind: PackKind,
+        buffer: String,
+        error: Option<String>,
+    },
+    /// y/N confirm dialog for removing a pack (kind-aware title).
+    UninstallPackConfirm {
+        slug: String,
+        kind: PackKind,
+        mod_id: String,
+        file_name: String,
+    },
 }
 
 /// Where the `Action::DismissModInstallFailed` arm should return to.
@@ -342,6 +379,10 @@ pub struct AppState {
     /// Populated by Action::ModpackImportStarted; cleared by ModpackImported /
     /// ModpackImportCancelled / ModpackImportFailed.
     pub running_modpack_imports: HashMap<String, CancellationToken>,
+    /// Phase 11: tracks (slug, kind) → CancellationToken for in-progress pack installs.
+    /// Populated by Effect::DropInstallPack / InstallPackFromModrinth;
+    /// cleared by Action::PackInstalled / PackInstallFailed / PackDropFailed.
+    pub running_pack_jobs: HashMap<(String, PackKind), CancellationToken>,
 }
 
 
@@ -715,6 +756,64 @@ pub enum Action {
     CancelModpackImport,
     /// Esc on ModpackImportFailedModal — returns to InstanceList.
     DismissModpackImportFailed,
+
+    // ── Phase 11 (11-04): Pack browser + installed list + drop-path ──────────
+    /// Open the Modrinth pack browser for a given slug + kind.
+    OpenPackBrowser { slug: String, kind: PackKind },
+    /// Navigate in the pack browser results list.
+    PackBrowserMove(i32),
+    /// Append a character to the pack browser search buffer.
+    PackBrowserTypeSearch(char),
+    /// Delete the last character from the pack browser search buffer.
+    PackBrowserBackspaceSearch,
+    /// Paste a string into the pack browser search buffer.
+    PackBrowserPasteSearch(String),
+    /// Pack browser search results arrived — slug+kind match guard applied in update().
+    PackBrowserSearchLoaded { slug: String, kind: PackKind, hits: Vec<ModrinthSearchHit> },
+    /// Pack browser search failed.
+    PackBrowserSearchFailed { slug: String, kind: PackKind, message: String },
+    /// Esc on pack browser — return to InstanceList.
+    PackBrowserClose,
+    /// `D` inside a pack browser — open the drop-from-path modal.
+    PackDropPathOpen { slug: String, kind: PackKind },
+    /// Append a character to the pack drop path buffer.
+    PackDropPathType(char),
+    /// Delete the last character from the pack drop path buffer.
+    PackDropPathBackspace,
+    /// Paste into the pack drop path buffer.
+    PackDropPathPaste(String),
+    /// Enter — submit the drop path.
+    PackDropPathSubmit,
+    /// Esc — cancel the drop path modal, return to pack browser.
+    PackDropPathCancel,
+    /// Installed packs list loaded (async).
+    InstalledPacksLoaded { slug: String, kind: PackKind, packs: Vec<InstalledModRow> },
+    /// Navigate in the installed packs list.
+    InstalledPacksMove(i32),
+    /// Tab key on InstalledModsList or InstalledPacksList — cycle Mod→Resource→Shader→Mod.
+    InstalledPacksCycleKind,
+    /// `e` on an installed pack row (Resource kind) — toggle enabled.
+    TogglePackEnabled,
+    /// `e` on an installed pack row (Shader kind) — show transient notice.
+    ShaderToggleNotice,
+    /// `x` on an installed pack row — open uninstall confirm.
+    OpenUninstallPackConfirm,
+    /// `y` on UninstallPackConfirm.
+    ConfirmUninstallPack,
+    /// `n`/Esc on UninstallPackConfirm.
+    CancelUninstallPack,
+    /// Pack installed successfully (drop or Modrinth).
+    PackInstalled { slug: String, kind: PackKind },
+    /// Pack install failed (Modrinth path).
+    PackInstallFailed { slug: String, kind: PackKind, error: String },
+    /// Pack drop-from-path install failed.
+    PackDropFailed { slug: String, kind: PackKind, error: String },
+    /// Pack uninstalled successfully.
+    PackUninstalled { slug: String, kind: PackKind, mod_id: String },
+    /// Pack enabled/disabled state toggled.
+    PackToggled { slug: String, kind: PackKind, mod_id: String, new_enabled: bool },
+    /// Install a pack from a Modrinth version (Enter in pack browser).
+    InstallPackFromBrowser { slug: String, kind: PackKind },
 }
 
 /// Effects requested by `update()`. NOTE: there is deliberately NO
@@ -855,6 +954,27 @@ pub enum Effect {
     /// PACK-01: cancel the running modpack import (no-op hook for symmetry with
     /// CancelLoaderInstall — the actual token.cancel() happened in update()).
     CancelModpackImport,
+
+    // ── Phase 11 (11-04): Pack browser + install effects ─────────────────────
+    /// Search Modrinth for packs of the given kind. `mc` is the MC version filter.
+    SearchPacks { slug: String, kind: PackKind, query: String, mc: Option<String> },
+    /// Read the per-instance pack ledger for the given kind.
+    FetchInstalledPacks { slug: String, kind: PackKind },
+    /// Copy-install a pack from a local file path.
+    DropInstallPack { slug: String, kind: PackKind, path: std::path::PathBuf },
+    /// Download + install a pack from a Modrinth version record.
+    InstallPackFromModrinth {
+        slug: String,
+        kind: PackKind,
+        project_id: String,
+        project_slug: String,
+        project_title: String,
+        version: ModrinthVersion,
+    },
+    /// Toggle a pack's enabled/disabled state (rename .zip ↔ .zip.disabled).
+    TogglePackEnabledEff { slug: String, kind: PackKind, mod_id: String },
+    /// Remove a pack file and its ledger row.
+    UninstallPack { slug: String, kind: PackKind, mod_id: String },
 }
 
 /// Format a loader for the status cell or switch dialog: "fabric:0.16.9".
@@ -3122,6 +3242,433 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         Action::DismissModpackImportFailed => {
             state.active_view = ActiveView::InstanceList { selected: 0 };
             vec![]
+        }
+
+        // ── Phase 11 (11-04): Pack browser + installed list + drop-path ───────
+        Action::OpenPackBrowser { slug, kind } => {
+            let mc = state
+                .instances
+                .iter()
+                .find(|m| m.slug == slug)
+                .map(|m| m.mc_version_id.clone());
+            state.active_view = ActiveView::PackBrowser {
+                slug: slug.clone(),
+                kind,
+                search: String::new(),
+                fetch_state: ModBrowserFetchState::Loading,
+                results: Vec::new(),
+                selected: 0,
+            };
+            vec![
+                Effect::SearchPacks { slug: slug.clone(), kind, query: String::new(), mc },
+                Effect::FetchInstalledPacks { slug, kind },
+            ]
+        }
+
+        Action::PackBrowserSearchLoaded { slug, kind, hits } => {
+            // Slug-AND-kind match guard (mirrors Phase 08.1-05 ModBrowserSearchLoaded).
+            if let ActiveView::PackBrowser {
+                slug: cur_slug,
+                kind: cur_kind,
+                results,
+                selected,
+                fetch_state,
+                ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug && *cur_kind == kind {
+                    let new_len = hits.len();
+                    *results = hits;
+                    *fetch_state = ModBrowserFetchState::Ready;
+                    *selected = (*selected).min(new_len.saturating_sub(1));
+                }
+            }
+            vec![]
+        }
+
+        Action::PackBrowserSearchFailed { slug, kind, message } => {
+            if let ActiveView::PackBrowser {
+                slug: cur_slug,
+                kind: cur_kind,
+                fetch_state,
+                ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug && *cur_kind == kind {
+                    *fetch_state = ModBrowserFetchState::Error(message);
+                }
+            }
+            vec![]
+        }
+
+        Action::PackBrowserMove(delta) => {
+            if let ActiveView::PackBrowser { results, selected, .. } = &mut state.active_view {
+                let len = results.len();
+                if len > 0 {
+                    let new_idx = (*selected as isize + delta as isize)
+                        .clamp(0, len as isize - 1) as usize;
+                    *selected = new_idx;
+                }
+            }
+            vec![]
+        }
+
+        Action::PackBrowserTypeSearch(c) => {
+            if let ActiveView::PackBrowser { slug, kind, search, fetch_state, .. } =
+                &mut state.active_view
+            {
+                search.push(c);
+                *fetch_state = ModBrowserFetchState::Loading;
+                let slug2 = slug.clone();
+                let kind2 = *kind;
+                let query = search.clone();
+                let mc = state
+                    .instances
+                    .iter()
+                    .find(|m| m.slug == slug2)
+                    .map(|m| m.mc_version_id.clone());
+                return vec![Effect::SearchPacks { slug: slug2, kind: kind2, query, mc }];
+            }
+            vec![]
+        }
+
+        Action::PackBrowserBackspaceSearch => {
+            if let ActiveView::PackBrowser { slug, kind, search, fetch_state, .. } =
+                &mut state.active_view
+            {
+                search.pop();
+                *fetch_state = ModBrowserFetchState::Loading;
+                let slug2 = slug.clone();
+                let kind2 = *kind;
+                let query = search.clone();
+                let mc = state
+                    .instances
+                    .iter()
+                    .find(|m| m.slug == slug2)
+                    .map(|m| m.mc_version_id.clone());
+                return vec![Effect::SearchPacks { slug: slug2, kind: kind2, query, mc }];
+            }
+            vec![]
+        }
+
+        Action::PackBrowserPasteSearch(s) => {
+            if let ActiveView::PackBrowser { slug, kind, search, fetch_state, .. } =
+                &mut state.active_view
+            {
+                search.push_str(&s);
+                *fetch_state = ModBrowserFetchState::Loading;
+                let slug2 = slug.clone();
+                let kind2 = *kind;
+                let query = search.clone();
+                let mc = state
+                    .instances
+                    .iter()
+                    .find(|m| m.slug == slug2)
+                    .map(|m| m.mc_version_id.clone());
+                return vec![Effect::SearchPacks { slug: slug2, kind: kind2, query, mc }];
+            }
+            vec![]
+        }
+
+        Action::PackBrowserClose => {
+            state.active_view = ActiveView::InstanceList { selected: 0 };
+            vec![]
+        }
+
+        Action::PackDropPathOpen { slug, kind } => {
+            state.active_view = ActiveView::PackDropPathInput {
+                slug,
+                kind,
+                buffer: String::new(),
+                error: None,
+            };
+            vec![]
+        }
+
+        Action::PackDropPathType(c) => {
+            if let ActiveView::PackDropPathInput { buffer, error, .. } = &mut state.active_view {
+                buffer.push(c);
+                *error = None;
+            }
+            vec![]
+        }
+
+        Action::PackDropPathBackspace => {
+            if let ActiveView::PackDropPathInput { buffer, .. } = &mut state.active_view {
+                buffer.pop();
+            }
+            vec![]
+        }
+
+        Action::PackDropPathPaste(s) => {
+            if let ActiveView::PackDropPathInput { buffer, error, .. } = &mut state.active_view {
+                buffer.push_str(&s);
+                *error = None;
+            }
+            vec![]
+        }
+
+        Action::PackDropPathSubmit => {
+            let captured = match &state.active_view {
+                ActiveView::PackDropPathInput { slug, kind, buffer, .. } => {
+                    if buffer.is_empty() {
+                        None // will set error below
+                    } else {
+                        Some((slug.clone(), *kind, std::path::PathBuf::from(buffer.clone())))
+                    }
+                }
+                _ => return vec![],
+            };
+            if let Some((slug, kind, path)) = captured {
+                // Transition back to browser while install runs (responsive UX).
+                state.active_view = ActiveView::PackBrowser {
+                    slug: slug.clone(),
+                    kind,
+                    search: String::new(),
+                    fetch_state: ModBrowserFetchState::Loading,
+                    results: Vec::new(),
+                    selected: 0,
+                };
+                vec![Effect::DropInstallPack { slug, kind, path }]
+            } else {
+                // Empty buffer — set error message.
+                if let ActiveView::PackDropPathInput { error, .. } = &mut state.active_view {
+                    *error = Some("Path cannot be empty".to_string());
+                }
+                vec![]
+            }
+        }
+
+        Action::PackDropPathCancel => {
+            let captured = match &state.active_view {
+                ActiveView::PackDropPathInput { slug, kind, .. } => Some((slug.clone(), *kind)),
+                _ => None,
+            };
+            let (slug, kind) = captured.unwrap_or_else(|| (String::new(), PackKind::Resource));
+            let mc = state
+                .instances
+                .iter()
+                .find(|m| m.slug == slug)
+                .map(|m| m.mc_version_id.clone());
+            state.active_view = ActiveView::PackBrowser {
+                slug: slug.clone(),
+                kind,
+                search: String::new(),
+                fetch_state: ModBrowserFetchState::Loading,
+                results: Vec::new(),
+                selected: 0,
+            };
+            vec![Effect::SearchPacks { slug, kind, query: String::new(), mc }]
+        }
+
+        Action::InstalledPacksLoaded { slug, kind, packs } => {
+            if let ActiveView::InstalledPacksList {
+                slug: cur_slug,
+                kind: cur_kind,
+                packs: ref mut p,
+                selected,
+                ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug && *cur_kind == kind {
+                    let new_len = packs.len();
+                    *p = packs;
+                    *selected = (*selected).min(new_len.saturating_sub(1));
+                }
+            }
+            vec![]
+        }
+
+        Action::InstalledPacksMove(delta) => {
+            if let ActiveView::InstalledPacksList { packs, selected, transient_status, .. } =
+                &mut state.active_view
+            {
+                // Clear transient status on any navigation.
+                *transient_status = None;
+                let len = packs.len();
+                if len > 0 {
+                    let new_idx = (*selected as isize + delta as isize)
+                        .clamp(0, len as isize - 1) as usize;
+                    *selected = new_idx;
+                }
+            }
+            vec![]
+        }
+
+        Action::InstalledPacksCycleKind => {
+            // Cycle: InstalledModsList → InstalledPacksList(Resource)
+            //         → InstalledPacksList(Shader) → InstalledModsList
+            match &state.active_view {
+                ActiveView::InstalledModsList { slug, .. } => {
+                    let slug2 = slug.clone();
+                    state.active_view = ActiveView::InstalledPacksList {
+                        slug: slug2.clone(),
+                        kind: PackKind::Resource,
+                        packs: Vec::new(),
+                        selected: 0,
+                        transient_status: None,
+                    };
+                    vec![Effect::FetchInstalledPacks { slug: slug2, kind: PackKind::Resource }]
+                }
+                ActiveView::InstalledPacksList { slug, kind: PackKind::Resource, .. } => {
+                    let slug2 = slug.clone();
+                    state.active_view = ActiveView::InstalledPacksList {
+                        slug: slug2.clone(),
+                        kind: PackKind::Shader,
+                        packs: Vec::new(),
+                        selected: 0,
+                        transient_status: None,
+                    };
+                    vec![Effect::FetchInstalledPacks { slug: slug2, kind: PackKind::Shader }]
+                }
+                ActiveView::InstalledPacksList { slug, kind: PackKind::Shader, .. } => {
+                    let slug2 = slug.clone();
+                    state.active_view = ActiveView::InstalledModsList {
+                        slug: slug2.clone(),
+                        mods: Vec::new(),
+                        selected: 0,
+                    };
+                    vec![Effect::FetchInstalledMods { slug: slug2 }]
+                }
+                _ => vec![],
+            }
+        }
+
+        Action::TogglePackEnabled => {
+            let captured = match &state.active_view {
+                ActiveView::InstalledPacksList { slug, kind, packs, selected, .. } => {
+                    packs.get(*selected).map(|row| (slug.clone(), *kind, row.mod_id.clone()))
+                }
+                _ => None,
+            };
+            let Some((slug, kind, mod_id)) = captured else {
+                return vec![];
+            };
+            vec![Effect::TogglePackEnabledEff { slug, kind, mod_id }]
+        }
+
+        Action::ShaderToggleNotice => {
+            if let ActiveView::InstalledPacksList { transient_status, .. } = &mut state.active_view {
+                *transient_status = Some(
+                    "Shaders cannot be toggled — use Iris/OptiFine in-game".to_string(),
+                );
+            }
+            vec![]
+        }
+
+        Action::OpenUninstallPackConfirm => {
+            let captured = match &state.active_view {
+                ActiveView::InstalledPacksList { slug, kind, packs, selected, .. } => {
+                    packs.get(*selected).map(|row| {
+                        (slug.clone(), *kind, row.mod_id.clone(), row.file_name.clone())
+                    })
+                }
+                _ => None,
+            };
+            let Some((slug, kind, mod_id, file_name)) = captured else {
+                return vec![];
+            };
+            state.active_view = ActiveView::UninstallPackConfirm { slug, kind, mod_id, file_name };
+            vec![]
+        }
+
+        Action::ConfirmUninstallPack => {
+            let captured = match &state.active_view {
+                ActiveView::UninstallPackConfirm { slug, kind, mod_id, .. } => {
+                    Some((slug.clone(), *kind, mod_id.clone()))
+                }
+                _ => None,
+            };
+            let Some((slug, kind, mod_id)) = captured else {
+                return vec![];
+            };
+            state.active_view = ActiveView::InstalledPacksList {
+                slug: slug.clone(),
+                kind,
+                packs: Vec::new(),
+                selected: 0,
+                transient_status: None,
+            };
+            vec![
+                Effect::UninstallPack { slug: slug.clone(), kind, mod_id },
+                Effect::FetchInstalledPacks { slug, kind },
+            ]
+        }
+
+        Action::CancelUninstallPack => {
+            let captured = match &state.active_view {
+                ActiveView::UninstallPackConfirm { slug, kind, .. } => {
+                    Some((slug.clone(), *kind))
+                }
+                _ => None,
+            };
+            let (slug, kind) = captured.unwrap_or_else(|| (String::new(), PackKind::Resource));
+            state.active_view = ActiveView::InstalledPacksList {
+                slug: slug.clone(),
+                kind,
+                packs: Vec::new(),
+                selected: 0,
+                transient_status: None,
+            };
+            vec![Effect::FetchInstalledPacks { slug, kind }]
+        }
+
+        Action::PackInstalled { slug, kind } => {
+            state.running_pack_jobs.remove(&(slug.clone(), kind));
+            vec![Effect::FetchInstalledPacks { slug, kind }]
+        }
+
+        Action::PackInstallFailed { slug, kind, error } => {
+            state.running_pack_jobs.remove(&(slug.clone(), kind));
+            tracing::warn!(?kind, %slug, %error, "PackInstallFailed");
+            vec![]
+        }
+
+        Action::PackDropFailed { slug, kind, error } => {
+            // Surface error as transient status if currently viewing pack browser.
+            if let ActiveView::PackBrowser { .. } | ActiveView::InstalledPacksList { .. } =
+                &state.active_view
+            {
+                if let ActiveView::InstalledPacksList { transient_status, .. } =
+                    &mut state.active_view
+                {
+                    *transient_status = Some(format!("Drop failed: {error}"));
+                }
+            }
+            state.running_pack_jobs.remove(&(slug, kind));
+            vec![]
+        }
+
+        Action::PackUninstalled { slug, kind, mod_id: _ } => {
+            vec![Effect::FetchInstalledPacks { slug, kind }]
+        }
+
+        Action::PackToggled { slug, kind, mod_id, new_enabled } => {
+            if let ActiveView::InstalledPacksList {
+                slug: cur_slug,
+                kind: cur_kind,
+                packs,
+                ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug && *cur_kind == kind {
+                    if let Some(row) = packs.iter_mut().find(|r| r.mod_id == mod_id) {
+                        row.enabled = new_enabled;
+                    }
+                }
+            }
+            vec![]
+        }
+
+        Action::InstallPackFromBrowser { slug, kind } => {
+            // Placeholder: full install flow (version picker → install) deferred to
+            // gap-closure. For now just emit SearchPacks to reload results.
+            let mc = state
+                .instances
+                .iter()
+                .find(|m| m.slug == slug)
+                .map(|m| m.mc_version_id.clone());
+            vec![Effect::SearchPacks { slug, kind, query: String::new(), mc }]
         }
     }
 }
