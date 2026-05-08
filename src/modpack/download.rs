@@ -61,16 +61,20 @@ pub const MODPACK_ALLOWLIST: &[&str] = &[
 /// - Host not in allowlist → `host: <actual host>`
 ///
 /// Loopback exemption: `http://127.0.0.1:*` and `http://localhost:*` are
-/// unconditionally permitted so that httpmock-backed tests (both inline and
-/// external in `tests/`) can serve mod jars over loopback. This mirrors
-/// `is_acceptable_mod_url` in `src/mods/installer.rs`. The exemption is
-/// invisible in production — real modpacks never reference loopback URLs.
+/// permitted under `cfg(debug_assertions)` so that httpmock-backed tests
+/// (both inline and external in `tests/`) can serve mod jars over loopback.
+/// Release builds (`cargo build --release` — `debug_assertions = false`)
+/// drop the exemption entirely so a malicious user-supplied `.mrpack`
+/// manifest cannot trick the launcher into pulling from a local server
+/// (different threat model than `installer.rs::is_acceptable_mod_url`,
+/// which accepts loopback unconditionally because Modrinth's API responses
+/// are trusted).
 pub fn is_url_allowlisted(url: &str, path: &str) -> Result<(), ModpackError> {
-    // Loopback exemption — mirrors installer.rs::is_acceptable_mod_url.
-    // Permits http://127.0.0.1:* and http://localhost:* so that httpmock-backed
-    // integration tests (both inline and in tests/*.rs) can serve mod jars over
-    // loopback. Real modpacks never reference loopback download URLs, so this
-    // exemption is invisible in production.
+    // Loopback exemption gated on debug_assertions so release builds drop it.
+    // External integration tests compile this module without `cfg(test)` set,
+    // but they DO compile with debug_assertions on — so the gate works for both
+    // inline unit tests and external integration tests.
+    #[cfg(debug_assertions)]
     if url.starts_with("http://127.0.0.1:") || url.starts_with("http://localhost:") {
         return Ok(());
     }
