@@ -577,8 +577,8 @@ mod tests {
 
         let buf = Cursor::new(Vec::new());
         let mut zip = zip::ZipWriter::new(buf);
-        let opts =
-            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let opts = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
 
         zip.add_directory("fixture-jdk-21-jre/", opts).unwrap();
         zip.add_directory("fixture-jdk-21-jre/bin/", opts).unwrap();
