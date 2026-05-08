@@ -292,7 +292,12 @@ impl ModrinthService {
         paths: &AppPaths,
         slug: &str,
     ) -> Result<Vec<InstalledModRow>, ModrinthError> {
-        Ok(read_ledger(paths, slug).await?.mods)
+        let ledger = read_ledger(paths, slug).await?;
+        Ok(ledger
+            .mods
+            .into_iter()
+            .filter(|m| matches!(m.kind, crate::mods::types::InstalledItemKind::Mod))
+            .collect())
     }
 
     #[tracing::instrument(skip_all, fields(slug = %slug, mod_id))]
@@ -568,6 +573,70 @@ mod tests {
         let rows = svc.list_installed_mods(&paths, "i").await.unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].mod_id, "M1");
+    }
+
+    #[tokio::test]
+    async fn test_list_installed_mods_filters_out_packs() {
+        // GAP-11-B regression: list_installed_mods MUST NOT leak resource_pack
+        // or shader rows into the InstalledModsList view. Without this filter,
+        // pressing `e` on a pack row dispatched the mod-toggle path which
+        // hardcodes mods/ subdir and silently failed.
+        let server = MockServer::start();
+        let svc = ModrinthService::with_client(make_client(&server));
+        let td = TempDir::new().unwrap();
+        let paths = test_paths(&td);
+        // Mod uses .jar (is_safe_mod_filename), packs use .zip (is_safe_pack_filename) —
+        // upsert_mod enforces .jar; upsert_pack enforces .zip. Use the right one per kind.
+        crate::mods::ledger::upsert_mod(
+            &paths,
+            "i",
+            InstalledModRow {
+                mod_id: "MOD-1".into(),
+                project_slug: "p".into(),
+                display_name: "MOD-1".into(),
+                version_id: "v".into(),
+                version_label: "0".into(),
+                file_name: "MOD-1.jar".into(),
+                sha512: "x".into(),
+                size: 1,
+                hash_algo: HashAlgo::Sha512,
+                kind: InstalledItemKind::Mod,
+                source: ModSource::Modrinth,
+                enabled: true,
+                installed_at: "now".into(),
+            },
+        )
+        .await
+        .unwrap();
+        for (mod_id, kind) in [
+            ("RP-1", InstalledItemKind::ResourcePack),
+            ("SH-1", InstalledItemKind::Shader),
+        ] {
+            crate::mods::ledger::upsert_pack(
+                &paths,
+                "i",
+                InstalledModRow {
+                    mod_id: mod_id.into(),
+                    project_slug: "p".into(),
+                    display_name: mod_id.into(),
+                    version_id: "v".into(),
+                    version_label: "0".into(),
+                    file_name: format!("{mod_id}.zip"),
+                    sha512: "x".into(),
+                    size: 1,
+                    hash_algo: HashAlgo::Sha512,
+                    kind,
+                    source: ModSource::Modrinth,
+                    enabled: true,
+                    installed_at: "now".into(),
+                },
+            )
+            .await
+            .unwrap();
+        }
+        let rows = svc.list_installed_mods(&paths, "i").await.unwrap();
+        assert_eq!(rows.len(), 1, "only Mod-kind rows should appear");
+        assert_eq!(rows[0].mod_id, "MOD-1");
     }
 
     #[tokio::test]

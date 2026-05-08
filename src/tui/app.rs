@@ -812,6 +812,9 @@ pub enum Action {
     PackUninstalled { slug: String, kind: PackKind, mod_id: String },
     /// Pack enabled/disabled state toggled.
     PackToggled { slug: String, kind: PackKind, mod_id: String, new_enabled: bool },
+    /// Pack toggle failed (rename failed, file missing, shader rejected, etc.).
+    /// Surfaced as `transient_status` on `InstalledPacksList`. (GAP-11-B)
+    PackToggleFailed { slug: String, kind: PackKind, error: String },
     /// Install a pack from a Modrinth version (Enter in pack browser).
     InstallPackFromBrowser { slug: String, kind: PackKind },
     /// Browser auto-pick stage: full `ModrinthVersion` resolved by the
@@ -3674,6 +3677,22 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
 
         Action::PackUninstalled { slug, kind, mod_id: _ } => {
             vec![Effect::FetchInstalledPacks { slug, kind }]
+        }
+
+        Action::PackToggleFailed { slug, kind, error } => {
+            // GAP-11-B: surface silent toggle failures so the user sees what went wrong.
+            if let ActiveView::InstalledPacksList {
+                slug: cur_slug,
+                kind: cur_kind,
+                transient_status,
+                ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug && *cur_kind == kind {
+                    *transient_status = Some(format!("Toggle failed: {error}"));
+                }
+            }
+            vec![]
         }
 
         Action::PackToggled { slug, kind, mod_id, new_enabled } => {

@@ -2010,7 +2010,12 @@ async fn execute_effects(
                         Ok(new_enabled) => {
                             let _ = tx.send(Action::PackToggled { slug, kind, mod_id, new_enabled }).await;
                         }
-                        Err(e) => tracing::warn!(error = %e, %slug, ?kind, "toggle_pack_enabled failed"),
+                        Err(e) => {
+                            tracing::warn!(error = %e, %slug, ?kind, "toggle_pack_enabled failed");
+                            let _ = tx
+                                .send(Action::PackToggleFailed { slug, kind, error: e.to_string() })
+                                .await;
+                        }
                     }
                 });
             }
