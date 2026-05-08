@@ -15,12 +15,15 @@
 //!   `client-overrides/`), path-traversal-guarded via `crate::util::safe_zip`
 //!   (Plan 10-04).
 //!
-//! Plan 10-05 (`service.rs`) will add the import-orchestration façade.
+//! - `service` — `ModpackService` façade implementing the 7-step atomic import
+//!   sequence; composes parse + download + overrides + LoaderService into a single
+//!   transactional entry point consumed by the TUI Effect arm (Plan 10-05).
 
 pub mod download;
 pub mod error;
 pub mod overrides;
 pub mod parse;
+pub mod service;
 
 pub use download::{
     download_files, filter_files_for_client, is_url_allowlisted, MODPACK_ALLOWLIST,
@@ -31,3 +34,4 @@ pub use parse::{
     detect_loader, parse_index, should_download_for_client, strip_leading_dot_slash,
     EnvRequirement, MrpackEnv, MrpackFile, MrpackHashes, MrpackIndex,
 };
+pub use service::ModpackService;
