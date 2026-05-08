@@ -310,13 +310,20 @@ mod tests {
     use super::*;
     use crate::domain::instance::InstanceManifest;
     use crate::instance::store::{read_instance_manifest, write_instance_manifest};
+    // Used only by tests gated #[cfg(unix)] and #[cfg(target_os = "linux")]
+    // (target_os = "linux" is a subset of unix). On Windows clippy fires
+    // `unused-imports` because every consuming test compiles out.
+    #[cfg(unix)]
     use crate::java::adoptium::AdoptiumClient;
+    #[cfg(unix)]
     use crate::java::mojang_jre::MojangJreClient;
     use crate::mojang::inherits::resolve_inherits;
     use crate::mojang::types::{
         AssetIndex, JavaVersion, ResolvedVersion, VersionDownloads, VersionJson,
     };
+    #[cfg(unix)]
     use httpmock::Method::GET;
+    #[cfg(unix)]
     use httpmock::MockServer;
     use std::collections::HashMap;
     use std::sync::OnceLock;
