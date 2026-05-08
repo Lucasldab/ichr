@@ -20,6 +20,9 @@ pub mod loader_version_picker_modal;
 pub mod mod_browser;
 pub mod mod_install_failed_modal;
 pub mod mod_version_picker_modal;
+pub mod modpack_import_failed_modal;
+pub mod modpack_import_path_modal;
+pub mod modpack_import_progress_modal;
 pub mod uninstall_mod_confirm;
 pub mod version_picker;
 
@@ -41,4 +44,7 @@ pub use loader_version_picker_modal::render_loader_version_picker_modal;
 pub use mod_browser::render_mod_browser;
 pub use mod_install_failed_modal::render_mod_install_failed_modal;
 pub use mod_version_picker_modal::render_mod_version_picker_modal;
+pub use modpack_import_failed_modal::render_modpack_import_failed_modal;
+pub use modpack_import_path_modal::render_modpack_import_path_modal;
+pub use modpack_import_progress_modal::render_modpack_import_progress_modal;
 pub use uninstall_mod_confirm::render_uninstall_mod_confirm;

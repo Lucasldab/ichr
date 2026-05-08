@@ -27,6 +27,9 @@ use super::views::{
     mod_browser::render_mod_browser,
     mod_install_failed_modal::render_mod_install_failed_modal,
     mod_version_picker_modal::render_mod_version_picker_modal,
+    modpack_import_failed_modal::render_modpack_import_failed_modal,
+    modpack_import_path_modal::render_modpack_import_path_modal,
+    modpack_import_progress_modal::render_modpack_import_progress_modal,
     uninstall_mod_confirm::render_uninstall_mod_confirm,
     version_picker::render_version_picker,
 };
@@ -101,6 +104,16 @@ pub fn view(state: &AppState, f: &mut Frame) {
         ActiveView::CfFilePickerModal { .. } => render_cf_file_picker_modal(f, main, state),
         ActiveView::CfInstallFailedModal { .. } => {
             render_cf_install_failed_modal(f, main, state)
+        }
+        // Phase 10 (10-06): Modpack import views.
+        ActiveView::ModpackImportPathInput { .. } => {
+            render_modpack_import_path_modal(f, main, state)
+        }
+        ActiveView::ModpackImportProgressModal { .. } => {
+            render_modpack_import_progress_modal(f, main, state)
+        }
+        ActiveView::ModpackImportFailedModal { .. } => {
+            render_modpack_import_failed_modal(f, main, state)
         }
     }
 

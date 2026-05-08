@@ -25,6 +25,7 @@ use crate::java::service::JavaService;
 use crate::loader::service::LoaderService;
 use crate::loader::types::{LoaderInfo, LoaderType};
 use crate::launcher;
+use crate::modpack::service::ModpackService;
 use crate::mods::curseforge::service::CurseForgeService;
 use crate::mods::service::ModrinthService;
 use crate::mojang::client::MojangClient;
@@ -96,6 +97,11 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
     let cf_service = Arc::new(
         CurseForgeService::new()
             .map_err(|e| anyhow::anyhow!("CurseForgeService::new: {e}"))?,
+    );
+    // Phase 10 (10-06): Modpack service backs the `i`-keybind import flow.
+    let modpack_service = Arc::new(
+        ModpackService::new()
+            .map_err(|e| anyhow::anyhow!("ModpackService::new: {e}"))?,
     );
 
     // Build the task plumbing. TaskEvents arrive on task_rx; we convert each
@@ -175,7 +181,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
                     Some(Ok(ev)) => {
                         if let Some(action) = map_event(ev, &state) {
                             let effects = update(&mut state, action);
-                            execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), Arc::clone(&modrinth_service), Arc::clone(&cf_service), &task_manager, &action_tx).await;
+                            execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), Arc::clone(&modrinth_service), Arc::clone(&cf_service), Arc::clone(&modpack_service), &task_manager, &action_tx).await;
                         }
                     }
                     Some(Err(e)) => {
@@ -189,7 +195,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
                 match maybe_action {
                     Some(action) => {
                         let effects = update(&mut state, action);
-                        execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), Arc::clone(&modrinth_service), Arc::clone(&cf_service), &task_manager, &action_tx).await;
+                        execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), Arc::clone(&modrinth_service), Arc::clone(&cf_service), Arc::clone(&modpack_service), &task_manager, &action_tx).await;
                     }
                     None => break,
                 }
@@ -278,6 +284,16 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         ActiveView::CfBrowser { .. } => {
             super::views::cf_browser::map_cf_browser_event(ev, state)
         }
+        // Phase 10 (10-06): Modpack import view event mappers.
+        ActiveView::ModpackImportPathInput { .. } => {
+            super::views::modpack_import_path_modal::map_modpack_import_path_event(ev)
+        }
+        ActiveView::ModpackImportProgressModal { .. } => {
+            super::views::modpack_import_progress_modal::map_modpack_import_progress_event(ev)
+        }
+        ActiveView::ModpackImportFailedModal { .. } => {
+            super::views::modpack_import_failed_modal::map_modpack_import_failed_event(ev)
+        }
         ActiveView::CfFilePickerModal { .. } => {
             super::views::cf_file_picker_modal::map_cf_file_picker_event(ev)
         }
@@ -292,6 +308,7 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         CtEvent::Key(KeyEvent { code: KeyCode::Char('q'), .. }) => Some(Action::Quit),
         CtEvent::Key(KeyEvent { code: KeyCode::Esc, .. }) => Some(Action::Quit),
         CtEvent::Key(KeyEvent { code: KeyCode::Char('c'), .. }) => Some(Action::OpenCreateModal),
+        CtEvent::Key(KeyEvent { code: KeyCode::Char('i'), .. }) => Some(Action::OpenModpackImport),
         CtEvent::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
@@ -613,6 +630,7 @@ async fn execute_effects(
     loader_service: Arc<LoaderService>,
     modrinth_service: Arc<ModrinthService>,
     cf_service: Arc<CurseForgeService>,
+    modpack_service: Arc<ModpackService>,
     task_manager: &TaskManager,
     action_tx: &mpsc::Sender<Action>,
 ) {
@@ -1653,6 +1671,113 @@ async fn execute_effects(
                     }
                     Ok(())
                 });
+            }
+
+            // ── Phase 10 (10-06): Modpack import effect arms ──
+
+            Effect::ImportModpack { mrpack_path } => {
+                let svc = Arc::clone(&modpack_service);
+                let loader_svc = Arc::clone(&loader_service);
+                let java_svc = Arc::clone(&java_service);
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                let job_id = task_manager.next_job_id();
+
+                // Derive a human-readable modpack name from the file stem for use
+                // in ModpackImportStarted (before the slug is assigned by create_instance).
+                let modpack_name_for_started = mrpack_path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("modpack")
+                    .to_string();
+
+                // mpsc forwarder: ModpackService emits TaskEvent::Progress through lt_tx.
+                // Translate each event into Action::ModpackImportProgress for gauge updates.
+                let (lt_tx, mut lt_rx) = mpsc::channel::<TaskEvent>(64);
+                {
+                    let tx_fwd = tx.clone();
+                    tokio::spawn(async move {
+                        while let Some(evt) = lt_rx.recv().await {
+                            if let TaskEvent::Progress { pct, msg, .. } = evt {
+                                // Slug is not known at the forwarder layer (it is assigned
+                                // inside import_mrpack after create_instance). Use an empty
+                                // slug; the ModpackImportProgress update arm matches on the
+                                // active_view shape rather than on the slug.
+                                let _ = tx_fwd
+                                    .send(Action::ModpackImportProgress {
+                                        slug: String::new(),
+                                        pct,
+                                        step_label: msg,
+                                        bytes_done: 0,
+                                        bytes_total: 0,
+                                    })
+                                    .await;
+                            }
+                        }
+                    });
+                }
+
+                let mrpack_path_for_task = mrpack_path.clone();
+                let modpack_name_for_task = modpack_name_for_started.clone();
+
+                task_manager.spawn_task(job_id, move |_task_tx, token| async move {
+                    // Dispatch ModpackImportStarted BEFORE calling import_mrpack so the
+                    // progress modal opens immediately. The slug is a placeholder (empty)
+                    // because the real slug is not known until import_mrpack returns.
+                    let _ = tx
+                        .send(Action::ModpackImportStarted {
+                            slug: String::new(),
+                            modpack_name: modpack_name_for_task.clone(),
+                            token: token.clone(),
+                        })
+                        .await;
+
+                    let res = svc
+                        .import_mrpack(
+                            &paths2,
+                            &mrpack_path_for_task,
+                            &loader_svc,
+                            &java_svc,
+                            lt_tx,
+                            token,
+                            job_id,
+                        )
+                        .await;
+
+                    match res {
+                        Ok(manifest) => {
+                            let _ = tx
+                                .send(Action::ModpackImported { slug: manifest.slug })
+                                .await;
+                        }
+                        Err(crate::modpack::error::ModpackError::Cancelled) => {
+                            // HIGH-2 regression fix: dispatch ModpackImportCancelled
+                            // (NOT ModpackImported{slug:""}, which would call remove("")
+                            // — a no-op against the real-slug HashMap key, leaving a
+                            // stale CancellationToken in running_modpack_imports).
+                            // The dedicated ModpackImportCancelled arm calls clear()
+                            // regardless of which slug was assigned before cancel.
+                            let _ = tx.send(Action::ModpackImportCancelled).await;
+                        }
+                        Err(e) => {
+                            let _ = tx
+                                .send(Action::ModpackImportFailed {
+                                    modpack_name: modpack_name_for_task,
+                                    error: e.to_string(),
+                                    log_tail: String::new(),
+                                })
+                                .await;
+                        }
+                    }
+                    Ok(())
+                });
+            }
+
+            Effect::CancelModpackImport => {
+                // The token.cancel() already happened in update() — this arm is a
+                // no-op hook for symmetry with CancelLoaderInstall. The import task
+                // observes the cancellation token and returns ModpackError::Cancelled;
+                // service-side cleanup (remove_dir_all) ran in import_mrpack's outer arm.
             }
         }
     }
