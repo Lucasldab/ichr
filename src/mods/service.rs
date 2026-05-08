@@ -353,7 +353,7 @@ impl ModrinthService {
 mod tests {
     use super::*;
     use crate::domain::instance::ModloaderKind;
-    use crate::mods::types::{HashAlgo, InstalledModRow, ModSource};
+    use crate::mods::types::{HashAlgo, InstalledItemKind, InstalledModRow, ModSource};
     use httpmock::prelude::*;
     use serde_json::json;
     use tempfile::TempDir;
@@ -443,6 +443,7 @@ mod tests {
                 sha512: "x".into(),
                 size: 1,
                 hash_algo: HashAlgo::Sha512,
+                kind: InstalledItemKind::Mod,
                 source: ModSource::Modrinth,
                 enabled: true,
                 installed_at: "now".into(),
@@ -556,6 +557,7 @@ mod tests {
                 sha512: "x".into(),
                 size: 1,
                 hash_algo: HashAlgo::Sha512,
+                kind: InstalledItemKind::Mod,
                 source: ModSource::Modrinth,
                 enabled: true,
                 installed_at: "now".into(),
@@ -589,6 +591,7 @@ mod tests {
                 sha512: "x".into(),
                 size: 1,
                 hash_algo: HashAlgo::Sha512,
+                kind: InstalledItemKind::Mod,
                 source: ModSource::Modrinth,
                 enabled: true,
                 installed_at: "now".into(),
@@ -621,6 +624,7 @@ mod tests {
                 sha512: "x".into(),
                 size: 1,
                 hash_algo: HashAlgo::Sha512,
+                kind: InstalledItemKind::Mod,
                 source: ModSource::Modrinth,
                 enabled: false,
                 installed_at: "now".into(),
@@ -662,6 +666,7 @@ mod tests {
                 sha512: "x".into(),
                 size: 1,
                 hash_algo: HashAlgo::Sha512,
+                kind: InstalledItemKind::Mod,
                 source: ModSource::Modrinth,
                 enabled: true,
                 installed_at: "now".into(),

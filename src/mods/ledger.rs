@@ -264,7 +264,7 @@ pub async fn uninstall(paths: &AppPaths, slug: &str, mod_id: &str) -> Result<(),
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mods::types::{HashAlgo, InstalledModRow, ModSource};
+    use crate::mods::types::{HashAlgo, InstalledItemKind, InstalledModRow, ModSource};
     use tempfile::TempDir;
 
     fn test_paths(td: &TempDir) -> AppPaths {
@@ -286,6 +286,7 @@ mod tests {
             sha512: "deadbeef".into(),
             size: 1024,
             hash_algo: HashAlgo::Sha512,
+            kind: InstalledItemKind::Mod,
             source: ModSource::Modrinth,
             enabled,
             installed_at: "2026-01-01T00:00:00Z".into(),

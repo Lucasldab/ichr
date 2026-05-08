@@ -49,6 +49,10 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
                     "modpack",
                     Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
                 ),
+                ModSource::Local => (
+                    "local",
+                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM),
+                ),
             };
             // State cell — body for enabled, DIM for disabled.
             let (state_label, state_style) = if m.enabled {

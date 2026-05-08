@@ -128,6 +128,28 @@ pub fn is_safe_mod_filename(s: &str) -> bool {
     })
 }
 
+/// 500 MB cap for resource/shader pack files. Larger than mods because
+/// high-resolution texture packs (Faithful 32x, Patrix 128x) can be
+/// 200-400 MB legitimately. Per 11-CONTEXT.md D-LOCK pack-size cap.
+pub const MAX_PACK_FILE_BYTES: u64 = 500 * 1024 * 1024;
+
+/// True iff `s` is a safe `.zip` pack filename — no path-traversal.
+/// Mirrors `is_safe_mod_filename` rules with three deltas:
+///   1. Extension is `.zip` (case-insensitive — Windows NTFS).
+///   2. SPACE byte is allowed (community packs: `Faithful 32x.zip`).
+///   3. Otherwise identical: no leading dot, no slash/backslash/`..`,
+///      ASCII alphanumeric + `._+- ` allowlist.
+pub fn is_safe_pack_filename(s: &str) -> bool {
+    let lower = s.to_ascii_lowercase();
+    if !lower.ends_with(".zip") { return false; }
+    if s.starts_with('.') { return false; }
+    if s.contains('/') || s.contains('\\') || s.contains("..") { return false; }
+    s.bytes().all(|b| {
+        b.is_ascii_alphanumeric()
+            || b == b'.' || b == b'_' || b == b'+' || b == b'-' || b == b' '
+    })
+}
+
 // ============================================================================
 // === .jar.disabled toggle helpers (08-RESEARCH.md §Pattern 7)            ===
 // ============================================================================
@@ -413,5 +435,59 @@ mod tests {
         let f = "sodium-fabric-0.5.8.jar";
         let d = disabled_filename(f);
         assert_eq!(enabled_filename(&d), Some(f));
+    }
+
+    // --- is_safe_pack_filename + MAX_PACK_FILE_BYTES -------------------------
+
+    #[test]
+    fn test_is_safe_pack_filename_accepts_basic_zip() {
+        assert!(is_safe_pack_filename("Faithful.zip"));
+    }
+
+    #[test]
+    fn test_is_safe_pack_filename_accepts_uppercase_extension() {
+        // Case-insensitive .zip check — Windows NTFS users may see .ZIP.
+        assert!(is_safe_pack_filename("Pack.ZIP"));
+    }
+
+    #[test]
+    fn test_is_safe_pack_filename_accepts_space() {
+        // D-LOCK: packs allow spaces (e.g. "Faithful 32x.zip").
+        assert!(is_safe_pack_filename("Faithful 32x.zip"));
+    }
+
+    #[test]
+    fn test_is_safe_pack_filename_rejects_jar() {
+        assert!(!is_safe_pack_filename("mod.jar"));
+    }
+
+    #[test]
+    fn test_is_safe_pack_filename_rejects_dot_dot() {
+        assert!(!is_safe_pack_filename("../etc/passwd.zip"));
+    }
+
+    #[test]
+    fn test_is_safe_pack_filename_rejects_path_separator_unix() {
+        assert!(!is_safe_pack_filename("subdir/pack.zip"));
+    }
+
+    #[test]
+    fn test_is_safe_pack_filename_rejects_path_separator_windows() {
+        assert!(!is_safe_pack_filename("subdir\\pack.zip"));
+    }
+
+    #[test]
+    fn test_is_safe_pack_filename_rejects_dotfile() {
+        assert!(!is_safe_pack_filename(".hidden.zip"));
+    }
+
+    #[test]
+    fn test_is_safe_pack_filename_rejects_no_extension() {
+        assert!(!is_safe_pack_filename("pack"));
+    }
+
+    #[test]
+    fn test_max_pack_file_bytes_is_500mb() {
+        assert_eq!(MAX_PACK_FILE_BYTES, 500 * 1024 * 1024);
     }
 }
