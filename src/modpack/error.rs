@@ -36,7 +36,8 @@ pub enum ModpackError {
     UnsupportedLoader { loader: String },
 
     /// A `downloads[]` URL in the manifest points to a host that is not on the
-    /// hardcoded allowlist.
+    /// hardcoded allowlist. Carries both the rejecting host and the manifest
+    /// `path` field so the user can identify which file to investigate.
     #[error("disallowed download source {host} in file {path}")]
     DisallowedSource { host: String, path: String },
 
