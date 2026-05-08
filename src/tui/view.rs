@@ -16,6 +16,7 @@ use super::views::{
     dep_confirm_modal::render_dep_confirm_modal,
     download_pane::render_download_pane,
     installed_mods_list::render_installed_mods_list,
+    installed_packs_list::render_installed_packs_list,
     instance_list::{render_group_inline_overlay, render_instance_list},
     java_picker_modal::render_java_picker_modal,
     launch_failed_modal::render_launch_failed_modal,
@@ -30,7 +31,10 @@ use super::views::{
     modpack_import_failed_modal::render_modpack_import_failed_modal,
     modpack_import_path_modal::render_modpack_import_path_modal,
     modpack_import_progress_modal::render_modpack_import_progress_modal,
+    pack_browser::render_pack_browser,
+    pack_drop_path_modal::render_pack_drop_path_modal,
     uninstall_mod_confirm::render_uninstall_mod_confirm,
+    uninstall_pack_confirm::render_uninstall_pack_confirm,
     version_picker::render_version_picker,
 };
 
@@ -53,11 +57,14 @@ pub fn view(state: &AppState, f: &mut Frame) {
     // instance-list background render so the modless view can claim the full
     // body width without bleed-through. The CurseForge file-picker and
     // install-failed modals overlay normally.
+    // Phase 11 (11-04): PackBrowser and InstalledPacksList also claim full screen.
     let full_screen = matches!(
         state.active_view,
         ActiveView::ModBrowser { .. }
             | ActiveView::InstalledModsList { .. }
             | ActiveView::CfBrowser { .. }
+            | ActiveView::PackBrowser { .. }
+            | ActiveView::InstalledPacksList { .. }
     );
     if !full_screen {
         render_instance_list(f, main, state);
@@ -115,6 +122,11 @@ pub fn view(state: &AppState, f: &mut Frame) {
         ActiveView::ModpackImportFailedModal { .. } => {
             render_modpack_import_failed_modal(f, main, state)
         }
+        // Phase 11 (11-04): pack browser + installed packs list + drop-path modal + confirm.
+        ActiveView::PackBrowser { .. } => render_pack_browser(f, main, state),
+        ActiveView::InstalledPacksList { .. } => render_installed_packs_list(f, main, state),
+        ActiveView::PackDropPathInput { .. } => render_pack_drop_path_modal(f, main, state),
+        ActiveView::UninstallPackConfirm { .. } => render_uninstall_pack_confirm(f, main, state),
     }
 
     render_download_pane(f, dl, state);

@@ -2506,3 +2506,457 @@ fn test_modpack_import_cancelled_clears_running_imports_and_returns_to_instance_
         "ModpackImportCancelled must emit no effects; got {effects:?}"
     );
 }
+
+// ── Phase 11 (11-04): Pack browser + installed list + D-LOCK keybind tests ──
+
+use mineltui::packs::kind::PackKind;
+
+// Helper: state with one instance + InstanceList active view.
+fn pack_instance_state(slug: &str) -> AppState {
+    let mut s = AppState::default();
+    s.instances.push(mineltui::domain::InstanceManifest::new(
+        slug.into(),
+        slug.into(),
+        "1.20.4".into(),
+    ));
+    s
+}
+
+// Helper: minimal installed pack row.
+fn pack_row(mod_id: &str, name: &str) -> InstalledModRow {
+    use mineltui::mods::types::{HashAlgo, InstalledItemKind, ModSource};
+    InstalledModRow {
+        mod_id: mod_id.into(),
+        project_slug: name.into(),
+        display_name: name.into(),
+        version_id: "v1".into(),
+        version_label: "1.0.0".into(),
+        file_name: format!("{name}.zip"),
+        sha512: "deadbeef".into(),
+        size: 1024,
+        hash_algo: HashAlgo::Sha512,
+        kind: InstalledItemKind::ResourcePack,
+        source: ModSource::Local,
+        enabled: true,
+        installed_at: "2026-01-01T00:00:00Z".into(),
+    }
+}
+
+#[test]
+#[allow(non_snake_case)]
+fn test_uppercase_R_opens_resource_pack_browser() {
+    use mineltui::tui::run::map_event_pub;
+    use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
+
+    let s = pack_instance_state("foo");
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('R'), KeyModifiers::SHIFT));
+    let action = map_event_pub(ev, &s);
+    assert!(
+        matches!(action, Some(Action::OpenPackBrowser { kind: PackKind::Resource, .. })),
+        "expected OpenPackBrowser{{Resource}}; got {action:?}"
+    );
+    // State transition.
+    let mut s2 = pack_instance_state("foo");
+    let effects = update(&mut s2, Action::OpenPackBrowser { slug: "foo".into(), kind: PackKind::Resource });
+    assert!(
+        matches!(s2.active_view, ActiveView::PackBrowser { kind: PackKind::Resource, .. }),
+        "active_view should be PackBrowser(Resource)"
+    );
+    assert!(
+        effects.iter().any(|e| matches!(e, Effect::SearchPacks { kind: PackKind::Resource, .. })),
+        "should emit SearchPacks(Resource)"
+    );
+}
+
+#[test]
+#[allow(non_snake_case)]
+fn test_uppercase_S_opens_shader_pack_browser() {
+    use mineltui::tui::run::map_event_pub;
+    use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
+
+    let s = pack_instance_state("foo");
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::SHIFT));
+    let action = map_event_pub(ev, &s);
+    assert!(
+        matches!(action, Some(Action::OpenPackBrowser { kind: PackKind::Shader, .. })),
+        "expected OpenPackBrowser{{Shader}}; got {action:?}"
+    );
+    let mut s2 = pack_instance_state("foo");
+    let effects = update(&mut s2, Action::OpenPackBrowser { slug: "foo".into(), kind: PackKind::Shader });
+    assert!(
+        matches!(s2.active_view, ActiveView::PackBrowser { kind: PackKind::Shader, .. }),
+        "active_view should be PackBrowser(Shader)"
+    );
+    assert!(
+        effects.iter().any(|e| matches!(e, Effect::SearchPacks { kind: PackKind::Shader, .. })),
+        "should emit SearchPacks(Shader)"
+    );
+}
+
+#[test]
+fn test_lowercase_r_still_opens_rename_inline() {
+    // D-LOCK keybind-conflict-resolution: lowercase 'r' must remain OpenRenameInline.
+    use mineltui::tui::run::map_event_pub;
+    use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
+
+    let s = pack_instance_state("foo");
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::NONE));
+    let action = map_event_pub(ev, &s);
+    assert!(
+        matches!(action, Some(Action::OpenRenameInline { .. })),
+        "lowercase 'r' must still dispatch OpenRenameInline; got {action:?}"
+    );
+    assert!(
+        !matches!(action, Some(Action::OpenPackBrowser { .. })),
+        "lowercase 'r' must NOT dispatch OpenPackBrowser"
+    );
+}
+
+#[test]
+fn test_lowercase_s_running_still_stops_instance() {
+    // D-LOCK keybind-conflict-resolution: lowercase 's' must remain StopInstance when running.
+    use mineltui::tui::run::map_event_pub;
+    use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
+
+    let mut s = pack_instance_state("foo");
+    s.running_instances.insert("foo".into(), CancellationToken::new());
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
+    let action = map_event_pub(ev, &s);
+    assert!(
+        matches!(action, Some(Action::StopInstance { .. })),
+        "lowercase 's' with running instance must dispatch StopInstance; got {action:?}"
+    );
+    assert!(
+        !matches!(action, Some(Action::OpenPackBrowser { .. })),
+        "lowercase 's' must NOT dispatch OpenPackBrowser"
+    );
+}
+
+#[test]
+fn test_lowercase_s_not_running_is_no_op() {
+    // lowercase 's' on non-running instance = no-op (pre-existing Phase 3 behavior).
+    use mineltui::tui::run::map_event_pub;
+    use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
+
+    let s = pack_instance_state("foo");
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
+    let action = map_event_pub(ev, &s);
+    assert!(action.is_none(), "lowercase 's' on non-running instance should be no-op; got {action:?}");
+}
+
+#[test]
+#[allow(non_snake_case)]
+fn test_uppercase_D_inside_resource_browser_opens_drop_modal_with_resource_kind() {
+    // D inside PackBrowser(Resource) → PackDropPathInput{kind=Resource}.
+    let mut s = AppState {
+        active_view: ActiveView::PackBrowser {
+            slug: "foo".into(),
+            kind: PackKind::Resource,
+            search: String::new(),
+            fetch_state: mineltui::mods::types::ModBrowserFetchState::Ready,
+            results: Vec::new(),
+            selected: 0,
+        },
+        ..AppState::default()
+    };
+    let effects = update(&mut s, Action::PackDropPathOpen { slug: "foo".into(), kind: PackKind::Resource });
+    assert!(
+        matches!(s.active_view, ActiveView::PackDropPathInput { kind: PackKind::Resource, .. }),
+        "active_view should be PackDropPathInput(Resource)"
+    );
+    assert!(effects.is_empty());
+}
+
+#[test]
+#[allow(non_snake_case)]
+fn test_uppercase_D_inside_shader_browser_opens_drop_modal_with_shader_kind() {
+    let mut s = AppState {
+        active_view: ActiveView::PackBrowser {
+            slug: "bar".into(),
+            kind: PackKind::Shader,
+            search: String::new(),
+            fetch_state: mineltui::mods::types::ModBrowserFetchState::Ready,
+            results: Vec::new(),
+            selected: 0,
+        },
+        ..AppState::default()
+    };
+    let effects = update(&mut s, Action::PackDropPathOpen { slug: "bar".into(), kind: PackKind::Shader });
+    assert!(
+        matches!(s.active_view, ActiveView::PackDropPathInput { kind: PackKind::Shader, .. }),
+        "active_view should be PackDropPathInput(Shader)"
+    );
+    assert!(effects.is_empty());
+}
+
+#[test]
+fn test_pack_drop_path_cancel_returns_to_browser() {
+    // PackDropPathCancel from PackDropPathInput{Resource} → PackBrowser{Resource}.
+    let mut s = AppState {
+        active_view: ActiveView::PackDropPathInput {
+            slug: "foo".into(),
+            kind: PackKind::Resource,
+            buffer: String::new(),
+            error: None,
+        },
+        ..AppState::default()
+    };
+    let effects = update(&mut s, Action::PackDropPathCancel);
+    assert!(
+        matches!(s.active_view, ActiveView::PackBrowser { kind: PackKind::Resource, slug, .. } if slug == "foo"),
+        "should return to PackBrowser(Resource, foo)"
+    );
+    assert!(
+        effects.iter().any(|e| matches!(e, Effect::SearchPacks { kind: PackKind::Resource, .. })),
+        "should emit SearchPacks to repopulate browser"
+    );
+}
+
+#[test]
+fn test_lowercase_m_enters_installed_mods() {
+    // `m` on InstanceList → InstalledModsList (existing Phase 8 behavior, NOT InstalledPacksList).
+    use mineltui::tui::run::map_event_pub;
+    use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
+
+    let s = pack_instance_state("foo");
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE));
+    let action = map_event_pub(ev, &s);
+    let mut s2 = pack_instance_state("foo");
+    if let Some(a) = action {
+        let _ = update(&mut s2, a);
+    }
+    assert!(
+        matches!(s2.active_view, ActiveView::InstalledModsList { .. }),
+        "m should enter InstalledModsList (Mod kind); got {:?}", s2.active_view
+    );
+    assert!(
+        !matches!(s2.active_view, ActiveView::InstalledPacksList { .. }),
+        "m must NOT enter InstalledPacksList"
+    );
+}
+
+#[test]
+fn test_tab_from_installed_mods_cycles_to_resource() {
+    let mut s = AppState {
+        active_view: ActiveView::InstalledModsList { slug: "foo".into(), mods: Vec::new(), selected: 0 },
+        ..AppState::default()
+    };
+    let effects = update(&mut s, Action::InstalledPacksCycleKind);
+    assert!(
+        matches!(s.active_view, ActiveView::InstalledPacksList { kind: PackKind::Resource, .. }),
+        "Tab from InstalledMods should cycle to InstalledPacksList(Resource)"
+    );
+    assert!(
+        effects.iter().any(|e| matches!(e, Effect::FetchInstalledPacks { kind: PackKind::Resource, .. })),
+        "should emit FetchInstalledPacks(Resource)"
+    );
+}
+
+#[test]
+fn test_tab_from_resource_cycles_to_shader() {
+    let mut s = AppState {
+        active_view: ActiveView::InstalledPacksList {
+            slug: "foo".into(),
+            kind: PackKind::Resource,
+            packs: Vec::new(),
+            selected: 0,
+            transient_status: None,
+        },
+        ..AppState::default()
+    };
+    let effects = update(&mut s, Action::InstalledPacksCycleKind);
+    assert!(
+        matches!(s.active_view, ActiveView::InstalledPacksList { kind: PackKind::Shader, .. }),
+        "Tab from Resource should cycle to InstalledPacksList(Shader)"
+    );
+    assert!(
+        effects.iter().any(|e| matches!(e, Effect::FetchInstalledPacks { kind: PackKind::Shader, .. })),
+        "should emit FetchInstalledPacks(Shader)"
+    );
+}
+
+#[test]
+fn test_tab_from_shader_cycles_back_to_mods() {
+    let mut s = AppState {
+        active_view: ActiveView::InstalledPacksList {
+            slug: "foo".into(),
+            kind: PackKind::Shader,
+            packs: Vec::new(),
+            selected: 0,
+            transient_status: None,
+        },
+        ..AppState::default()
+    };
+    let effects = update(&mut s, Action::InstalledPacksCycleKind);
+    assert!(
+        matches!(s.active_view, ActiveView::InstalledModsList { .. }),
+        "Tab from Shader should cycle back to InstalledModsList"
+    );
+    assert!(
+        effects.iter().any(|e| matches!(e, Effect::FetchInstalledMods { .. })),
+        "should emit FetchInstalledMods"
+    );
+}
+
+#[test]
+fn test_e_on_resource_row_dispatches_toggle() {
+    let row = pack_row("r1", "cool-pack");
+    let mut s = AppState {
+        active_view: ActiveView::InstalledPacksList {
+            slug: "foo".into(),
+            kind: PackKind::Resource,
+            packs: vec![row],
+            selected: 0,
+            transient_status: None,
+        },
+        ..AppState::default()
+    };
+    let effects = update(&mut s, Action::TogglePackEnabled);
+    assert!(
+        effects.iter().any(|e| matches!(e, Effect::TogglePackEnabledEff { kind: PackKind::Resource, .. })),
+        "TogglePackEnabled on Resource should emit TogglePackEnabledEff(Resource); got {effects:?}"
+    );
+}
+
+#[test]
+fn test_e_on_shader_row_dispatches_shader_toggle_notice() {
+    let mut s = AppState {
+        active_view: ActiveView::InstalledPacksList {
+            slug: "foo".into(),
+            kind: PackKind::Shader,
+            packs: Vec::new(),
+            selected: 0,
+            transient_status: None,
+        },
+        ..AppState::default()
+    };
+    let effects = update(&mut s, Action::ShaderToggleNotice);
+    assert!(effects.is_empty());
+    if let ActiveView::InstalledPacksList { transient_status, .. } = &s.active_view {
+        assert!(
+            transient_status.as_deref() == Some("Shaders cannot be toggled — use Iris/OptiFine in-game"),
+            "transient_status should be set to shader notice; got {transient_status:?}"
+        );
+    } else {
+        panic!("active_view changed unexpectedly");
+    }
+}
+
+#[test]
+fn test_x_on_any_pack_kind_opens_confirm() {
+    for kind in [PackKind::Resource, PackKind::Shader] {
+        let row = pack_row("r1", "pack");
+        let mut s = AppState {
+            active_view: ActiveView::InstalledPacksList {
+                slug: "foo".into(),
+                kind,
+                packs: vec![row],
+                selected: 0,
+                transient_status: None,
+            },
+            ..AppState::default()
+        };
+        let effects = update(&mut s, Action::OpenUninstallPackConfirm);
+        assert!(effects.is_empty());
+        assert!(
+            matches!(s.active_view, ActiveView::UninstallPackConfirm { kind: k, .. } if k == kind),
+            "x should open UninstallPackConfirm with kind={kind:?}"
+        );
+    }
+}
+
+#[test]
+fn test_pack_browser_search_loaded_with_matching_slug_kind_populates_results() {
+    let hits = vec![
+        ModrinthSearchHit { project_id: "p1".into(), slug: "cool".into(), title: "Cool Pack".into(),
+            description: "nice".into(), downloads: 100, already_installed: false },
+    ];
+    let mut s = AppState {
+        active_view: ActiveView::PackBrowser {
+            slug: "foo".into(),
+            kind: PackKind::Resource,
+            search: String::new(),
+            fetch_state: mineltui::mods::types::ModBrowserFetchState::Loading,
+            results: Vec::new(),
+            selected: 0,
+        },
+        ..AppState::default()
+    };
+    let _ = update(&mut s, Action::PackBrowserSearchLoaded {
+        slug: "foo".into(),
+        kind: PackKind::Resource,
+        hits: hits.clone(),
+    });
+    if let ActiveView::PackBrowser { results, fetch_state, .. } = &s.active_view {
+        assert_eq!(results.len(), 1, "results should be populated");
+        assert_eq!(*fetch_state, mineltui::mods::types::ModBrowserFetchState::Ready);
+    } else {
+        panic!("active_view changed unexpectedly");
+    }
+}
+
+#[test]
+fn test_pack_browser_search_loaded_with_mismatched_slug_does_not_overwrite() {
+    // Slug-match-guard: mismatched slug → results stay empty.
+    let mut s = AppState {
+        active_view: ActiveView::PackBrowser {
+            slug: "foo".into(),
+            kind: PackKind::Resource,
+            search: String::new(),
+            fetch_state: mineltui::mods::types::ModBrowserFetchState::Loading,
+            results: Vec::new(),
+            selected: 0,
+        },
+        ..AppState::default()
+    };
+    let _ = update(&mut s, Action::PackBrowserSearchLoaded {
+        slug: "bar".into(),  // mismatched slug
+        kind: PackKind::Resource,
+        hits: vec![ModrinthSearchHit { project_id: "p1".into(), slug: "x".into(),
+            title: "X".into(), description: "x".into(), downloads: 0, already_installed: false }],
+    });
+    if let ActiveView::PackBrowser { results, .. } = &s.active_view {
+        assert!(results.is_empty(), "mismatched slug should NOT overwrite results");
+    } else {
+        panic!("active_view changed unexpectedly");
+    }
+}
+
+#[test]
+fn test_pack_browser_search_loaded_with_mismatched_kind_does_not_overwrite() {
+    // Kind-match-guard: mismatched kind → results stay empty.
+    let mut s = AppState {
+        active_view: ActiveView::PackBrowser {
+            slug: "foo".into(),
+            kind: PackKind::Resource,
+            search: String::new(),
+            fetch_state: mineltui::mods::types::ModBrowserFetchState::Loading,
+            results: Vec::new(),
+            selected: 0,
+        },
+        ..AppState::default()
+    };
+    let _ = update(&mut s, Action::PackBrowserSearchLoaded {
+        slug: "foo".into(),
+        kind: PackKind::Shader,  // mismatched kind
+        hits: vec![ModrinthSearchHit { project_id: "p1".into(), slug: "x".into(),
+            title: "X".into(), description: "x".into(), downloads: 0, already_installed: false }],
+    });
+    if let ActiveView::PackBrowser { results, .. } = &s.active_view {
+        assert!(results.is_empty(), "mismatched kind should NOT overwrite results");
+    } else {
+        panic!("active_view changed unexpectedly");
+    }
+}
+
+#[test]
+fn test_pack_installed_action_clears_running_pack_jobs_entry() {
+    let mut s = AppState::default();
+    s.running_pack_jobs.insert(("foo".into(), PackKind::Resource), CancellationToken::new());
+    assert_eq!(s.running_pack_jobs.len(), 1, "precondition: one entry in running_pack_jobs");
+    let _ = update(&mut s, Action::PackInstalled { slug: "foo".into(), kind: PackKind::Resource });
+    assert!(
+        s.running_pack_jobs.is_empty(),
+        "PackInstalled should clear the running_pack_jobs entry"
+    );
+}

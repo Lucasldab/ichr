@@ -28,6 +28,8 @@ use crate::launcher;
 use crate::modpack::service::ModpackService;
 use crate::mods::curseforge::service::CurseForgeService;
 use crate::mods::service::ModrinthService;
+use crate::packs::kind::PackKind;
+use crate::packs::service::PackService;
 use crate::mojang::client::MojangClient;
 use crate::mojang::types::VersionEntry;
 use crate::persistence::paths::AppPaths;
@@ -102,6 +104,11 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
     let modpack_service = Arc::new(
         ModpackService::new()
             .map_err(|e| anyhow::anyhow!("ModpackService::new: {e}"))?,
+    );
+    // Phase 11 (11-04): Pack service backs R/S pack browser + install flows.
+    let pack_service = Arc::new(
+        PackService::new()
+            .map_err(|e| anyhow::anyhow!("PackService::new: {e}"))?,
     );
 
     // Build the task plumbing. TaskEvents arrive on task_rx; we convert each
@@ -181,7 +188,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
                     Some(Ok(ev)) => {
                         if let Some(action) = map_event(ev, &state) {
                             let effects = update(&mut state, action);
-                            execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), Arc::clone(&modrinth_service), Arc::clone(&cf_service), Arc::clone(&modpack_service), &task_manager, &action_tx).await;
+                            execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), Arc::clone(&modrinth_service), Arc::clone(&cf_service), Arc::clone(&modpack_service), Arc::clone(&pack_service), &task_manager, &action_tx).await;
                         }
                     }
                     Some(Err(e)) => {
@@ -195,7 +202,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
                 match maybe_action {
                     Some(action) => {
                         let effects = update(&mut state, action);
-                        execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), Arc::clone(&modrinth_service), Arc::clone(&cf_service), Arc::clone(&modpack_service), &task_manager, &action_tx).await;
+                        execute_effects(effects, &state, &paths, Arc::clone(&mojang), Arc::clone(&account_service), Arc::clone(&java_service), Arc::clone(&loader_service), Arc::clone(&modrinth_service), Arc::clone(&cf_service), Arc::clone(&modpack_service), Arc::clone(&pack_service), &task_manager, &action_tx).await;
                     }
                     None => break,
                 }
@@ -299,6 +306,19 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         }
         ActiveView::CfInstallFailedModal { .. } => {
             super::views::cf_install_failed_modal::map_cf_install_failed_event(ev)
+        }
+        // Phase 11 (11-04): pack browser + installed packs list + drop-path + confirm.
+        ActiveView::PackBrowser { .. } => {
+            super::views::pack_browser::map_pack_browser_event(ev, state)
+        }
+        ActiveView::InstalledPacksList { .. } => {
+            super::views::installed_packs_list::map_installed_packs_list_event(ev, state)
+        }
+        ActiveView::PackDropPathInput { .. } => {
+            super::views::pack_drop_path_modal::map_pack_drop_path_event(ev)
+        }
+        ActiveView::UninstallPackConfirm { .. } => {
+            super::views::uninstall_pack_confirm::map_uninstall_pack_confirm_event(ev)
         }
     }
 }
@@ -444,6 +464,40 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
                         && !state.running_mod_jobs.contains_key(&m.slug)
                     {
                         return Some(Action::OpenCfBrowser { slug: m.slug.clone() });
+                    }
+                }
+            }
+            None
+        }
+        // Phase 11 D-LOCK: uppercase R → Resource Pack browser.
+        // lowercase 'r' (OpenRenameInline) is NOT modified.
+        CtEvent::Key(KeyEvent { code: KeyCode::Char('R'), modifiers, .. })
+            if !modifiers.contains(KeyModifiers::CONTROL) =>
+        {
+            if let ActiveView::InstanceList { selected } = &state.active_view {
+                if let Some(m) = state.instances.get(*selected) {
+                    if !state.running_pack_jobs.contains_key(&(m.slug.clone(), PackKind::Resource)) {
+                        return Some(Action::OpenPackBrowser {
+                            slug: m.slug.clone(),
+                            kind: PackKind::Resource,
+                        });
+                    }
+                }
+            }
+            None
+        }
+        // Phase 11 D-LOCK: uppercase S → Shader Pack browser.
+        // lowercase 's' (StopInstance) is NOT modified.
+        CtEvent::Key(KeyEvent { code: KeyCode::Char('S'), modifiers, .. })
+            if !modifiers.contains(KeyModifiers::CONTROL) =>
+        {
+            if let ActiveView::InstanceList { selected } = &state.active_view {
+                if let Some(m) = state.instances.get(*selected) {
+                    if !state.running_pack_jobs.contains_key(&(m.slug.clone(), PackKind::Shader)) {
+                        return Some(Action::OpenPackBrowser {
+                            slug: m.slug.clone(),
+                            kind: PackKind::Shader,
+                        });
                     }
                 }
             }
@@ -631,6 +685,7 @@ async fn execute_effects(
     modrinth_service: Arc<ModrinthService>,
     cf_service: Arc<CurseForgeService>,
     modpack_service: Arc<ModpackService>,
+    pack_service: Arc<PackService>,
     task_manager: &TaskManager,
     action_tx: &mpsc::Sender<Action>,
 ) {
@@ -1780,6 +1835,139 @@ async fn execute_effects(
                 // no-op hook for symmetry with CancelLoaderInstall. The import task
                 // observes the cancellation token and returns ModpackError::Cancelled;
                 // service-side cleanup (remove_dir_all) ran in import_mrpack's outer arm.
+            }
+
+            // ── Phase 11 (11-04): Pack browser + install effect arms ─────────
+            Effect::SearchPacks { slug, kind, query, mc } => {
+                let svc = Arc::clone(&pack_service);
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match svc.search(&query, kind, mc.as_deref(), Some(&paths2), Some(&slug)).await {
+                        Ok(hits) => {
+                            let _ = tx.send(Action::PackBrowserSearchLoaded { slug, kind, hits }).await;
+                        }
+                        Err(e) => {
+                            tracing::warn!(error = %e, %slug, ?kind, "PackService search failed");
+                            let _ = tx.send(Action::PackBrowserSearchFailed { slug, kind, message: e.to_string() }).await;
+                        }
+                    }
+                });
+            }
+
+            Effect::FetchInstalledPacks { slug, kind } => {
+                let svc = Arc::clone(&pack_service);
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match svc.list_installed(&paths2, &slug, kind).await {
+                        Ok(packs) => {
+                            let _ = tx.send(Action::InstalledPacksLoaded { slug, kind, packs }).await;
+                        }
+                        Err(e) => tracing::warn!(error = %e, %slug, ?kind, "list_installed failed"),
+                    }
+                });
+            }
+
+            Effect::DropInstallPack { slug, kind, path } => {
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                let token = tokio_util::sync::CancellationToken::new();
+                let token2 = token.clone();
+                tokio::spawn(async move {
+                    match crate::packs::install::drop_pack_from_path(&paths2, &slug, kind, &path, &token2).await {
+                        Ok(_outcome) => {
+                            let _ = tx.send(Action::PackInstalled { slug, kind }).await;
+                        }
+                        Err(e) => {
+                            let _ = tx.send(Action::PackDropFailed { slug, kind, error: e.to_string() }).await;
+                        }
+                    }
+                });
+                // Suppress unused token warning — it's a handle for future cancel support.
+                let _ = token;
+            }
+
+            Effect::InstallPackFromModrinth { slug, kind, project_id, project_slug, project_title, version } => {
+                let svc = Arc::clone(&pack_service);
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                let job_id = task_manager.next_job_id();
+
+                // Progress forwarder (mirrors InstallModWithDeps pattern).
+                let (lt_tx, mut lt_rx) = mpsc::channel::<crate::tasks::TaskEvent>(64);
+                {
+                    let tx_fwd = tx.clone();
+                    tokio::spawn(async move {
+                        while let Some(evt) = lt_rx.recv().await {
+                            if let crate::tasks::TaskEvent::Progress { id, pct, msg } = evt {
+                                let _ = tx_fwd
+                                    .send(Action::Task(crate::tasks::TaskEvent::Progress { id, pct, msg }))
+                                    .await;
+                            }
+                        }
+                    });
+                }
+
+                let slug_task = slug.clone();
+                let project_id_task = project_id.clone();
+                task_manager.spawn_task(job_id, move |_task_tx, token| async move {
+                    let slug = slug_task;
+                    match svc
+                        .install_modrinth(
+                            &paths2,
+                            &slug,
+                            kind,
+                            &version,
+                            &project_slug,
+                            &project_id,
+                            &project_title,
+                            lt_tx,
+                            token,
+                            job_id,
+                        )
+                        .await
+                    {
+                        Ok(_row) => {
+                            let _ = tx.send(Action::PackInstalled { slug, kind }).await;
+                        }
+                        Err(crate::packs::error::PackError::Cancelled) => {
+                            tracing::info!(%slug, ?kind, %project_id_task, "pack install cancelled");
+                        }
+                        Err(e) => {
+                            let _ = tx.send(Action::PackInstallFailed { slug, kind, error: e.to_string() }).await;
+                        }
+                    }
+                    Ok(())
+                });
+            }
+
+            Effect::TogglePackEnabledEff { slug, kind, mod_id } => {
+                let svc = Arc::clone(&pack_service);
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match svc.toggle_pack_enabled(&paths2, &slug, &mod_id, kind).await {
+                        Ok(new_enabled) => {
+                            let _ = tx.send(Action::PackToggled { slug, kind, mod_id, new_enabled }).await;
+                        }
+                        Err(e) => tracing::warn!(error = %e, %slug, ?kind, "toggle_pack_enabled failed"),
+                    }
+                });
+            }
+
+            Effect::UninstallPack { slug, kind, mod_id } => {
+                let svc = Arc::clone(&pack_service);
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match svc.uninstall_pack(&paths2, &slug, &mod_id, kind).await {
+                        Ok(()) => {
+                            let _ = tx.send(Action::PackUninstalled { slug, kind, mod_id }).await;
+                        }
+                        Err(e) => tracing::warn!(error = %e, %slug, ?kind, "uninstall_pack failed"),
+                    }
+                });
             }
         }
     }
