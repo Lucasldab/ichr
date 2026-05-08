@@ -823,6 +823,11 @@ mod tests {
     // Missing javaVersion in VersionJson → defaults to jre-legacy (Java 8)
     // -----------------------------------------------------------------------
 
+    // Linux-only — same pattern as test_resolve_auto_mojang_path: pins
+    // OsName::Linux on the service constructor and asserts a fixture-extracted
+    // `bin/java` exists. Service path construction is host-OS-conditional, so
+    // on Windows the assert reads `bin/java.exe`.
+    #[cfg(target_os = "linux")]
     #[tokio::test]
     async fn test_resolve_version_without_java_version_defaults_to_legacy() {
         let _guard = java_env_lock().lock().await;

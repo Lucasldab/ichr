@@ -374,15 +374,24 @@ mod instance_pack_paths_tests {
     fn test_instance_pack_file_joins_filename_after_subdir() {
         let p = test_paths();
         let file = p.instance_pack_file("myworld", PackKind::Resource, "Faithful.zip");
-        // Should end with .minecraft/resourcepacks/Faithful.zip
-        assert_eq!(
-            file,
-            PathBuf::from("/data/instances/myworld/.minecraft/resourcepacks/Faithful.zip")
-        );
-        // Verify it ends_with the expected suffix
+        // Build expected via Path::join so the separator matches the host OS
+        // (forward slash on unix, backslash on windows). String literals are
+        // unsafe across platforms.
+        let expected = PathBuf::from("/data")
+            .join("instances")
+            .join("myworld")
+            .join(".minecraft")
+            .join("resourcepacks")
+            .join("Faithful.zip");
+        assert_eq!(file, expected);
+        // Path::ends_with handles separator normalization; the .to_string_lossy
+        // form below would fail on windows because the actual path uses '\\'
+        // while the literal suffix uses '/'.
+        let suffix = PathBuf::from(".minecraft")
+            .join("resourcepacks")
+            .join("Faithful.zip");
         assert!(
-            file.to_string_lossy()
-                .ends_with(".minecraft/resourcepacks/Faithful.zip"),
+            file.ends_with(&suffix),
             "got: {}",
             file.display()
         );
