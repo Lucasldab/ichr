@@ -60,8 +60,14 @@ aes-gcm = "0.10.3"
 base64 = "0.22"
 dotenvy = "0.15"
 
+[build-dependencies]
+# Windows side-by-side manifest embedding for PLAT-04 (longPathAware).
+# No-op on non-Windows targets via the CARGO_CFG_WINDOWS guard in build.rs.
+embed-manifest = "1.5"
+
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "test-util"] }
 tempfile = "3"
 filetime = "0.2"
 httpmock = "0.8.3"
+embed-manifest = "1.5"
