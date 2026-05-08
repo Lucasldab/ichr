@@ -71,3 +71,24 @@ tempfile = "3"
 filetime = "0.2"
 httpmock = "0.8.3"
 embed-manifest = "1.5"
+
+# Cargo-dist managed config (Plan 12-03).
+# Restricted to v1 targets: Linux x86_64 + Windows x86_64 only (per project policy).
+# `dist generate --mode=ci` regenerates .github/workflows/release.yml from this block.
+[workspace.metadata.dist]
+cargo-dist-version = "0.31.0"
+ci = ["github"]
+installers = ["shell", "powershell"]
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+]
+install-path = "CARGO_HOME"
+install-updater = false
+cache-builds = true
+github-attestations = true
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
