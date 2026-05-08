@@ -2135,3 +2135,372 @@ fn test_version_picker_empty_state_neoforge_below_1201() {
         "MC-incompatibility copy not shown for NeoForge/1.19.4: {rendered}"
     );
 }
+
+// ========================================================================
+// Phase 10: Modpack Import TUI integration (Plan 10-06)
+// 13 tui_smoke tests covering keybind, modal flow, progress dispatch, cancel
+// cleanup, failure modal dismiss.
+// ========================================================================
+
+// Test 1: 'i' on InstanceList opens path-input modal
+#[test]
+fn test_i_key_on_instance_list_opens_path_input_modal() {
+    let mut s = state_with_one_instance("ti", "1.21.4");
+    let ev = CtEvent::Key(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::NONE));
+    let action = map_event_pub(ev, &s).expect("'i' must emit an action");
+    assert!(
+        matches!(action, Action::OpenModpackImport),
+        "expected OpenModpackImport; got {action:?}"
+    );
+    update(&mut s, action);
+    assert!(
+        matches!(s.active_view, ActiveView::ModpackImportPathInput { .. }),
+        "active_view must be ModpackImportPathInput; got {:?}",
+        s.active_view
+    );
+}
+
+// Test 2: Typing chars in the path-input modal updates the buffer
+#[test]
+fn test_path_input_typing_updates_buffer() {
+    let mut s = AppState {
+        active_view: ActiveView::ModpackImportPathInput {
+            buffer: String::new(),
+            error: None,
+        },
+        ..AppState::default()
+    };
+    update(&mut s, Action::ImportPathTypeSearch('a'));
+    update(&mut s, Action::ImportPathTypeSearch('b'));
+    update(&mut s, Action::ImportPathTypeSearch('c'));
+    match &s.active_view {
+        ActiveView::ModpackImportPathInput { buffer, .. } => {
+            assert_eq!(buffer, "abc", "buffer must be 'abc' after typing 3 chars");
+        }
+        _ => panic!("view changed unexpectedly: {:?}", s.active_view),
+    }
+}
+
+// Test 3: Paste appends to buffer
+#[test]
+fn test_path_input_paste_appends_to_buffer() {
+    let mut s = AppState {
+        active_view: ActiveView::ModpackImportPathInput {
+            buffer: "x".into(),
+            error: None,
+        },
+        ..AppState::default()
+    };
+    update(&mut s, Action::ImportPathPasteSearch("/path/to/pack.mrpack".into()));
+    match &s.active_view {
+        ActiveView::ModpackImportPathInput { buffer, .. } => {
+            assert_eq!(buffer, "x/path/to/pack.mrpack");
+        }
+        _ => panic!("view changed unexpectedly"),
+    }
+}
+
+// Test 4: Backspace pops the last char
+#[test]
+fn test_path_input_backspace_pops_buffer() {
+    let mut s = AppState {
+        active_view: ActiveView::ModpackImportPathInput {
+            buffer: "abc".into(),
+            error: None,
+        },
+        ..AppState::default()
+    };
+    update(&mut s, Action::ImportPathBackspaceSearch);
+    match &s.active_view {
+        ActiveView::ModpackImportPathInput { buffer, .. } => {
+            assert_eq!(buffer, "ab");
+        }
+        _ => panic!("view changed unexpectedly"),
+    }
+}
+
+// Test 5: Submit with empty path sets error and stays on path-input modal
+#[test]
+fn test_path_input_submit_empty_sets_error() {
+    let mut s = AppState {
+        active_view: ActiveView::ModpackImportPathInput {
+            buffer: String::new(),
+            error: None,
+        },
+        ..AppState::default()
+    };
+    let effects = update(&mut s, Action::ImportPathSubmit);
+    assert!(
+        effects.is_empty(),
+        "empty-path submit must emit no effects; got {effects:?}"
+    );
+    match &s.active_view {
+        ActiveView::ModpackImportPathInput { error: Some(e), .. } => {
+            assert!(e.contains("path required"), "error must mention 'path required'; got {e}");
+        }
+        ActiveView::ModpackImportPathInput { error: None, .. } => {
+            panic!("submit with empty path must set error")
+        }
+        _ => panic!("view must remain ModpackImportPathInput"),
+    }
+}
+
+// Test 6: Submit with non-empty path dispatches Effect::ImportModpack
+#[test]
+fn test_path_input_submit_dispatches_import_modpack_effect() {
+    let mut s = AppState {
+        active_view: ActiveView::ModpackImportPathInput {
+            buffer: "/some/path.mrpack".into(),
+            error: None,
+        },
+        ..AppState::default()
+    };
+    let effects = update(&mut s, Action::ImportPathSubmit);
+    let has_import = effects.iter().any(|e| {
+        matches!(e, Effect::ImportModpack { mrpack_path }
+            if mrpack_path == &std::path::PathBuf::from("/some/path.mrpack"))
+    });
+    assert!(
+        has_import,
+        "submit with non-empty path must emit Effect::ImportModpack{{path}}; got {effects:?}"
+    );
+}
+
+// Test 7: Esc on path-input modal cancels and returns to InstanceList
+#[test]
+fn test_path_input_esc_cancels_to_instance_list() {
+    let mut s = AppState {
+        active_view: ActiveView::ModpackImportPathInput {
+            buffer: "/some/path.mrpack".into(),
+            error: None,
+        },
+        ..AppState::default()
+    };
+    update(&mut s, Action::ImportPathCancel);
+    assert!(
+        matches!(s.active_view, ActiveView::InstanceList { selected: 0 }),
+        "Esc must return to InstanceList; got {:?}",
+        s.active_view
+    );
+}
+
+// Test 8: ModpackImportStarted transitions to progress modal and records token
+#[test]
+fn test_modpack_import_started_transitions_to_progress_modal_and_records_token() {
+    let token = CancellationToken::new();
+    let mut s = AppState::default();
+    update(
+        &mut s,
+        Action::ModpackImportStarted {
+            slug: "test-pack".into(),
+            modpack_name: "Test Pack".into(),
+            token: token.clone(),
+        },
+    );
+    assert!(
+        matches!(s.active_view, ActiveView::ModpackImportProgressModal { .. }),
+        "must transition to ModpackImportProgressModal; got {:?}",
+        s.active_view
+    );
+    assert!(
+        s.running_modpack_imports.contains_key("test-pack"),
+        "token must be recorded in running_modpack_imports"
+    );
+}
+
+// Test 9: ModpackImportProgress updates step_label and bytes_done in modal
+#[test]
+fn test_modpack_import_progress_updates_modal_step_label() {
+    let token = CancellationToken::new();
+    let mut s = AppState {
+        active_view: ActiveView::ModpackImportProgressModal {
+            modpack_name: "Test Pack".into(),
+            step_label: "Starting".into(),
+            step_index: 0,
+            step_total: 7,
+            bytes_done: 0,
+            bytes_total: 0,
+            cancel_token_key: "test-pack".into(),
+            log_tail: String::new(),
+        },
+        ..AppState::default()
+    };
+    s.running_modpack_imports.insert("test-pack".into(), token);
+    update(
+        &mut s,
+        Action::ModpackImportProgress {
+            slug: String::new(),
+            pct: 50,
+            step_label: "Downloading mods 5/10".into(),
+            bytes_done: 1024,
+            bytes_total: 2048,
+        },
+    );
+    match &s.active_view {
+        ActiveView::ModpackImportProgressModal { step_label, bytes_done, .. } => {
+            assert_eq!(step_label, "Downloading mods 5/10");
+            assert_eq!(*bytes_done, 1024);
+        }
+        _ => panic!("view must remain ModpackImportProgressModal"),
+    }
+}
+
+// Test 10: CancelModpackImport calls token.cancel() and returns to InstanceList
+#[test]
+fn test_cancel_modpack_import_calls_token_cancel_and_returns_to_instance_list() {
+    let token = CancellationToken::new();
+    let token_clone = token.clone();
+    let mut s = AppState {
+        active_view: ActiveView::ModpackImportProgressModal {
+            modpack_name: "Test Pack".into(),
+            step_label: "Downloading".into(),
+            step_index: 3,
+            step_total: 7,
+            bytes_done: 512,
+            bytes_total: 1024,
+            cancel_token_key: "test-pack".into(),
+            log_tail: String::new(),
+        },
+        ..AppState::default()
+    };
+    s.running_modpack_imports.insert("test-pack".into(), token);
+
+    let effects = update(&mut s, Action::CancelModpackImport);
+
+    assert!(
+        token_clone.is_cancelled(),
+        "CancelModpackImport must call token.cancel()"
+    );
+    assert!(
+        matches!(s.active_view, ActiveView::InstanceList { selected: 0 }),
+        "must return to InstanceList; got {:?}",
+        s.active_view
+    );
+    assert!(
+        s.running_modpack_imports.is_empty(),
+        "running_modpack_imports must be empty after cancel"
+    );
+    assert!(
+        effects.iter().any(|e| matches!(e, Effect::CancelModpackImport)),
+        "must emit Effect::CancelModpackImport; got {effects:?}"
+    );
+}
+
+// Test 11: ModpackImported clears state and emits FetchInstances
+#[test]
+fn test_modpack_imported_clears_state_and_emits_fetch_instances() {
+    let token = CancellationToken::new();
+    let mut s = AppState {
+        active_view: ActiveView::ModpackImportProgressModal {
+            modpack_name: "Test Pack".into(),
+            step_label: "Done".into(),
+            step_index: 7,
+            step_total: 7,
+            bytes_done: 1024,
+            bytes_total: 1024,
+            cancel_token_key: "test-pack".into(),
+            log_tail: String::new(),
+        },
+        ..AppState::default()
+    };
+    s.running_modpack_imports.insert("test-pack".into(), token);
+
+    let effects = update(&mut s, Action::ModpackImported { slug: "test-pack".into() });
+
+    assert!(
+        matches!(s.active_view, ActiveView::InstanceList { selected: 0 }),
+        "must return to InstanceList; got {:?}",
+        s.active_view
+    );
+    assert!(
+        s.running_modpack_imports.is_empty(),
+        "running_modpack_imports must be empty after import succeeded"
+    );
+    assert!(
+        effects.iter().any(|e| matches!(e, Effect::FetchInstances)),
+        "must emit Effect::FetchInstances; got {effects:?}"
+    );
+}
+
+// Test 12: ModpackImportFailed shows failed modal; DismissModpackImportFailed returns to InstanceList
+#[test]
+fn test_modpack_import_failed_opens_failed_modal_then_dismiss() {
+    let mut s = AppState::default();
+    update(
+        &mut s,
+        Action::ModpackImportFailed {
+            modpack_name: "Bad Pack".into(),
+            error: "boom".into(),
+            log_tail: String::new(),
+        },
+    );
+    assert!(
+        matches!(s.active_view, ActiveView::ModpackImportFailedModal { .. }),
+        "must transition to ModpackImportFailedModal; got {:?}",
+        s.active_view
+    );
+
+    update(&mut s, Action::DismissModpackImportFailed);
+    assert!(
+        matches!(s.active_view, ActiveView::InstanceList { selected: 0 }),
+        "DismissModpackImportFailed must return to InstanceList; got {:?}",
+        s.active_view
+    );
+}
+
+// Test 13: HIGH-2 regression pin — ModpackImportCancelled clears running_modpack_imports
+// and returns to InstanceList (NOT ModpackImportFailedModal). This pinned regression
+// ensures the dedicated ModpackImportCancelled arm calls clear() rather than the
+// ModpackImported arm calling remove("") (a no-op against a real-slug key).
+#[test]
+fn test_modpack_import_cancelled_clears_running_imports_and_returns_to_instance_list() {
+    let token = CancellationToken::new();
+    let mut s = AppState {
+        active_view: ActiveView::ModpackImportProgressModal {
+            modpack_name: "Real Pack".into(),
+            step_label: "Downloading".into(),
+            step_index: 2,
+            step_total: 7,
+            bytes_done: 0,
+            bytes_total: 0,
+            cancel_token_key: "real-slug".into(),
+            log_tail: String::new(),
+        },
+        ..AppState::default()
+    };
+    // Pre-populate with a real slug (as if ModpackImportStarted had fired)
+    s.running_modpack_imports.insert("real-slug".into(), token);
+
+    let effects = update(&mut s, Action::ModpackImportCancelled);
+
+    // Must return to InstanceList (not ModpackImportFailedModal — silent treatment)
+    assert!(
+        matches!(s.active_view, ActiveView::InstanceList { selected: 0 }),
+        "ModpackImportCancelled must return to InstanceList; got {:?}",
+        s.active_view
+    );
+
+    // HIGH-2: running_modpack_imports must be empty regardless of which slug was assigned
+    assert!(
+        s.running_modpack_imports.is_empty(),
+        "running_modpack_imports must be cleared by ModpackImportCancelled"
+    );
+
+    // Must NOT emit FetchInstances (nothing was created)
+    assert!(
+        !effects.iter().any(|e| matches!(e, Effect::FetchInstances)),
+        "ModpackImportCancelled must NOT emit FetchInstances; got {effects:?}"
+    );
+
+    // Must NOT be a failed modal (silent cancellation)
+    assert!(
+        !matches!(s.active_view, ActiveView::ModpackImportFailedModal { .. }),
+        "ModpackImportCancelled must NOT open the failed modal"
+    );
+
+    // Effects must be empty (no side-effects needed — everything is cleaned up by update())
+    assert!(
+        effects.is_empty(),
+        "ModpackImportCancelled must emit no effects; got {effects:?}"
+    );
+}
