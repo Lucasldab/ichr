@@ -514,6 +514,23 @@ impl PackService {
         write_ledger(paths, slug, &ledger).await?;
         Ok(())
     }
+
+    // ====================================================================
+    // === Version accessor (for live tests and TUI install flow)        ===
+    // ====================================================================
+
+    /// Fetch a full `ModrinthVersion` by version_id.
+    ///
+    /// Delegates to `ModrinthClient::get_version`. Added in Plan 05 so live
+    /// tests can resolve the full version object from a pinned version_id
+    /// without going through the search → list_versions → select flow.
+    #[tracing::instrument(skip_all, fields(version_id = %version_id))]
+    pub async fn get_version(
+        &self,
+        version_id: &str,
+    ) -> Result<ModrinthVersion, PackError> {
+        Ok(self.client.get_version(version_id).await?)
+    }
 }
 
 // ============================================================================
