@@ -4,9 +4,10 @@
 //!
 //! Uses `spawn_blocking` — the `zip` crate is synchronous CPU work.
 
-use std::path::{Component, Path, PathBuf};
+use std::path::Path;
 
 use crate::error::AppError;
+use crate::util::safe_zip::safe_extract_path;
 
 /// Extract the contents of `jar_path` into `dest_dir`. Paths are canonicalized
 /// and any entry that would escape `dest_dir` (via `..` or absolute paths)
@@ -56,17 +57,3 @@ pub async fn extract_native_jar(
     Ok(())
 }
 
-/// Returns `None` if the zip entry name would escape `base` (absolute path,
-/// `..` component, Windows drive letter, etc.). Otherwise returns the
-/// resolved path inside `base`.
-fn safe_extract_path(entry_name: &str, base: &Path) -> Option<PathBuf> {
-    let mut result = base.to_path_buf();
-    for component in Path::new(entry_name).components() {
-        match component {
-            Component::Normal(c) => result.push(c),
-            // Rejects RootDir, CurDir, ParentDir, Prefix — all traversal vectors.
-            _ => return None,
-        }
-    }
-    Some(result)
-}
