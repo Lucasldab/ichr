@@ -33,8 +33,10 @@ use tokio_util::sync::CancellationToken;
 use crate::domain::InstanceManifest;
 use crate::instance::store::{read_instance_manifest, write_instance_manifest};
 use crate::java::service::JavaService;
+use crate::install::install_version;
 use crate::loader::error::LoaderError;
 use crate::loader::service::LoaderService;
+use crate::mojang::client::MojangClient;
 use crate::modpack::download::download_files;
 use crate::modpack::error::ModpackError;
 use crate::modpack::overrides::apply_overrides;
@@ -104,6 +106,7 @@ impl ModpackService {
         &self,
         paths: &AppPaths,
         mrpack_path: &Path,
+        mojang_client: &MojangClient,
         loader_service: &LoaderService,
         java_service: &JavaService,
         progress_tx: mpsc::Sender<TaskEvent>,
@@ -147,7 +150,7 @@ impl ModpackService {
             .map_err(|e| ModpackError::Http(format!("create_instance: {e}")))?;
         let slug = manifest_initial.slug.clone();
 
-        // ── STEPS 3-7: cleanup-wrapped inner block ────────────────────────────
+        // ── STEPS 2.5-7: cleanup-wrapped inner block ──────────────────────────
         let inner_result = self
             .import_inner(
                 paths,
@@ -155,6 +158,7 @@ impl ModpackService {
                 &mc_version,
                 &index,
                 mrpack_path,
+                mojang_client,
                 loader_service,
                 java_service,
                 &progress_tx,
@@ -204,12 +208,62 @@ impl ModpackService {
         mc_version: &str,
         index: &MrpackIndex,
         mrpack_path: &Path,
+        mojang_client: &MojangClient,
         loader_service: &LoaderService,
         java_service: &JavaService,
         progress_tx: &mpsc::Sender<TaskEvent>,
         token: &CancellationToken,
         job_id: JobId,
     ) -> Result<(), ModpackError> {
+        // ── STEP 2.5: install vanilla MC (GAP-10-A fix) ───────────────────────
+        // LoaderService::install_loader → JavaService::resolve_jre_for_mc_version_install
+        // requires the vanilla version JSON on disk. For a fresh modpack import,
+        // vanilla MC has never been installed for this version, so we install it here
+        // before the loader can be wired up. Idempotent: existing installs are skipped.
+        if !paths.version_json(mc_version).exists() {
+            if token.is_cancelled() {
+                return Err(ModpackError::Cancelled);
+            }
+            let _ = progress_tx
+                .send(TaskEvent::Progress {
+                    id: job_id,
+                    pct: 12,
+                    msg: format!("Installing vanilla MC {mc_version}"),
+                })
+                .await;
+
+            let cache_path = paths.cache_dir.join("manifest_v2.json");
+            let manifest = mojang_client
+                .fetch_manifest(&cache_path)
+                .await
+                .map_err(|e| ModpackError::Http(format!("fetch Mojang manifest: {e}")))?;
+            let entry = manifest
+                .versions
+                .iter()
+                .find(|v| v.id == mc_version)
+                .ok_or_else(|| {
+                    ModpackError::Http(format!(
+                        "vanilla MC {mc_version} not found in Mojang manifest \
+                         (versions cover release+snapshot; pre-release/alpha excluded)"
+                    ))
+                })?
+                .clone();
+            install_version(
+                job_id,
+                paths,
+                mojang_client,
+                progress_tx.clone(),
+                token.clone(),
+                slug,
+                &entry,
+            )
+            .await
+            .map_err(|e| match e {
+                crate::error::AppError::Cancelled => ModpackError::Cancelled,
+                other => ModpackError::Http(format!("install vanilla MC: {other}")),
+            })?;
+        }
+
         // ── STEP 3: download mods (.tmp files on disk) ────────────────────────
         let _ = progress_tx
             .send(TaskEvent::Progress {
@@ -377,6 +431,7 @@ mod tests {
     use zip::write::SimpleFileOptions;
 
     use super::ModpackService;
+    use crate::mojang::client::MojangClient;
     use crate::modpack::error::ModpackError;
     use crate::persistence::paths::AppPaths;
     use crate::tasks::JobId;
@@ -502,6 +557,28 @@ mod tests {
         reqwest::Client::builder().build().expect("build reqwest client")
     }
 
+    /// Pre-populate the vanilla MC version JSON so Step 2.5's existence check
+    /// skips the live Mojang manifest fetch. Tests that exercise the modpack
+    /// import flow without real network must call this in setup, otherwise
+    /// Step 2.5 will attempt a live `fetch_manifest` and the test will hang
+    /// or fail offline.
+    async fn pre_install_vanilla_marker(paths: &AppPaths, mc_version: &str) {
+        let json_path = paths.version_json(mc_version);
+        if let Some(parent) = json_path.parent() {
+            tokio::fs::create_dir_all(parent).await.unwrap();
+        }
+        tokio::fs::write(&json_path, b"{}").await.unwrap();
+    }
+
+    /// Construct a real `MojangClient` for tests. Step 2.5 short-circuits when
+    /// the version JSON marker exists, so this client's `fetch_manifest` is
+    /// never actually called by the inline tests (the live Mojang URL is not
+    /// hit). Tests that omit `pre_install_vanilla_marker` will trigger a real
+    /// fetch and may hang offline.
+    fn make_mojang_client() -> MojangClient {
+        MojangClient::new().expect("build mojang client")
+    }
+
     // ── Test 1: happy path — vanilla pack (no loader), 1 mod, 1 override ─────
 
     #[tokio::test]
@@ -546,6 +623,8 @@ mod tests {
         let svc = ModpackService::with_client(make_http_client());
         let loader_svc = crate::loader::service::LoaderService::new().unwrap();
         let java_svc = crate::java::service::JavaService::new().unwrap();
+        let mojang_svc = make_mojang_client();
+        pre_install_vanilla_marker(&paths, "1.20.4").await;
         let (tx, _rx) = mpsc::channel(64);
         let token = CancellationToken::new();
 
@@ -553,6 +632,7 @@ mod tests {
             .import_mrpack(
                 &paths,
                 &mrpack,
+                &mojang_svc,
                 &loader_svc,
                 &java_svc,
                 tx,
@@ -616,6 +696,8 @@ mod tests {
         let svc = ModpackService::with_client(make_http_client());
         let loader_svc = crate::loader::service::LoaderService::new().unwrap();
         let java_svc = crate::java::service::JavaService::new().unwrap();
+        let mojang_svc = make_mojang_client();
+        pre_install_vanilla_marker(&paths, "1.20.4").await;
         let (tx, _rx) = mpsc::channel(64);
         let token = CancellationToken::new();
 
@@ -623,6 +705,7 @@ mod tests {
             .import_mrpack(
                 &paths,
                 &mrpack,
+                &mojang_svc,
                 &loader_svc,
                 &java_svc,
                 tx,
@@ -660,6 +743,8 @@ mod tests {
         let svc = ModpackService::with_client(make_http_client());
         let loader_svc = crate::loader::service::LoaderService::new().unwrap();
         let java_svc = crate::java::service::JavaService::new().unwrap();
+        let mojang_svc = make_mojang_client();
+        pre_install_vanilla_marker(&paths, "1.20.4").await;
         let (tx, _rx) = mpsc::channel(64);
 
         // Cancel BEFORE calling import_mrpack
@@ -670,6 +755,7 @@ mod tests {
             .import_mrpack(
                 &paths,
                 &mrpack,
+                &mojang_svc,
                 &loader_svc,
                 &java_svc,
                 tx,
@@ -728,6 +814,8 @@ mod tests {
         let svc = ModpackService::with_client(make_http_client());
         let loader_svc = crate::loader::service::LoaderService::new().unwrap();
         let java_svc = crate::java::service::JavaService::new().unwrap();
+        let mojang_svc = make_mojang_client();
+        pre_install_vanilla_marker(&paths, "1.20.4").await;
         let (tx, _rx) = mpsc::channel(64);
         let token = CancellationToken::new();
         let token_clone = token.clone();
@@ -739,6 +827,7 @@ mod tests {
             svc.import_mrpack(
                 &paths_clone,
                 &mrpack_clone,
+                &mojang_svc,
                 &loader_svc,
                 &java_svc,
                 tx,
@@ -785,6 +874,8 @@ mod tests {
         let svc = ModpackService::with_client(make_http_client());
         let loader_svc = crate::loader::service::LoaderService::new().unwrap();
         let java_svc = crate::java::service::JavaService::new().unwrap();
+        let mojang_svc = make_mojang_client();
+        pre_install_vanilla_marker(&paths, "1.20.4").await;
         let (tx, _rx) = mpsc::channel(64);
         let token = CancellationToken::new();
 
@@ -792,6 +883,7 @@ mod tests {
             .import_mrpack(
                 &paths,
                 &mrpack,
+                &mojang_svc,
                 &loader_svc,
                 &java_svc,
                 tx,
@@ -858,6 +950,8 @@ mod tests {
         let svc = ModpackService::with_client(make_http_client());
         let loader_svc = crate::loader::service::LoaderService::new().unwrap();
         let java_svc = crate::java::service::JavaService::new().unwrap();
+        let mojang_svc = make_mojang_client();
+        pre_install_vanilla_marker(&paths, "1.20.4").await;
         let (tx, _rx) = mpsc::channel(64);
         let token = CancellationToken::new();
 
@@ -865,6 +959,7 @@ mod tests {
             .import_mrpack(
                 &paths,
                 &mrpack,
+                &mojang_svc,
                 &loader_svc,
                 &java_svc,
                 tx,
@@ -914,11 +1009,13 @@ mod tests {
             let svc = ModpackService::with_client(make_http_client());
             let loader_svc = crate::loader::service::LoaderService::new().unwrap();
             let java_svc = crate::java::service::JavaService::new().unwrap();
+        let mojang_svc = make_mojang_client();
+        pre_install_vanilla_marker(&paths, "1.20.4").await;
             let (tx, _rx) = mpsc::channel(64);
             let token = CancellationToken::new();
             token.cancel();
             let r = svc
-                .import_mrpack(&paths, &mrpack, &loader_svc, &java_svc, tx, token, JobId(7))
+                .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(7))
                 .await;
             assert!(matches!(r, Err(ModpackError::Cancelled)), "first run must cancel: {r:?}");
         }
@@ -928,10 +1025,12 @@ mod tests {
             let svc = ModpackService::with_client(make_http_client());
             let loader_svc = crate::loader::service::LoaderService::new().unwrap();
             let java_svc = crate::java::service::JavaService::new().unwrap();
+        let mojang_svc = make_mojang_client();
+        pre_install_vanilla_marker(&paths, "1.20.4").await;
             let (tx, _rx) = mpsc::channel(64);
             let token = CancellationToken::new();
             let r = svc
-                .import_mrpack(&paths, &mrpack, &loader_svc, &java_svc, tx, token, JobId(8))
+                .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(8))
                 .await;
             assert!(r.is_ok(), "second run must succeed: {r:?}");
             let manifest = r.unwrap();
@@ -980,12 +1079,14 @@ mod tests {
         let svc = ModpackService::with_client(make_http_client());
         let loader_svc = crate::loader::service::LoaderService::new().unwrap();
         let java_svc = crate::java::service::JavaService::new().unwrap();
+        let mojang_svc = make_mojang_client();
+        pre_install_vanilla_marker(&paths, "1.20.4").await;
 
         let (tx, mut rx) = mpsc::channel::<crate::tasks::TaskEvent>(64);
         let token = CancellationToken::new();
 
         let result = svc
-            .import_mrpack(&paths, &mrpack, &loader_svc, &java_svc, tx, token, JobId(9))
+            .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(9))
             .await;
 
         assert!(result.is_ok(), "must succeed: {result:?}");
@@ -1049,11 +1150,13 @@ mod tests {
         let svc = ModpackService::with_client(make_http_client());
         let loader_svc = crate::loader::service::LoaderService::new().unwrap();
         let java_svc = crate::java::service::JavaService::new().unwrap();
+        let mojang_svc = make_mojang_client();
+        pre_install_vanilla_marker(&paths, "1.20.4").await;
         let (tx, _rx) = mpsc::channel(64);
         let token = CancellationToken::new();
 
         let result = svc
-            .import_mrpack(&paths, &mrpack, &loader_svc, &java_svc, tx, token, JobId(10))
+            .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(10))
             .await;
 
         assert!(result.is_err(), "loader install failure must return Err");
@@ -1132,11 +1235,13 @@ mod tests {
         let svc = ModpackService::with_client(make_http_client());
         let loader_svc = crate::loader::service::LoaderService::new().unwrap();
         let java_svc = crate::java::service::JavaService::new().unwrap();
+        let mojang_svc = make_mojang_client();
+        pre_install_vanilla_marker(&paths, "1.20.4").await;
         let (tx, _rx) = mpsc::channel(64);
         let token = CancellationToken::new();
 
         let result = svc
-            .import_mrpack(&paths, &mrpack, &loader_svc, &java_svc, tx, token, JobId(11))
+            .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(11))
             .await;
 
         assert!(result.is_ok(), "filter-test import must succeed: {result:?}");

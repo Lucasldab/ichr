@@ -1677,6 +1677,7 @@ async fn execute_effects(
 
             Effect::ImportModpack { mrpack_path } => {
                 let svc = Arc::clone(&modpack_service);
+                let mojang_arc = Arc::clone(&mojang);
                 let loader_svc = Arc::clone(&loader_service);
                 let java_svc = Arc::clone(&java_service);
                 let paths2 = paths.clone();
@@ -1736,6 +1737,7 @@ async fn execute_effects(
                         .import_mrpack(
                             &paths2,
                             &mrpack_path_for_task,
+                            &mojang_arc,
                             &loader_svc,
                             &java_svc,
                             lt_tx,

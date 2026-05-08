@@ -11,6 +11,7 @@ use tempfile::TempDir;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
+use mineltui::mojang::client::MojangClient;
 use mineltui::modpack::ModpackError;
 use mineltui::modpack::service::ModpackService;
 use mineltui::persistence::paths::AppPaths;
@@ -40,13 +41,30 @@ fn make_svc() -> ModpackService {
     ModpackService::with_client(http)
 }
 
-async fn make_loader_java() -> (
+async fn make_services(paths: &AppPaths) -> (
     mineltui::loader::service::LoaderService,
     mineltui::java::service::JavaService,
+    MojangClient,
 ) {
     let loader_svc = mineltui::loader::service::LoaderService::new().expect("LoaderService::new");
     let java_svc = mineltui::java::service::JavaService::new().expect("JavaService::new");
-    (loader_svc, java_svc)
+    let mojang_svc = MojangClient::new().expect("MojangClient::new");
+    // GAP-10-A fix: pre-touch vanilla version JSON so Step 2.5's existence check
+    // skips the live Mojang manifest fetch (test fixtures use mc_version "1.20.4").
+    pre_install_vanilla_version_json(paths, "1.20.4").await;
+    (loader_svc, java_svc, mojang_svc)
+}
+
+/// GAP-10-A test helper: pre-touch the vanilla MC version JSON so that
+/// `ModpackService::import_mrpack` Step 2.5 (added by Phase 10.1) skips the
+/// live Mojang manifest fetch. Without this, integration tests would attempt
+/// network access and fail offline.
+async fn pre_install_vanilla_version_json(paths: &AppPaths, mc_version: &str) {
+    let json_path = paths.version_json(mc_version);
+    if let Some(parent) = json_path.parent() {
+        tokio::fs::create_dir_all(parent).await.unwrap();
+    }
+    tokio::fs::write(&json_path, b"{}").await.unwrap();
 }
 
 // ─── Test 1: end_to_end_import_minimal_pack ───────────────────────────────────
@@ -88,12 +106,12 @@ async fn end_to_end_import_minimal_pack() {
     );
 
     let svc = make_svc();
-    let (loader_svc, java_svc) = make_loader_java().await;
+    let (loader_svc, java_svc, mojang_svc) = make_services(&paths).await;
     let (tx, _rx) = mpsc::channel(64);
     let token = CancellationToken::new();
 
     let result = svc
-        .import_mrpack(&paths, &mrpack, &loader_svc, &java_svc, tx, token, JobId(1))
+        .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(1))
         .await;
 
     let manifest = result.expect("end-to-end import must succeed");
@@ -164,12 +182,12 @@ async fn import_atomicity_failure_cleans_dir() {
     );
 
     let svc = make_svc();
-    let (loader_svc, java_svc) = make_loader_java().await;
+    let (loader_svc, java_svc, mojang_svc) = make_services(&paths).await;
     let (tx, _rx) = mpsc::channel(64);
     let token = CancellationToken::new();
 
     let result = svc
-        .import_mrpack(&paths, &mrpack, &loader_svc, &java_svc, tx, token, JobId(2))
+        .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(2))
         .await;
 
     assert!(result.is_err(), "failed download must return Err: {result:?}");
@@ -215,7 +233,7 @@ async fn import_pre_cancel_cleans_state() {
     );
 
     let svc = make_svc();
-    let (loader_svc, java_svc) = make_loader_java().await;
+    let (loader_svc, java_svc, mojang_svc) = make_services(&paths).await;
     let (tx, _rx) = mpsc::channel(64);
 
     // Cancel BEFORE calling import_mrpack
@@ -223,7 +241,7 @@ async fn import_pre_cancel_cleans_state() {
     token.cancel();
 
     let result = svc
-        .import_mrpack(&paths, &mrpack, &loader_svc, &java_svc, tx, token, JobId(3))
+        .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(3))
         .await;
 
     assert!(
@@ -291,12 +309,12 @@ async fn import_with_unsupported_client_skips_files() {
     );
 
     let svc = make_svc();
-    let (loader_svc, java_svc) = make_loader_java().await;
+    let (loader_svc, java_svc, mojang_svc) = make_services(&paths).await;
     let (tx, _rx) = mpsc::channel(64);
     let token = CancellationToken::new();
 
     let result = svc
-        .import_mrpack(&paths, &mrpack, &loader_svc, &java_svc, tx, token, JobId(4))
+        .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(4))
         .await;
 
     let manifest = result.expect("filter-test import must succeed");
@@ -336,13 +354,13 @@ async fn import_with_path_traversal_in_overrides_skips_safely() {
     build_mrpack_with_path_traversal(&mrpack, "1.20.4");
 
     let svc = make_svc();
-    let (loader_svc, java_svc) = make_loader_java().await;
+    let (loader_svc, java_svc, mojang_svc) = make_services(&paths).await;
     let (tx, _rx) = mpsc::channel(64);
     let token = CancellationToken::new();
 
     // Import must succeed (traversal entries are silently skipped, not errored)
     let result = svc
-        .import_mrpack(&paths, &mrpack, &loader_svc, &java_svc, tx, token, JobId(5))
+        .import_mrpack(&paths, &mrpack, &mojang_svc, &loader_svc, &java_svc, tx, token, JobId(5))
         .await;
 
     let manifest = result.expect("traversal-skipping import must succeed");

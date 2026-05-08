@@ -133,6 +133,8 @@ async fn live_import_pinned_modpack() {
         mineltui::loader::service::LoaderService::new().expect("LoaderService::new");
     let java_svc =
         mineltui::java::service::JavaService::new().expect("JavaService::new");
+    let mojang_svc =
+        mineltui::mojang::client::MojangClient::new().expect("MojangClient::new");
 
     let (tx, mut rx) = mpsc::channel::<mineltui::tasks::TaskEvent>(256);
 
@@ -154,6 +156,7 @@ async fn live_import_pinned_modpack() {
         .import_mrpack(
             &paths,
             &mrpack_path,
+            &mojang_svc,
             &loader_svc,
             &java_svc,
             tx,
