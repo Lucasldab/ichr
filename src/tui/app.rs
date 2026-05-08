@@ -1491,57 +1491,77 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             let chosen = &versions[real_idx];
             let chosen_version = chosen.version.clone();
 
-            // Same version already installed — no-op.
-            if current_version.as_deref() == Some(&chosen_version) {
-                return vec![];
+            // Look up the currently installed loader for this instance, regardless
+            // of kind. The `current_version` plumbed through from the version picker
+            // is filtered by target kind (used only for the same-kind in-picker
+            // "← currently installed" hint), so it is None for cross-kind switches
+            // and cannot be used to detect that the user is switching loader TYPE.
+            // Compute installed_loader fresh here so cross-kind switches still trip
+            // the WARNING confirm modal (UAT Check 5 regression — major).
+            let installed_loader: Option<(crate::domain::instance::ModloaderKind, String)> =
+                state.instances.iter()
+                    .find(|m| m.slug == slug)
+                    .and_then(|m| m.loader.as_ref())
+                    .map(|l| (l.kind, l.version.clone()));
+
+            let target_kind = match loader_type {
+                LoaderType::Fabric => crate::domain::instance::ModloaderKind::Fabric,
+                LoaderType::Quilt => crate::domain::instance::ModloaderKind::Quilt,
+                LoaderType::Forge => crate::domain::instance::ModloaderKind::Forge,
+                LoaderType::NeoForge => crate::domain::instance::ModloaderKind::NeoForge,
+            };
+
+            // Same exact loader+version already installed — no-op (also covers the
+            // historical `current_version.as_deref() == Some(&chosen_version)` case).
+            if let Some((installed_kind, ref installed_ver)) = installed_loader {
+                if installed_kind == target_kind && installed_ver == &chosen_version {
+                    return vec![];
+                }
             }
 
-            // Get mc_version from instances.
             let mc_version = state.instances.iter()
                 .find(|m| m.slug == slug)
                 .map(|m| m.mc_version_id.clone())
                 .unwrap_or_default();
 
-            if current_version.is_some() {
-                // Different version / switching — show confirm dialog.
-                let loader_kind = match loader_type {
-                    LoaderType::Fabric => crate::domain::instance::ModloaderKind::Fabric,
-                    LoaderType::Quilt => crate::domain::instance::ModloaderKind::Quilt,
-                    LoaderType::Forge => crate::domain::instance::ModloaderKind::Forge,
-                    LoaderType::NeoForge => crate::domain::instance::ModloaderKind::NeoForge,
-                };
-                let from_label = current_version
-                    .as_deref()
-                    .map(|v| loader_label_short(loader_kind, v));
-                let to_label = loader_label_short(loader_kind, &chosen_version);
-                // type_switch is false because we are in the version picker for a specific type.
-                state.active_view = ActiveView::LoaderSwitchConfirm {
-                    slug,
-                    from_loader: from_label,
-                    to_loader: to_label,
-                    type_switch: false,
-                };
-                vec![]
-            } else {
-                // No existing loader — emit install effect and show progress.
-                state.active_view = ActiveView::LoaderInstallProgressModal {
-                    slug: slug.clone(),
-                    loader: loader_type,
-                    version: chosen_version.clone(),
-                    step_label: "Fetching meta".into(),
-                    step_index: 1,
-                    step_total: 4,
-                    bytes_done: 0,
-                    bytes_total: 0,
-                    cancel_token_key: slug.clone(),
-                    log_tail: String::new(),
-                };
-                vec![Effect::InstallLoader {
-                    slug,
-                    loader_type,
-                    mc_version,
-                    loader_version: chosen_version,
-                }]
+            match installed_loader {
+                Some((installed_kind, installed_ver)) => {
+                    // Switching — same kind (different version) OR cross-kind (TYPE switch).
+                    // type_switch flips on cross-kind to render the red WARNING line in
+                    // LoaderSwitchConfirm (loader_switch_confirm.rs:25 conditional).
+                    let type_switch = installed_kind != target_kind;
+                    let from_label = Some(loader_label_short(installed_kind, &installed_ver));
+                    let to_label = loader_label_short(target_kind, &chosen_version);
+                    state.active_view = ActiveView::LoaderSwitchConfirm {
+                        slug,
+                        from_loader: from_label,
+                        to_loader: to_label,
+                        type_switch,
+                    };
+                    let _ = current_version; // intentionally unused after fix; kept on the picker for the in-modal `← currently installed` hint
+                    vec![]
+                }
+                None => {
+                    // Vanilla instance, no installed loader — emit install effect directly.
+                    state.active_view = ActiveView::LoaderInstallProgressModal {
+                        slug: slug.clone(),
+                        loader: loader_type,
+                        version: chosen_version.clone(),
+                        step_label: "Fetching meta".into(),
+                        step_index: 1,
+                        step_total: 4,
+                        bytes_done: 0,
+                        bytes_total: 0,
+                        cancel_token_key: slug.clone(),
+                        log_tail: String::new(),
+                    };
+                    vec![Effect::InstallLoader {
+                        slug,
+                        loader_type,
+                        mc_version,
+                        loader_version: chosen_version,
+                    }]
+                }
             }
         }
         Action::LoaderVersionPickerCancel => {
@@ -3134,6 +3154,91 @@ mod tests {
             other => panic!("expected InstallLoader, got {other:?}"),
         }
         assert!(matches!(s.active_view, ActiveView::LoaderInstallProgressModal { .. }));
+    }
+
+    /// Phase 6 UAT Check 5 regression pin: when an instance has Fabric installed
+    /// and the user picks a Quilt version, the LoaderSwitchConfirm must surface
+    /// `type_switch: true` so the red WARNING line renders. Prior bug: the
+    /// version-picker plumbed `current_version` was filtered by target kind, so
+    /// a cross-kind switch saw `current_version: None` and dropped to the direct
+    /// install branch — bypassing the safety warning entirely.
+    #[test]
+    fn test_loader_version_select_cross_kind_emits_warning_confirm() {
+        let mut s = vanilla_state_with("ti", "1.21.4");
+        // Install Fabric on the instance.
+        s.instances[0].loader = Some(crate::loader::types::LoaderInfo {
+            kind: crate::domain::instance::ModloaderKind::Fabric,
+            version: "0.16.9".into(),
+            version_id: "fabric-loader-0.16.9-1.21.4".into(),
+        });
+        // Open Quilt version picker — current_version is None because the picker
+        // filters by target kind (Quilt) and the installed kind is Fabric.
+        s.active_view = ActiveView::LoaderVersionPickerModal {
+            slug: "ti".into(), loader: LoaderType::Quilt,
+            versions: fab_versions(3), filter_stable_only: false,
+            search: String::new(), selected: 0, current_version: None,
+        };
+        let effects = update(&mut s, Action::LoaderVersionSelect);
+        assert!(effects.is_empty(),
+            "cross-kind switch must NOT emit InstallLoader directly; it must show the WARNING confirm first");
+        match &s.active_view {
+            ActiveView::LoaderSwitchConfirm { from_loader, to_loader, type_switch, .. } => {
+                assert!(*type_switch,
+                    "cross-kind switch (Fabric → Quilt) MUST set type_switch: true so the red WARNING line renders (UAT Check 5)");
+                assert_eq!(from_loader.as_deref(), Some("fabric:0.16.9"),
+                    "from_loader must reflect the actually-installed loader, not the target-kind filter");
+                assert!(to_loader.starts_with("quilt:"),
+                    "to_loader must reflect the chosen target: {to_loader}");
+            }
+            other => panic!("expected LoaderSwitchConfirm with type_switch: true, got {other:?}"),
+        }
+    }
+
+    /// Same-kind different-version switch: confirm shows but type_switch stays false
+    /// (no red WARNING). Pins the non-warning branch of the 3-way decision.
+    #[test]
+    fn test_loader_version_select_same_kind_diff_version_confirm_no_warning() {
+        let mut s = vanilla_state_with("ti", "1.21.4");
+        s.instances[0].loader = Some(crate::loader::types::LoaderInfo {
+            kind: crate::domain::instance::ModloaderKind::Fabric,
+            version: "0.16.5".into(),
+            version_id: "fabric-loader-0.16.5-1.21.4".into(),
+        });
+        s.active_view = ActiveView::LoaderVersionPickerModal {
+            slug: "ti".into(), loader: LoaderType::Fabric,
+            versions: fab_versions(3), filter_stable_only: false,
+            search: String::new(), selected: 1, current_version: Some("0.16.5".into()),
+        };
+        let effects = update(&mut s, Action::LoaderVersionSelect);
+        assert!(effects.is_empty(), "same-kind diff-version must show confirm, not install directly");
+        match &s.active_view {
+            ActiveView::LoaderSwitchConfirm { type_switch, .. } => {
+                assert!(!*type_switch, "same-kind switch must NOT set type_switch (no WARNING)");
+            }
+            other => panic!("expected LoaderSwitchConfirm, got {other:?}"),
+        }
+    }
+
+    /// Same-kind same-version (already installed) is a no-op. Pins that the new
+    /// 3-way logic preserves the original short-circuit.
+    #[test]
+    fn test_loader_version_select_already_installed_is_noop() {
+        let mut s = vanilla_state_with("ti", "1.21.4");
+        s.instances[0].loader = Some(crate::loader::types::LoaderInfo {
+            kind: crate::domain::instance::ModloaderKind::Fabric,
+            version: "0.16.0".into(),
+            version_id: "fabric-loader-0.16.0-1.21.4".into(),
+        });
+        s.active_view = ActiveView::LoaderVersionPickerModal {
+            slug: "ti".into(), loader: LoaderType::Fabric,
+            versions: fab_versions(3), filter_stable_only: false,
+            search: String::new(), selected: 0, current_version: Some("0.16.0".into()),
+        };
+        let prev_view = s.active_view.clone();
+        let effects = update(&mut s, Action::LoaderVersionSelect);
+        assert!(effects.is_empty(), "already-installed must be no-op");
+        assert!(matches!(&s.active_view, ActiveView::LoaderVersionPickerModal { .. }),
+            "already-installed must leave active_view unchanged: was {prev_view:?}, now {:?}", s.active_view);
     }
 
     #[test]
