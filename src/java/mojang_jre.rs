@@ -554,6 +554,10 @@ mod tests {
         b"fixture-java-bin\n"
     }
 
+    // Used only by the linux-only + unix-only tests below
+    // (test_install_extracts_file_with_sha1_verify, test_install_symlink_on_linux).
+    // On Windows both callers are gated off → helper is dead. Match scope.
+    #[cfg(unix)]
     fn make_manifest_body(server_base: &str) -> String {
         let sha1 = crate::mojang::cache::sha1_hex_of_bytes(fixture_bytes());
         let template = include_str!("../../tests/fixtures/java/mojang_variant_manifest.json");
