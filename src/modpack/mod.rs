@@ -11,16 +11,22 @@
 //!   `MOD_DOWNLOAD_CONCURRENCY` and `download_one_with_hash_algo` from
 //!   `crate::mods::installer`).
 //!
-//! Plans 10-04 (`overrides.rs`) and 10-05 (`service.rs`) will add further sub-modules.
+//! - `overrides` — `apply_overrides` two-pass zip extractor (`overrides/` then
+//!   `client-overrides/`), path-traversal-guarded via `crate::util::safe_zip`
+//!   (Plan 10-04).
+//!
+//! Plan 10-05 (`service.rs`) will add the import-orchestration façade.
 
 pub mod download;
 pub mod error;
+pub mod overrides;
 pub mod parse;
 
 pub use download::{
     download_files, filter_files_for_client, is_url_allowlisted, MODPACK_ALLOWLIST,
 };
 pub use error::ModpackError;
+pub use overrides::apply_overrides;
 pub use parse::{
     detect_loader, parse_index, should_download_for_client, strip_leading_dot_slash,
     EnvRequirement, MrpackEnv, MrpackFile, MrpackHashes, MrpackIndex,
