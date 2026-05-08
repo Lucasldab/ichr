@@ -83,6 +83,9 @@ pub enum AppError {
     #[error("CurseForge error: {0}")]
     CurseForge(#[from] crate::mods::curseforge::error::CurseForgeError),
 
+    #[error("Modpack error: {0}")]
+    Modpack(#[from] crate::modpack::error::ModpackError),
+
     #[error("No active account — add a Microsoft account or launch in offline mode")]
     NoActiveAccount,
 }
