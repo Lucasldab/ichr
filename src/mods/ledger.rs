@@ -29,7 +29,7 @@ use std::sync::{Arc, OnceLock};
 use tokio::sync::Mutex;
 
 use crate::mods::error::ModrinthError;
-use crate::mods::filter::{disabled_filename, is_safe_mod_filename};
+use crate::mods::filter::{disabled_filename, is_safe_mod_filename, is_safe_pack_filename};
 use crate::mods::types::{InstalledModRow, Ledger};
 use crate::persistence::paths::AppPaths;
 
@@ -124,6 +124,38 @@ pub async fn upsert_mod(
 ) -> Result<(), ModrinthError> {
     // V5 input validation: never accept a mod row with an unsafe filename.
     if !is_safe_mod_filename(&row.file_name) {
+        return Err(io_err(format!("unsafe ledger filename: {}", row.file_name)));
+    }
+    let lock = per_instance_lock(slug);
+    let _guard = lock.lock().await;
+
+    let mut ledger = read_ledger(paths, slug).await?;
+    if let Some(existing) = ledger.mods.iter_mut().find(|m| m.mod_id == row.mod_id) {
+        *existing = row;
+    } else {
+        ledger.mods.push(row);
+    }
+    write_ledger(paths, slug, &ledger).await
+}
+
+/// Insert or replace a pack row in the per-instance ledger.
+/// Mirrors `upsert_mod` exactly — same per-instance lock, same read→mutate→write,
+/// same replace-on-mod_id semantics — but validates filename via
+/// `is_safe_pack_filename` (which accepts `.zip` instead of `.jar`).
+/// Per 11-RESEARCH.md §"Upsert Validation Gate" + Researcher Q4 (keep
+/// ledger logic together).
+#[tracing::instrument(
+    name = "packs::upsert_pack",
+    skip_all,
+    fields(slug = %slug, mod_id = %row.mod_id, kind = ?row.kind)
+)]
+pub async fn upsert_pack(
+    paths: &AppPaths,
+    slug: &str,
+    row: InstalledModRow,
+) -> Result<(), ModrinthError> {
+    // V5 input validation — pack flavor (.zip + SPACE allowed).
+    if !is_safe_pack_filename(&row.file_name) {
         return Err(io_err(format!("unsafe ledger filename: {}", row.file_name)));
     }
     let lock = per_instance_lock(slug);
@@ -265,6 +297,7 @@ pub async fn uninstall(paths: &AppPaths, slug: &str, mod_id: &str) -> Result<(),
 mod tests {
     use super::*;
     use crate::mods::types::{HashAlgo, InstalledItemKind, InstalledModRow, ModSource};
+    use super::upsert_pack;
     use tempfile::TempDir;
 
     fn test_paths(td: &TempDir) -> AppPaths {
@@ -538,6 +571,112 @@ mod tests {
         assert!(
             !Arc::ptr_eq(&a1, &b),
             "different slugs must yield different Arcs"
+        );
+    }
+
+    // --- upsert_pack ---------------------------------------------------------
+
+    fn mk_pack_row(mod_id: &str, file_name: &str, kind: InstalledItemKind) -> InstalledModRow {
+        InstalledModRow {
+            mod_id: mod_id.into(),
+            project_slug: "faithful-32x".into(),
+            display_name: "Faithful 32x".into(),
+            version_id: "v1".into(),
+            version_label: "1.0".into(),
+            file_name: file_name.into(),
+            sha512: "deadbeef".into(),
+            size: 10 * 1024 * 1024,
+            hash_algo: HashAlgo::Sha1,
+            kind,
+            source: ModSource::Local,
+            enabled: true,
+            installed_at: "2026-05-08T00:00:00Z".into(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_upsert_pack_writes_zip_filename_row() {
+        let td = TempDir::new().unwrap();
+        let paths = test_paths(&td);
+        let row = mk_pack_row("pack:abc", "Faithful 32x.zip", InstalledItemKind::ResourcePack);
+        upsert_pack(&paths, "x", row).await.unwrap();
+        let l = read_ledger(&paths, "x").await.unwrap();
+        assert_eq!(l.mods.len(), 1);
+        assert_eq!(l.mods[0].file_name, "Faithful 32x.zip");
+        assert_eq!(l.mods[0].kind, InstalledItemKind::ResourcePack);
+    }
+
+    #[tokio::test]
+    async fn test_upsert_pack_rejects_jar_filename() {
+        let td = TempDir::new().unwrap();
+        let paths = test_paths(&td);
+        let bad = mk_pack_row("pack:abc", "sodium.jar", InstalledItemKind::ResourcePack);
+        let r = upsert_pack(&paths, "x", bad).await;
+        assert!(matches!(r, Err(ModrinthError::Io(_))), "got {r:?}");
+        // Error message must mention "unsafe ledger filename".
+        if let Err(ModrinthError::Io(e)) = r {
+            assert!(
+                e.to_string().contains("unsafe ledger filename"),
+                "message: {e}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_upsert_pack_rejects_path_traversal() {
+        let td = TempDir::new().unwrap();
+        let paths = test_paths(&td);
+        let bad = mk_pack_row("pack:abc", "../escape.zip", InstalledItemKind::Shader);
+        let r = upsert_pack(&paths, "x", bad).await;
+        assert!(matches!(r, Err(ModrinthError::Io(_))), "got {r:?}");
+    }
+
+    #[tokio::test]
+    async fn test_upsert_pack_replaces_row_on_same_mod_id() {
+        let td = TempDir::new().unwrap();
+        let paths = test_paths(&td);
+        let row1 = mk_pack_row("pack:abc", "OldPack.zip", InstalledItemKind::ResourcePack);
+        let mut row2 = mk_pack_row("pack:abc", "NewPack.zip", InstalledItemKind::ResourcePack);
+        row2.display_name = "New Faithful".into();
+
+        upsert_pack(&paths, "x", row1).await.unwrap();
+        upsert_pack(&paths, "x", row2).await.unwrap();
+
+        let l = read_ledger(&paths, "x").await.unwrap();
+        // Same mod_id → replace, NOT append.
+        assert_eq!(l.mods.len(), 1, "must replace, not append");
+        assert_eq!(l.mods[0].file_name, "NewPack.zip");
+    }
+
+    #[tokio::test]
+    async fn test_upsert_pack_coexists_with_upsert_mod() {
+        let td = TempDir::new().unwrap();
+        let paths = test_paths(&td);
+
+        // Insert a mod row via upsert_mod.
+        upsert_mod(&paths, "x", mk_row("mod:m1", "sodium.jar", true))
+            .await
+            .unwrap();
+
+        // Insert a pack row via upsert_pack.
+        let pack =
+            mk_pack_row("pack:p1", "Faithful 32x.zip", InstalledItemKind::ResourcePack);
+        upsert_pack(&paths, "x", pack).await.unwrap();
+
+        let l = read_ledger(&paths, "x").await.unwrap();
+        assert_eq!(l.mods.len(), 2, "both rows present");
+
+        let mod_row = l.mods.iter().find(|m| m.mod_id == "mod:m1").unwrap();
+        let pack_row = l.mods.iter().find(|m| m.mod_id == "pack:p1").unwrap();
+        assert_eq!(mod_row.kind, InstalledItemKind::Mod);
+        assert_eq!(pack_row.kind, InstalledItemKind::ResourcePack);
+        assert!(
+            mod_row.file_name.ends_with(".jar"),
+            "mod row still .jar"
+        );
+        assert!(
+            pack_row.file_name.ends_with(".zip"),
+            "pack row is .zip"
         );
     }
 }
