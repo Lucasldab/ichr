@@ -1,0 +1,87 @@
+# PR-time CI matrix: fmt + clippy + tests on Linux & Windows.
+#
+# Triggered on push to main and on every pull request.
+# This workflow is COMPLEMENTARY to .github/workflows/release.yml
+# (cargo-dist generated, tag-push triggered). cargo-dist's release
+# workflow only runs at release time, so this workflow is the
+# pre-release gate for cross-platform regressions.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      # Auto-installs the toolchain pinned in rust-toolchain.toml (1.88).
+      # Caches the registry + target/ across runs.
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt, clippy
+          cache: true
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: cargo nextest run
+        run: cargo nextest run --profile ci
+
+  metadata:
+    name: dist metadata regression guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+
+      # Free regression guard: validates Cargo.toml [package] metadata
+      # is sufficient for crates.io publish, without actually publishing.
+      # Catches missing repository / homepage / readme / categories
+      # before they become a release blocker.
+      - name: cargo publish --dry-run
+        run: cargo publish --dry-run --allow-dirty
+
+      # MSRV drift guard: rust-toolchain.toml's `channel` must match
+      # Cargo.toml's [package].rust-version. If a contributor bumps
+      # one without the other, downstream consumers of `cargo install`
+      # see a confusing "expected X, got Y" error. Catch it at PR time.
+      - name: rust-toolchain.toml and Cargo.toml MSRV parity
+        run: |
+          TC=$(grep -E '^channel' rust-toolchain.toml | cut -d'"' -f2)
+          RV=$(grep -E '^rust-version' Cargo.toml | cut -d'"' -f2)
+          echo "rust-toolchain.toml channel: $TC"
+          echo "Cargo.toml rust-version:     $RV"
+          if [ "$TC" != "$RV" ]; then
+            echo "MSRV drift detected -- these must stay in sync"
+            exit 1
+          fi
+          echo "MSRV parity OK ($TC)"
