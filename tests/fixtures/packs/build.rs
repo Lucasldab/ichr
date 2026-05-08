@@ -11,8 +11,7 @@
 //     minimal shader pack `.zip` with shaders/composite.fsh + shaders.properties.
 //   - `sha1_hex_of` — compute real SHA-1 hex from bytes (for hash verification).
 //
-// Uses the synchronous `zip` crate per CLAUDE.md: "synchronous — modpack
-// extract is not the hot path".
+// Uses the synchronous `zip` crate — modpack extract is not on the hot path.
 
 use std::io::Write as _;
 use std::path::Path;

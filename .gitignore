@@ -1,8 +1,5 @@
 # Planning / workflow artifacts — kept local
 .planning/
-.claude/
-CLAUDE.md
-AGENTS.md
 
 # Rust
 /target
