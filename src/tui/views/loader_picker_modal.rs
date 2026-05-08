@@ -1,4 +1,4 @@
-//! Loader picker modal — None / Fabric / Quilt selector.
+//! Loader picker modal -- None / Fabric / Quilt selector.
 //!
 //! Mirrors `java_picker_modal.rs`. Three rows; footer hint; REVERSED for
 //! selected, DIM for others.
@@ -12,7 +12,7 @@ use ratatui::Frame;
 use crate::tui::app::{Action, ActiveView, AppState};
 
 const ROW_LABELS: [&str; 5] = [
-    "None (vanilla — remove installed loader)",
+    "None (vanilla -- remove installed loader)",
     "Fabric Loader ▶",
     "Quilt Loader ▶",
     "Forge ▶",
@@ -40,7 +40,7 @@ pub fn render_loader_picker_modal(f: &mut Frame, area: Rect, state: &AppState) {
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(format!(" Install Loader — {slug} "));
+        .title(format!(" Install Loader -- {slug} "));
     let inner = block.inner(modal_area);
     f.render_widget(block, modal_area);
 

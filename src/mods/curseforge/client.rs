@@ -4,7 +4,7 @@
 //!
 //!   - `x-api-key` header on default_headers (NEVER per-request, NEVER in URL)
 //!   - integer `modLoaderType` enum filter (NOT a string list)
-//!   - nullable `downloadUrl` — `get_file_download_url` returns Ok(None) on 403/404
+//!   - nullable `downloadUrl` -- `get_file_download_url` returns Ok(None) on 403/404
 //!   - SHA-1 (CurseForge default) instead of SHA-512
 //!
 //! The api key value is **never** logged. Tracing instruments use
@@ -101,7 +101,7 @@ impl CurseForgeClient {
 
     // --- Endpoints -----------------------------------------------------------
 
-    /// `GET /v1/mods/search` — project search.
+    /// `GET /v1/mods/search` -- project search.
     ///
     /// 09-RESEARCH.md §Endpoint #1.
     #[tracing::instrument(skip_all, fields(query, mc, loader_type, page_size))]
@@ -136,7 +136,7 @@ impl CurseForgeClient {
         Ok(env.data)
     }
 
-    /// `GET /v1/mods/{modId}` — single mod detail.
+    /// `GET /v1/mods/{modId}` -- single mod detail.
     ///
     /// 09-RESEARCH.md §Endpoint #2. 404 → `CurseForgeError::ModNotFound`.
     #[tracing::instrument(skip_all, fields(mod_id))]
@@ -171,7 +171,7 @@ impl CurseForgeClient {
         Ok(env.data)
     }
 
-    /// `GET /v1/mods/{modId}/files` — file list (versions).
+    /// `GET /v1/mods/{modId}/files` -- file list (versions).
     ///
     /// 09-RESEARCH.md §Endpoint #3.
     #[tracing::instrument(skip_all, fields(mod_id, mc, loader_type))]
@@ -201,7 +201,7 @@ impl CurseForgeClient {
         Ok(env.data)
     }
 
-    /// `GET /v1/mods/{modId}/files/{fileId}/download-url` — fetch download URL.
+    /// `GET /v1/mods/{modId}/files/{fileId}/download-url` -- fetch download URL.
     ///
     /// 09-RESEARCH.md §Endpoint #4. 403/404 → `Ok(None)` (file restricted; the
     /// installer composes the FileNotDownloadable error with the web URL).
@@ -223,7 +223,7 @@ impl CurseForgeClient {
             .await
             .map_err(|e| CurseForgeError::Http(format!("GET {url}: {e}")))?;
 
-        // 403/404 means restricted — let the installer compose the
+        // 403/404 means restricted -- let the installer compose the
         // FileNotDownloadable error with the web URL. We DO NOT raise here.
         // Per 09-RESEARCH.md §"Endpoint #4" line 141.
         if resp.status() == reqwest::StatusCode::NOT_FOUND
@@ -278,7 +278,7 @@ impl CurseForgeClient {
 
 /// Parse 429 response into `CurseForgeError::RateLimited`.
 /// Falls back to 60s if Retry-After is absent or unparseable. Per Pitfall 7
-/// (09-RESEARCH.md line 972) v1 surfaces only — no auto-retry.
+/// (09-RESEARCH.md line 972) v1 surfaces only -- no auto-retry.
 fn rate_limit_from(resp: &reqwest::Response) -> CurseForgeError {
     let secs = resp
         .headers()
@@ -292,7 +292,7 @@ fn rate_limit_from(resp: &reqwest::Response) -> CurseForgeError {
 }
 
 // ============================================================================
-// === Tests (httpmock 0.8.3 — already in [dev-dependencies])              ===
+// === Tests (httpmock 0.8.3 -- already in [dev-dependencies])              ===
 // ============================================================================
 #[cfg(test)]
 mod tests {

@@ -1,12 +1,12 @@
-//! Pure CurseForge filter mapping — no I/O.
+//! Pure CurseForge filter mapping -- no I/O.
 //!
 //! Maps ichr's `LoaderInfo` to CurseForge's `ModLoaderType` integer enum.
 //!
-//! **Pitfall 4 (09-RESEARCH.md line 954) — DO NOT confuse with Modrinth's
+//! **Pitfall 4 (09-RESEARCH.md line 954) -- DO NOT confuse with Modrinth's
 //! string enum.** CurseForge's enum is:
 //!   1 = Forge
-//!   2 = Cauldron (legacy — not in ichr's ModloaderKind)
-//!   3 = LiteLoader (legacy — not in ichr's ModloaderKind)
+//!   2 = Cauldron (legacy -- not in ichr's ModloaderKind)
+//!   3 = LiteLoader (legacy -- not in ichr's ModloaderKind)
 //!   4 = Fabric
 //!   5 = Quilt
 //!   6 = NeoForge
@@ -25,7 +25,7 @@ use crate::domain::instance::ModloaderKind;
 use crate::loader::types::LoaderInfo;
 
 /// Map ichr loader to CurseForge's ModLoaderType integer enum.
-/// Returns `None` for `Vanilla` — caller omits the `modLoaderType` query param.
+/// Returns `None` for `Vanilla` -- caller omits the `modLoaderType` query param.
 pub fn curseforge_loader_type(loader: Option<&LoaderInfo>) -> Option<i32> {
     match loader.map(|l| l.kind) {
         None | Some(ModloaderKind::Vanilla) => None,
@@ -73,7 +73,7 @@ mod tests {
 
     #[test]
     fn test_quilt_returns_five_not_expanded_to_fabric() {
-        // Per 09-RESEARCH.md Pattern 3 lines 808-816 — CurseForge has no
+        // Per 09-RESEARCH.md Pattern 3 lines 808-816 -- CurseForge has no
         // "include both" mechanism, so Quilt instances query modLoaderType=5
         // ONLY (unlike Modrinth where Quilt expands to ["fabric", "quilt"]).
         let l = loader(ModloaderKind::Quilt);

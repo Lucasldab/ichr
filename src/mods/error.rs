@@ -18,7 +18,7 @@ pub enum ModrinthError {
     #[error("Modrinth response parse failed: {0}")]
     Parse(String),
 
-    /// SHA-512 verification of a downloaded mod file failed (Pitfall 3 — case-insensitive compare).
+    /// SHA-512 verification of a downloaded mod file failed (Pitfall 3 -- case-insensitive compare).
     /// UI-SPEC line 676: "Downloaded file SHA-512 did not match Modrinth's manifest".
     #[error("SHA-512 mismatch for {url}: expected {expected}, got {got}")]
     Sha512Mismatch {
@@ -50,9 +50,9 @@ pub enum ModrinthError {
     #[error("Failed to parse installed-mods.toml: {0}")]
     LedgerParse(String),
 
-    /// Modrinth returned 429 — rate limit (300 req/min anonymous).
+    /// Modrinth returned 429 -- rate limit (300 req/min anonymous).
     /// v1 surfaces only; no auto-retry per 08-RESEARCH.md line 174.
-    #[error("Modrinth rate limit hit — retry after {retry_after_secs}s")]
+    #[error("Modrinth rate limit hit -- retry after {retry_after_secs}s")]
     RateLimited { retry_after_secs: u64 },
 
     /// Defensive (Pitfall 5): mod file URL is null/empty/non-HTTPS.

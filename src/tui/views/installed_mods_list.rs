@@ -1,4 +1,4 @@
-//! Installed mods list — full-screen 4-column table of mods in an instance.
+//! Installed mods list -- full-screen 4-column table of mods in an instance.
 //!
 //! Source: 08-UI-SPEC.md §"Installed Mods List" lines 326-365.
 //! Mirrors `instance_list.rs` (Table widget + REVERSED selection +
@@ -24,8 +24,8 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
     };
 
     if mods.is_empty() {
-        // UI-SPEC line 365 — empty-state copy, DIM, single line.
-        let p = Paragraph::new("No mods installed — press Esc and M to browse")
+        // UI-SPEC line 365 -- empty-state copy, DIM, single line.
+        let p = Paragraph::new("No mods installed -- press Esc and M to browse")
             .style(
                 Style::default()
                     .fg(Color::DarkGray)
@@ -34,7 +34,7 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(format!("Installed Mods — {slug}  (e/x/Esc)")),
+                    .title(format!("Installed Mods -- {slug}  (e/x/Esc)")),
             );
         f.render_widget(p, area);
         return;
@@ -44,7 +44,7 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
         .iter()
         .enumerate()
         .map(|(i, m)| {
-            // Source cell — short tags for body sources (Phase 9 09-07
+            // Source cell -- short tags for body sources (Phase 9 09-07
             // Pitfall 10 visual disambiguator: `[M]` Modrinth, `[CF]` CurseForge);
             // DIM long-form for the rare manual/modpack paths.
             let (source_label, source_style) = match m.source {
@@ -69,7 +69,7 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
                         .add_modifier(Modifier::DIM),
                 ),
             };
-            // State cell — body for enabled, DIM for disabled.
+            // State cell -- body for enabled, DIM for disabled.
             let (state_label, state_style) = if m.enabled {
                 ("enabled", Style::default())
             } else {
@@ -109,7 +109,7 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
     .block(
         Block::default()
             .borders(Borders::ALL)
-            .title(format!("Installed Mods — {slug}  (e/x/Esc)")),
+            .title(format!("Installed Mods -- {slug}  (e/x/Esc)")),
     );
     f.render_widget(table, area);
 }

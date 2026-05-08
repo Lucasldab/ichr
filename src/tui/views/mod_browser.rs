@@ -1,17 +1,17 @@
-//! Mod browser — full-screen split-pane Modrinth browser.
+//! Mod browser -- full-screen split-pane Modrinth browser.
 //!
 //! Source: 08-UI-SPEC.md §"Mod Browser" lines 172-251 (layout, copy,
 //! palette). j/k disambiguation pattern mirrored from
 //! `loader_version_picker_modal.rs:139-143`.
 //!
 //! Layout:
-//!  - Length(3) header — block title + filter chips
-//!  - Length(3) search bar — ratatui-textarea single-line input
-//!  - Min(1)   body — Percentage(40)/Percentage(60) horizontal split
-//!  - Length(1) footer — DIM keybind hint
+//!  - Length(3) header -- block title + filter chips
+//!  - Length(3) search bar -- ratatui-textarea single-line input
+//!  - Min(1)   body -- Percentage(40)/Percentage(60) horizontal split
+//!  - Length(1) footer -- DIM keybind hint
 //!
 //! NOTE: this view OWNS the search-input rendering but DOES NOT own a
-//! `TextArea` instance — `state.active_view` carries the search String
+//! `TextArea` instance -- `state.active_view` carries the search String
 //! (single source of truth), and we render it directly with the same
 //! Yellow/DarkGray palette established by `loader_version_picker_modal.rs`.
 //! Rationale: integrating ratatui-textarea would force the search String
@@ -99,7 +99,7 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
     };
 
     let header_line = Line::from(vec![
-        Span::styled(format!("Mods — {slug}    "), Style::default()),
+        Span::styled(format!("Mods -- {slug}    "), Style::default()),
         Span::styled(format!("[{mc_chip_text}]"), mc_chip_style),
         Span::raw("  "),
         Span::styled(format!("[{loader_chip_text}]"), loader_chip_style),
@@ -107,7 +107,7 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
     let header_para = Paragraph::new(header_line).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(format!(" Mods — {slug} ")),
+            .title(format!(" Mods -- {slug} ")),
     );
     f.render_widget(header_para, chunks[0]);
 
@@ -127,7 +127,7 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
         Style::default().fg(Color::Yellow)
     };
     // GAP-FOCUS-INDICATOR-08 (Phase 8.2): Yellow border signals the search
-    // input is the focused widget — distinguishes the input from passive
+    // input is the focused widget -- distinguishes the input from passive
     // surrounding panes (header / results / detail / footer) regardless of
     // whether the buffer is empty. Mirrors the established Yellow=active
     // palette already used by the chip styles and the inner Paragraph.
@@ -157,7 +157,7 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
     );
 
     // ---- Footer hint (DIM) ----
-    // UI-SPEC §"Mod Browser" line 249 — extended with `Backspace clear` when search non-empty.
+    // UI-SPEC §"Mod Browser" line 249 -- extended with `Backspace clear` when search non-empty.
     let footer_text = if search.is_empty() {
         "↑/k ↓/j  Enter install  v MC-filter  l loader-filter  Esc back".to_string()
     } else {
@@ -182,7 +182,7 @@ fn render_results_pane(
     // Loading / error / empty single-line states (UI-SPEC lines 226-231).
     let placeholder = match fetch_state {
         ModBrowserFetchState::Loading => Some("Searching Modrinth..."),
-        ModBrowserFetchState::Error(_) => Some("Failed to reach Modrinth — check network"),
+        ModBrowserFetchState::Error(_) => Some("Failed to reach Modrinth -- check network"),
         ModBrowserFetchState::Ready if results.is_empty() => Some("No mods found"),
         ModBrowserFetchState::Ready => None,
     };
@@ -262,7 +262,7 @@ fn render_detail_pane(
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    // Empty state (no hit selected) — UI-SPEC line 244-246.
+    // Empty state (no hit selected) -- UI-SPEC line 244-246.
     if selected_hit.is_none() {
         let p = Paragraph::new("Select a mod to see details").style(
             Style::default()
@@ -295,7 +295,7 @@ fn render_detail_pane(
         )));
         lines.push(divider_line(inner.width));
         // Wrap the body across multiple lines via Paragraph::wrap() applied
-        // separately below — for now push the raw body then break out.
+        // separately below -- for now push the raw body then break out.
         lines.push(Line::raw(d.body.clone()));
         lines.push(Line::raw(""));
         lines.push(Line::raw(format!("Downloads: {}", thousands(d.downloads))));
@@ -321,7 +321,7 @@ fn render_detail_pane(
         if let ModBrowserFetchState::Error(_) = fetch_state {
             lines.push(Line::raw(""));
             lines.push(Line::from(Span::styled(
-                "Could not load details — check network".to_string(),
+                "Could not load details -- check network".to_string(),
                 Style::default()
                     .fg(Color::DarkGray)
                     .add_modifier(Modifier::DIM),
@@ -350,7 +350,7 @@ fn truncate(s: &str, max_w: usize) -> String {
 }
 
 /// Format a number with thousands separators using comma grouping
-/// (UI-SPEC line 686 — `312,448,221`).
+/// (UI-SPEC line 686 -- `312,448,221`).
 fn thousands(n: u64) -> String {
     let s = n.to_string();
     let bytes = s.as_bytes();
@@ -424,7 +424,7 @@ pub fn map_mod_browser_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             ..
         }) => Some(Action::ModBrowserOpenVersions),
         // Filter chip toggles (only fire when search is empty, otherwise letters
-        // type into the search input — matches UI-SPEC §Keybind Contract).
+        // type into the search input -- matches UI-SPEC §Keybind Contract).
         CtEvent::Key(KeyEvent {
             code: KeyCode::Char('v'),
             modifiers,

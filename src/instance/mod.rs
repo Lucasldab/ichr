@@ -1,7 +1,7 @@
 //! Instance CRUD primitives.
 //!
-//! - `slug` — name → slug conversion + collision resolution
-//! - `store` — read / write / list `instance.json` on disk
+//! - `slug` -- name → slug conversion + collision resolution
+//! - `store` -- read / write / list `instance.json` on disk
 //!
 //! Full create/clone/delete orchestration lives in the `services` layer
 //! (plan 02-05) and depends on this module.

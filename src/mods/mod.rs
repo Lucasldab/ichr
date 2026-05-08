@@ -1,4 +1,4 @@
-//! Modrinth integration — search, dependency resolution, mod install/uninstall,
+//! Modrinth integration -- search, dependency resolution, mod install/uninstall,
 //! per-instance mod ledger.
 //! See `.planning/phases/08-modrinth-integration/08-RESEARCH.md`.
 

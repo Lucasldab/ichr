@@ -1,10 +1,10 @@
-//! Java runtime facade — single entry point for JRE resolution, installation,
+//! Java runtime facade -- single entry point for JRE resolution, installation,
 //! system detection, and per-instance override persistence.
 //!
 //! # Precedence order for `resolve_jre_for_launch`
 //!
-//! 1. `ICHR_JAVA` env var — debug escape hatch; logs WARN, skips validation.
-//! 2. `instance.java_override` — per-instance override (install-if-missing).
+//! 1. `ICHR_JAVA` env var -- debug escape hatch; logs WARN, skips validation.
+//! 2. `instance.java_override` -- per-instance override (install-if-missing).
 //! 3. Auto-resolve Mojang via `version.java_version.component`.
 //! 4. Adoptium fallback (Mojang absent for this platform/variant).
 //!
@@ -48,7 +48,7 @@ impl JavaService {
         })
     }
 
-    /// Construct with explicit clients — used in tests to inject httpmock
+    /// Construct with explicit clients -- used in tests to inject httpmock
     /// servers without touching environment variables.
     #[cfg(test)]
     pub fn with_clients(
@@ -73,10 +73,10 @@ impl JavaService {
     ///
     /// Precedence (first match wins):
     ///
-    /// 1. `ICHR_JAVA` env var — bypass all managed JRE logic (logs WARN).
-    /// 2. `instance.java_override` — per-instance override (install-if-missing).
-    /// 3. Auto Mojang — uses `version.java_version.component` from the MC manifest.
-    /// 4. Adoptium fallback — when Mojang has no entry for the current platform.
+    /// 1. `ICHR_JAVA` env var -- bypass all managed JRE logic (logs WARN).
+    /// 2. `instance.java_override` -- per-instance override (install-if-missing).
+    /// 3. Auto Mojang -- uses `version.java_version.component` from the MC manifest.
+    /// 4. Adoptium fallback -- when Mojang has no entry for the current platform.
     #[tracing::instrument(skip_all, fields(slug = %instance.slug))]
     pub async fn resolve_jre_for_launch(
         &self,
@@ -84,13 +84,13 @@ impl JavaService {
         instance: &InstanceManifest,
         version: &ResolvedVersion,
     ) -> Result<PathBuf, AppError> {
-        // Step 1 — ICHR_JAVA debug override (wins unconditionally; the
+        // Step 1 -- ICHR_JAVA debug override (wins unconditionally; the
         // early return makes all subsequent steps unreachable when the var
-        // is set — semantically equivalent to "checked last as bypass-all").
+        // is set -- semantically equivalent to "checked last as bypass-all").
         if let Ok(p) = std::env::var("ICHR_JAVA") {
             tracing::warn!(
                 path = %p,
-                "ICHR_JAVA overrides JRE resolution — validation skipped"
+                "ICHR_JAVA overrides JRE resolution -- validation skipped"
             );
             return Ok(PathBuf::from(p));
         }
@@ -103,12 +103,12 @@ impl JavaService {
             None => ("jre-legacy".to_string(), 8u32),
         };
 
-        // Step 2 — per-instance override (install-if-missing).
+        // Step 2 -- per-instance override (install-if-missing).
         if let Some(id) = &instance.java_override {
             return self.resolve_override(paths, id, required_major).await;
         }
 
-        // Step 3 — auto Mojang: look up platform key then the component variant.
+        // Step 3 -- auto Mojang: look up platform key then the component variant.
         if let Some(plat) = mojang_platform_key(self.os, self.arch) {
             let index = self.mojang.fetch_all_json(None).await?;
             if let Some(variant) = MojangJreClient::select_variant(&index, plat, &component_hint) {
@@ -120,7 +120,7 @@ impl JavaService {
             }
         }
 
-        // Step 4 — Adoptium fallback (Mojang has no entry for this platform).
+        // Step 4 -- Adoptium fallback (Mojang has no entry for this platform).
         let exe = self
             .adoptium
             .install_adoptium(paths, required_major, self.arch, self.os)
@@ -140,7 +140,7 @@ impl JavaService {
     ) -> Result<PathBuf, AppError> {
         match id {
             JavaRuntimeId::Mojang { variant } => {
-                // Requires a Mojang platform entry — fall through error if none.
+                // Requires a Mojang platform entry -- fall through error if none.
                 let plat = mojang_platform_key(self.os, self.arch).ok_or(AppError::JavaNotFound)?;
                 let index = self.mojang.fetch_all_json(None).await?;
                 let entry = MojangJreClient::select_variant(&index, plat, variant)
@@ -273,7 +273,7 @@ impl JavaService {
                 slug: mc_version.to_string(),
             });
         }
-        // 2) Read + parse — `?` auto-wraps via #[from] on AppError::Io and
+        // 2) Read + parse -- `?` auto-wraps via #[from] on AppError::Io and
         //    AppError::MojangParse. No string-based fallback variants.
         let bytes = tokio::fs::read(&json_path).await?;
         let version_json: crate::mojang::types::VersionJson = serde_json::from_slice(&bytes)?;
@@ -290,7 +290,7 @@ impl JavaService {
             std::collections::HashMap::new();
         let resolved = crate::mojang::inherits::resolve_inherits(&version_json, &parents)?;
 
-        // 3) Synthesize a stub instance manifest — no overrides, drives the
+        // 3) Synthesize a stub instance manifest -- no overrides, drives the
         //    standard precedence chain inside resolve_jre_for_launch.
         let stub = InstanceManifest::new(
             "loader-install".into(),
@@ -351,7 +351,7 @@ mod tests {
     }
 
     fn minimal_version(component: &str, major: u32) -> ResolvedVersion {
-        // Construct as VersionJson then promote via resolve_inherits — this
+        // Construct as VersionJson then promote via resolve_inherits -- this
         // mirrors the production codepath (parse-from-disk -> resolve) and
         // proves the demoted Option fields wrap cleanly.
         let v = VersionJson {
@@ -522,7 +522,7 @@ mod tests {
         let prior = std::env::var("ICHR_JAVA").ok();
         std::env::set_var("ICHR_JAVA", fake_java.to_str().unwrap());
 
-        // Service with real (production) clients — they must NOT be called.
+        // Service with real (production) clients -- they must NOT be called.
         let svc = JavaService::new().expect("service build");
         let instance = instance_no_override("env-wins");
         let version = minimal_version("java-runtime-delta", 21);
@@ -814,7 +814,7 @@ mod tests {
         let adoptium =
             AdoptiumClient::new_with_base_url(server.base_url()).expect("adoptium client");
         let mojang = MojangJreClient::new().expect("mojang client");
-        // Force Aarch64 Linux — mojang_platform_key returns None → Adoptium.
+        // Force Aarch64 Linux -- mojang_platform_key returns None → Adoptium.
         let svc = JavaService::with_clients(mojang, adoptium, Arch::Aarch64, OsName::Linux);
 
         let instance = instance_no_override("aarch64-fallback");
@@ -838,7 +838,7 @@ mod tests {
     // Missing javaVersion in VersionJson → defaults to jre-legacy (Java 8)
     // -----------------------------------------------------------------------
 
-    // Linux-only — same pattern as test_resolve_auto_mojang_path: pins
+    // Linux-only -- same pattern as test_resolve_auto_mojang_path: pins
     // OsName::Linux on the service constructor and asserts a fixture-extracted
     // `bin/java` exists. Service path construction is host-OS-conditional, so
     // on Windows the assert reads `bin/java.exe`.

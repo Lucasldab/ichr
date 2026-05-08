@@ -25,16 +25,16 @@ pub enum StorageBackend {
 }
 
 /// A persisted Microsoft account record. Refresh tokens are stored out-of-band
-/// (keyring entry name = `id`, or encrypted file blob keyed by `id`) — they
+/// (keyring entry name = `id`, or encrypted file blob keyed by `id`) -- they
 /// never live inside this struct in plaintext.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Account {
-    /// Stable identifier — the MS account object ID (or fallback to MC UUID).
+    /// Stable identifier -- the MS account object ID (or fallback to MC UUID).
     /// Also the keyring entry account name.
     pub id: String,
     /// Minecraft player name (e.g., "PlayerOne").
     pub mc_username: String,
-    /// Minecraft UUID in hyphenated form (e.g., "c6bf8193-..." — 36 chars).
+    /// Minecraft UUID in hyphenated form (e.g., "c6bf8193-..." -- 36 chars).
     pub mc_uuid: String,
     /// Unix epoch seconds at which the cached MC access token expires.
     /// Chain orchestrator uses this to decide whether to refresh.

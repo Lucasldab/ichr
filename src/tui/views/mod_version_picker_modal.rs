@@ -1,8 +1,8 @@
-//! Mod version picker modal — centered list of available versions for one mod.
+//! Mod version picker modal -- centered list of available versions for one mod.
 //!
 //! Source: 08-UI-SPEC.md §"Mod Detail Action: Version Picker" lines 253-275.
 //! Mirrors `loader_version_picker_modal.rs` (analog), minus the
-//! filter_stable_only toggle and the in-modal search input — UI-SPEC version
+//! filter_stable_only toggle and the in-modal search input -- UI-SPEC version
 //! picker is a static modal with no in-modal filtering.
 
 use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
@@ -46,9 +46,9 @@ pub fn render_mod_version_picker_modal(f: &mut Frame, area: Rect, state: &AppSta
 
     // ---- Version list ----
     let items: Vec<ListItem> = if versions.is_empty() {
-        // UI-SPEC line 651 — empty/no-compatible-versions copy.
+        // UI-SPEC line 651 -- empty/no-compatible-versions copy.
         vec![
-            ListItem::new("No versions match MC + loader — press Esc and adjust filters").style(
+            ListItem::new("No versions match MC + loader -- press Esc and adjust filters").style(
                 Style::default()
                     .fg(Color::DarkGray)
                     .add_modifier(Modifier::DIM),
@@ -83,7 +83,7 @@ pub fn render_mod_version_picker_modal(f: &mut Frame, area: Rect, state: &AppSta
     let list = List::new(items).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(format!("{project_title} — versions")),
+            .title(format!("{project_title} -- versions")),
     );
     let mut list_state = ratatui::widgets::ListState::default();
     list_state.select(Some(*selected));

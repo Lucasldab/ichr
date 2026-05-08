@@ -1,10 +1,10 @@
-//! Maven metadata XML — minimal hand-rolled substring parser.
+//! Maven metadata XML -- minimal hand-rolled substring parser.
 //!
 //! Source schema: https://maven.apache.org/repositories/metadata.html
 //!
 //! The fixed-shape `<metadata><versioning><versions><version>...</version>...`
 //! tree means a substring scan for `<version>...</version>` text nodes is
-//! sufficient. We intentionally do NOT pull `quick-xml` — the document is
+//! sufficient. We intentionally do NOT pull `quick-xml` -- the document is
 //! tiny (~50KB) and the failure modes (truncated input, bad encoding) are
 //! handled by returning whatever was parsed up to the corruption point.
 //!
@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     fn test_extract_versions_truncated_does_not_panic() {
-        // Open tag with no closing tag — must not panic
+        // Open tag with no closing tag -- must not panic
         let xml = "<metadata><versions><version>1.0.0";
         let _ = extract_versions(xml); // panic-free
     }
@@ -107,7 +107,7 @@ mod tests {
             v.iter().any(|x| x == "21.1.228"),
             "NeoForge 21.1.228 missing: {v:?}"
         );
-        // Pitfall 8 — 4-segment betas must round-trip untouched
+        // Pitfall 8 -- 4-segment betas must round-trip untouched
         assert!(
             v.iter().any(|x| x == "26.1.2.41-beta"),
             "NeoForge 4-segment beta missing"

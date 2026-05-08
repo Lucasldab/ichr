@@ -12,7 +12,7 @@
 //!   supported_os        = Windows7..=Windows11
 //!   requested_execution_level = AsInvoker
 //!
-//! We use the defaults verbatim — no custom builder calls. The manifest
+//! We use the defaults verbatim -- no custom builder calls. The manifest
 //! is purely necessary for child-process inheritance: Rust std's `\\?\`
 //! auto-prefixing already handles the launcher's own file ops since
 //! Rust 1.58, but the JVM spawned via tokio::process::Command does NOT

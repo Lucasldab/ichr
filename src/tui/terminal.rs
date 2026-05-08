@@ -36,7 +36,7 @@ pub fn init() -> std::io::Result<Tui> {
 }
 
 /// Disable bracketed paste, leave the alternate screen, and disable raw
-/// mode (in that order). Idempotent — safe to call from both the normal
+/// mode (in that order). Idempotent -- safe to call from both the normal
 /// exit path and the panic hook. Best-effort: errors are intentionally
 /// swallowed so the panic-restore path does not itself panic.
 pub fn restore() -> std::io::Result<()> {

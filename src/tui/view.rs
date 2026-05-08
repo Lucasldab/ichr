@@ -53,7 +53,7 @@ pub fn view(state: &AppState, f: &mut Frame) {
     let dl = layout[1];
 
     // Phase 8 (08-08) + Phase 9 (09-07): full-screen views (ModBrowser,
-    // InstalledModsList, CfBrowser) own the entire `main` rect — suppress the
+    // InstalledModsList, CfBrowser) own the entire `main` rect -- suppress the
     // instance-list background render so the modless view can claim the full
     // body width without bleed-through. The CurseForge file-picker and
     // install-failed modals overlay normally.

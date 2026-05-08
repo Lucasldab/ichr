@@ -37,12 +37,12 @@ pub enum PackError {
     Io(#[from] std::io::Error),
 
     /// User cancelled the operation (Esc / CancellationToken).
-    /// Treated as a clean return at the TUI boundary — not an error.
+    /// Treated as a clean return at the TUI boundary -- not an error.
     #[error("Pack operation cancelled")]
     Cancelled,
 
     /// Toggle is not supported for shader packs (Iris/OptiFine manage shader
-    /// selection in their own config — no filesystem enable/disable for shaders).
+    /// selection in their own config -- no filesystem enable/disable for shaders).
     /// D-LOCK: `PackKind::Shader` path through `toggle_pack_enabled` returns this.
     #[error("toggle not supported for {kind:?} packs (Iris/OptiFine config required)")]
     ShaderToggleNotSupported { kind: crate::packs::kind::PackKind },

@@ -1,4 +1,4 @@
-//! Live CurseForge install smoke test — gated by `#[ignore]`.
+//! Live CurseForge install smoke test -- gated by `#[ignore]`.
 //!
 //! Run with: `cargo nextest run --run-ignored only -E 'test(curseforge_live)'`
 //! (or `cargo test --test curseforge_live -- --ignored --nocapture`)
@@ -10,7 +10,7 @@
 //!   - Internet access (api.curseforge.com + edge.forgecdn.net)
 //!   - `CURSEFORGE_API_KEY` env var set (build-time
 //!     `ICHR_CURSEFORGE_API_KEY_DEFAULT` also works in principle but is
-//!     NOT assumed for CI test runs — the runtime env var is the canonical
+//!     NOT assumed for CI test runs -- the runtime env var is the canonical
 //!     test-time secret).
 //!
 //! Skip behavior: per 09-RESEARCH.md §Open Questions Q10 (line 1346), missing
@@ -36,7 +36,7 @@ fn skip_if_no_api_key(test_name: &str) -> bool {
     match std::env::var("CURSEFORGE_API_KEY") {
         Ok(v) if !v.is_empty() => false,
         _ => {
-            eprintln!("[curseforge_live] SKIPPED {test_name} — CURSEFORGE_API_KEY not set");
+            eprintln!("[curseforge_live] SKIPPED {test_name} -- CURSEFORGE_API_KEY not set");
             true
         }
     }
@@ -51,7 +51,7 @@ fn fabric_loader() -> LoaderInfo {
 }
 
 #[tokio::test]
-#[ignore = "requires internet + CURSEFORGE_API_KEY env var — see module docs"]
+#[ignore = "requires internet + CURSEFORGE_API_KEY env var -- see module docs"]
 async fn live_install_downloadable_mod_fabric_1_20_4() {
     if skip_if_no_api_key("live_install_downloadable_mod_fabric_1_20_4") {
         return;
@@ -129,7 +129,7 @@ async fn live_install_downloadable_mod_fabric_1_20_4() {
         chosen.hashes.iter().any(|h| h.algo == 1),
     );
 
-    // 4. Install — drain progress events into /dev/null.
+    // 4. Install -- drain progress events into /dev/null.
     let (tx, mut rx) = mpsc::channel(64);
     tokio::spawn(async move { while rx.recv().await.is_some() {} });
     let token = CancellationToken::new();
@@ -168,13 +168,13 @@ async fn live_install_downloadable_mod_fabric_1_20_4() {
     );
 
     println!(
-        "[curseforge_live] SUCCESS — installed {} (file={}) into ledger with source=CurseForge, hash_algo=Sha1",
+        "[curseforge_live] SUCCESS -- installed {} (file={}) into ledger with source=CurseForge, hash_algo=Sha1",
         sodium.name, row.file_name,
     );
 }
 
 #[tokio::test]
-#[ignore = "requires internet + CURSEFORGE_API_KEY env var + a known-restricted mod — see module docs"]
+#[ignore = "requires internet + CURSEFORGE_API_KEY env var + a known-restricted mod -- see module docs"]
 async fn live_restricted_mod_returns_file_not_downloadable() {
     if skip_if_no_api_key("live_restricted_mod_returns_file_not_downloadable") {
         return;
@@ -220,7 +220,7 @@ async fn live_restricted_mod_returns_file_not_downloadable() {
         Some(h) => h,
         None => {
             eprintln!(
-                "[curseforge_live] SKIPPED restricted-mod test — candidate slug '{RESTRICTED_CANDIDATE_SLUG}' not found in current CurseForge data; update RESTRICTED_CANDIDATE_SLUG to a current example"
+                "[curseforge_live] SKIPPED restricted-mod test -- candidate slug '{RESTRICTED_CANDIDATE_SLUG}' not found in current CurseForge data; update RESTRICTED_CANDIDATE_SLUG to a current example"
             );
             return;
         }
@@ -235,7 +235,7 @@ async fn live_restricted_mod_returns_file_not_downloadable() {
         Some(f) => f,
         None => {
             eprintln!(
-                "[curseforge_live] SKIPPED restricted-mod test — candidate '{RESTRICTED_CANDIDATE_SLUG}' no longer has restricted files; update RESTRICTED_CANDIDATE_SLUG"
+                "[curseforge_live] SKIPPED restricted-mod test -- candidate '{RESTRICTED_CANDIDATE_SLUG}' no longer has restricted files; update RESTRICTED_CANDIDATE_SLUG"
             );
             return;
         }
@@ -263,7 +263,7 @@ async fn live_restricted_mod_returns_file_not_downloadable() {
             assert_eq!(mod_slug, RESTRICTED_CANDIDATE_SLUG);
             assert_eq!(file_id, restricted.id);
             println!(
-                "[curseforge_live] SUCCESS — restricted mod surfaced FileNotDownloadable with web_url={web_url}"
+                "[curseforge_live] SUCCESS -- restricted mod surfaced FileNotDownloadable with web_url={web_url}"
             );
 
             // Atomicity: ledger MUST be empty after a failed install.

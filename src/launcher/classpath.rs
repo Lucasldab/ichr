@@ -1,7 +1,7 @@
-//! Classpath string builder — OS-correct separator, rules-filtered library
+//! Classpath string builder -- OS-correct separator, rules-filtered library
 //! walk, client.jar placed last.
 //!
-//! PITFALLS.md Pitfall 14: use `cfg!(target_os = "windows")` — NEVER
+//! PITFALLS.md Pitfall 14: use `cfg!(target_os = "windows")` -- NEVER
 //! `std::path::MAIN_SEPARATOR`, which is the path component separator (`/`
 //! or `\`) and is a DIFFERENT character from the classpath separator (`:` or
 //! `;`).
@@ -32,13 +32,13 @@ pub fn classpath_separator() -> char {
 /// Build the colon/semicolon-separated classpath string for `version`.
 ///
 /// Walk order:
-/// 1. `version.libraries` — filtered by `evaluate_rules(&lib.rules, ctx)`.
+/// 1. `version.libraries` -- filtered by `evaluate_rules(&lib.rules, ctx)`.
 /// 2. Libraries where `needs_native_extraction` is `true` are skipped (those
 ///    are extracted into the per-instance natives dir, not put on the classpath).
 /// 3. `paths.version_jar(&version.root_id)` appended LAST (standard ordering).
 ///    NOTE: uses `root_id` (vanilla MC id at the inheritsFrom chain root)
 ///    rather than `id` (loader id post-merge). Phase 6's loader install
-///    writes only `{loader-id}.json` — never a `{loader-id}.jar` — so
+///    writes only `{loader-id}.json` -- never a `{loader-id}.jar` -- so
 ///    using `id` here would produce a classpath entry pointing at a
 ///    non-existent file and the JVM would `ClassNotFoundException`.
 ///
@@ -63,9 +63,9 @@ pub fn build_classpath(
         }
     }
 
-    // Client JAR is always last — standard Minecraft launcher ordering.
+    // Client JAR is always last -- standard Minecraft launcher ordering.
     // SECONDARY-BUG-FIX (Phase 8.3 GAP-LAUNCH-PARSE-08): the JAR lives at
-    // versions/{root-vanilla-id}/{root-vanilla-id}.jar — Phase 6 loader
+    // versions/{root-vanilla-id}/{root-vanilla-id}.jar -- Phase 6 loader
     // install never writes a loader JAR (only the loader JSON). Pre-8.3
     // code used &version.id which is the loader id post-merge, pointing
     // at a non-existent file and causing ClassNotFoundException at JVM

@@ -1,4 +1,4 @@
-//! Pure LaunchCommand composer — ties classpath, substitution, offline auth,
+//! Pure LaunchCommand composer -- ties classpath, substitution, offline auth,
 //! and version-JSON arg resolution into a single `LaunchCommand` struct.
 //! No I/O, no async, no process spawning.
 //!
@@ -26,7 +26,7 @@ const LEGACY_JVM_ARGS: &[&str] = &[
     "${classpath}",
 ];
 
-/// A fully-resolved JVM launch command — everything needed to spawn Minecraft
+/// A fully-resolved JVM launch command -- everything needed to spawn Minecraft
 /// except stdio wiring and process management.
 ///
 /// Fields are intentionally public so plan 03-03 (`spawn`) can consume them

@@ -7,7 +7,7 @@
 fail-fast = true
 
 [profile.ci]
-# CI doesn't fail-fast — we want the full picture per run, not just the first failure.
+# CI doesn't fail-fast -- we want the full picture per run, not just the first failure.
 fail-fast = false
 # Retry transient flakes (network races, filesystem timing) once before reporting failure.
 retries = 1

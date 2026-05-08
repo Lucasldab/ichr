@@ -1,4 +1,4 @@
-//! CurseForge file picker modal — centered list of available files for one mod.
+//! CurseForge file picker modal -- centered list of available files for one mod.
 //!
 //! Source: 09-RESEARCH.md §"TUI Integration Plumbing" + 09-PATTERNS.md
 //! §`src/tui/views/cf_file_picker_modal.rs` (deltas off `mod_version_picker_modal.rs`).
@@ -54,7 +54,7 @@ pub fn render_cf_file_picker_modal(f: &mut Frame, area: Rect, state: &AppState) 
     // ---- File list ----
     let items: Vec<ListItem> = if files.is_empty() {
         vec![
-            ListItem::new("No files match MC + loader — press Esc and adjust filters").style(
+            ListItem::new("No files match MC + loader -- press Esc and adjust filters").style(
                 Style::default()
                     .fg(Color::DarkGray)
                     .add_modifier(Modifier::DIM),
@@ -88,7 +88,7 @@ pub fn render_cf_file_picker_modal(f: &mut Frame, area: Rect, state: &AppState) 
     let list = List::new(items).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(format!("{} — files", mod_detail.name)),
+            .title(format!("{} -- files", mod_detail.name)),
     );
     let mut list_state = ratatui::widgets::ListState::default();
     list_state.select(Some(*selected));
@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn esc_closes_modal() {
-        // Esc returns CloseModal — the update() arm then returns to InstanceList.
+        // Esc returns CloseModal -- the update() arm then returns to InstanceList.
         assert!(matches!(
             map_cf_file_picker_event(key(KeyCode::Esc)),
             Some(Action::CloseModal)
@@ -275,7 +275,7 @@ mod tests {
         assert!(text.contains("(beta)"), "beta label missing:\n{text}");
         assert!(text.contains("← latest"), "latest marker missing:\n{text}");
         assert!(
-            text.contains("Sodium — files"),
+            text.contains("Sodium -- files"),
             "mod-name title missing:\n{text}"
         );
     }

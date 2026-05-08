@@ -4,7 +4,7 @@ Terminal-UI Minecraft Java Edition launcher for Linux and Windows.
 
 Create instances, install modloaders, browse and install mods from
 Modrinth, import modpacks, manage resource and shader packs, launch
-Minecraft — without leaving the terminal.
+Minecraft -- without leaving the terminal.
 
 ```
 ┌─ ichr ────────────────────────────────────────────────┐
@@ -22,7 +22,7 @@ Minecraft — without leaving the terminal.
 
 - **Instances**: per-instance `.minecraft/`, isolated game directories,
   per-instance Java override
-- **Modloaders**: Fabric, Quilt, Forge, NeoForge — installed via the official
+- **Modloaders**: Fabric, Quilt, Forge, NeoForge -- installed via the official
   installer JARs
 - **Modrinth integration**: search, filter by MC version + loader, install with
   automatic dependency resolution
@@ -30,7 +30,7 @@ Minecraft — without leaving the terminal.
 - **Resource and shader packs**: drop-in install + Modrinth browse-and-install
 - **Java runtime management**: auto-resolves Mojang JRE per version, Adoptium
   fallback for unsupported architectures, system-Java override
-- **Microsoft Account auth**: device-code OAuth — no embedded credentials, no
+- **Microsoft Account auth**: device-code OAuth -- no embedded credentials, no
   password handling. Tokens stored in OS keychain (libsecret on Linux,
   DPAPI on Windows) or AES-256-GCM encrypted file fallback.
 - **Single binary**: no installer, no runtime dependencies. `cargo install` or
@@ -38,7 +38,7 @@ Minecraft — without leaving the terminal.
 
 ## Status
 
-**v0.1.0** — first public release. The core path (create instance, install
+**v0.1.0** -- first public release. The core path (create instance, install
 modloader, install mods from Modrinth, launch) works end-to-end on Linux.
 
 **Microsoft Account sign-in currently requires a one-time setup** to register
@@ -50,7 +50,7 @@ client ID will be embedded in the binary and no setup will be required.
 
 See [`docs/msa-setup.md`](docs/msa-setup.md) for the 5-minute walkthrough.
 
-CurseForge integration is in the codebase but disabled by default in v1 —
+CurseForge integration is in the codebase but disabled by default in v1 --
 it requires a CurseForge API key that must be obtained from
 console.curseforge.com.
 

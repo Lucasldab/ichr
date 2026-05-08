@@ -52,7 +52,7 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
         .collect();
     // Phase 9 (09-07): F keybind opens the CurseForge browser. Title shows the
     // disabled hint `(no API key)` when no CurseForge API key was resolved at
-    // startup — matches the Phase 6 `L (running)` DIM disabled-feature pattern.
+    // startup -- matches the Phase 6 `L (running)` DIM disabled-feature pattern.
     let title = if state.cf_api_key_present {
         "Instances (c/r/x/d/g/Enter/s/A/L/M/m/F)"
     } else {
@@ -81,7 +81,7 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
             "Launching as: {}  (press A to manage accounts)",
             a.mc_username
         ),
-        None => "Offline mode — press A to add a Microsoft account".to_string(),
+        None => "Offline mode -- press A to add a Microsoft account".to_string(),
     };
     let footer = Paragraph::new(footer_text).style(Style::default().add_modifier(Modifier::DIM));
     f.render_widget(footer, footer_area);

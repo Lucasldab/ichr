@@ -1,4 +1,4 @@
-//! Live Forge install smoke test — `#[ignore]`-gated.
+//! Live Forge install smoke test -- `#[ignore]`-gated.
 //!
 //! Run with: `cargo test --test loader_forge_live -- --ignored --nocapture`
 //!
@@ -47,7 +47,7 @@ fn make_progress_drain(label: &'static str) -> mpsc::Sender<TaskEvent> {
 }
 
 #[tokio::test]
-#[ignore = "requires internet access — see module docs"]
+#[ignore = "requires internet access -- see module docs"]
 async fn live_forge_install_1_20_1() {
     let td = TempDir::new().expect("tempdir");
     let paths = make_paths(&td);
@@ -204,22 +204,22 @@ async fn live_forge_install_1_20_1() {
     );
 
     println!(
-        "[forge_live] SUCCESS — installed Forge {} (id={})",
+        "[forge_live] SUCCESS -- installed Forge {} (id={})",
         loader_version, loader.version_id
     );
 }
 
-/// GAP-7-A umbrella regression — fast-fail live test that guards against
+/// GAP-7-A umbrella regression -- fast-fail live test that guards against
 /// any ForgeWrapper install-blocker (class load, entry point, or class
 /// resolution failure).
 ///
 /// Three historical signatures detected (any one of which fires the banner):
 ///   - round-1 (pre-07.1-02): `NoClassDefFoundError: cpw/mods/modlauncher/Launcher`
-///     — Main was invoked without the three -Dforgewrapper.* properties so
+///     -- Main was invoked without the three -Dforgewrapper.* properties so
 ///     MultiMCFileDetector.getLibraryDir fell back to introspecting modlauncher.
 ///   - round-2 (post-07.1-02 / pre-07.2-01): `Main method not found in
 ///     class io.github.zekerzhayard.forgewrapper.installer.Installer`
-///     — argv class swapped to Installer (a library class with no main()).
+///     -- argv class swapped to Installer (a library class with no main()).
 ///   - any future regression that reverts back to either of the above
 ///     (or invents a new ForgeWrapper class-related blocker).
 ///
@@ -228,11 +228,11 @@ async fn live_forge_install_1_20_1() {
 ///
 /// This test is FASTER than `live_forge_install_1_20_1` because it asserts
 /// EARLY behaviour (subprocess class load / entry point) rather than full
-/// pipeline, but it is NOT a substitute — `live_forge_install_1_20_1`
+/// pipeline, but it is NOT a substitute -- `live_forge_install_1_20_1`
 /// exercises full install + harvest + manifest + library copy. Both are
 /// `#[ignore]`-gated; both run during HUMAN-UAT.
 #[tokio::test]
-#[ignore = "requires internet access — see module docs"]
+#[ignore = "requires internet access -- see module docs"]
 async fn live_forge_install_does_not_throw_install_blocker() {
     let td = TempDir::new().expect("tempdir");
     let paths = make_paths(&td);
@@ -329,7 +329,7 @@ async fn live_forge_install_does_not_throw_install_blocker() {
                 || msg.contains("forgewrapper.installer.Installer");
             if r1_classdef || r2_no_main || r3_main_iooobe || any_wrapper_class {
                 panic!(
-                    "GAP-7-A umbrella regression detected — install subprocess \
+                    "GAP-7-A umbrella regression detected -- install subprocess \
                      threw a ForgeWrapper class-related blocker. Round-1 signal: \
                      NoClassDefFoundError/modlauncher = {r1_classdef}. Round-2 \
                      signal: 'Main method not found' = {r2_no_main}. Round-3 signal: \
@@ -349,7 +349,7 @@ async fn live_forge_install_does_not_throw_install_blocker() {
             panic!("install_loader failed for non-GAP-7-A-v3 reason: {msg}");
         }
         Ok(()) => {
-            println!("[forge_install_blocker] install_loader succeeded — GAP-7-A umbrella closed");
+            println!("[forge_install_blocker] install_loader succeeded -- GAP-7-A umbrella closed");
         }
     }
 

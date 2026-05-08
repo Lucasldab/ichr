@@ -1,9 +1,9 @@
-//! Java picker modal — lets the user select a per-instance Java override.
+//! Java picker modal -- lets the user select a per-instance Java override.
 //!
 //! Rows:
-//!   Auto        — clears java_override (delegate to resolver default)
-//!   Detected(…) — a working system Java from scan_system_javas()
-//!   Manual      — escape hatch: edit instance.json by hand
+//!   Auto        -- clears java_override (delegate to resolver default)
+//!   Detected(…) -- a working system Java from scan_system_javas()
+//!   Manual      -- escape hatch: edit instance.json by hand
 
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -42,7 +42,7 @@ pub fn render_java_picker_modal(f: &mut Frame, area: Rect, state: &AppState) {
     // Outer block.
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(format!(" Java Runtime — {slug} "));
+        .title(format!(" Java Runtime -- {slug} "));
     let inner = block.inner(modal_area);
     f.render_widget(block, modal_area);
 

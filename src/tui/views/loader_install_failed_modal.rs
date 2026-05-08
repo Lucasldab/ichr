@@ -1,4 +1,4 @@
-//! Loader install failure modal — mirrors `launch_failed_modal.rs`.
+//! Loader install failure modal -- mirrors `launch_failed_modal.rs`.
 //!
 //! Shown when LoaderInstallFailed is dispatched. Esc dismisses.
 

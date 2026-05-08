@@ -4,27 +4,27 @@
 //! observe in isolation, plus paranoid regression-net duplicates of the most
 //! load-bearing unit-level invariants:
 //!
-//! 1. `test_constructor_rejects_empty_key_before_reqwest_invoked` — empty
+//! 1. `test_constructor_rejects_empty_key_before_reqwest_invoked` -- empty
 //!    API key produces `Err` at `CurseForgeClient::new_with_base_url`
 //!    construction (no reqwest call). Defense-in-depth integration test for
 //!    the empty-string filter at the precedence-resolver boundary; duplicated
 //!    here so a regression in 09-03's `new_with_base_url` is caught even if
 //!    the unit test is removed.
-//! 2. `test_x_api_key_present_at_integration_layer` — the `x-api-key` header
+//! 2. `test_x_api_key_present_at_integration_layer` -- the `x-api-key` header
 //!    survives the service-layer wrap (Pitfall 2). Mock requires the header
 //!    on the wire; a missing header would surface as an httpmock 404 (no
 //!    matching mock).
 //! 3. `test_install_with_inline_url_writes_ledger_row_with_curseforge_source`
-//!    — full happy install path through `CurseForgeService::with_client`.
+//!    -- full happy install path through `CurseForgeService::with_client`.
 //!    Writes ledger row with `source: ModSource::CurseForge`,
 //!    `hash_algo: HashAlgo::Sha1`, sha512 field stores SHA-1 hex (historical
 //!    naming carve-out per 09-RESEARCH.md §"Per-Instance Ledger Reuse"
 //!    lines 297-318).
 //! 4. `test_install_with_null_download_url_returns_file_not_downloadable_no_ledger_row`
-//!    — `downloadUrl: null` + the dedicated `/download-url` endpoint
+//!    -- `downloadUrl: null` + the dedicated `/download-url` endpoint
 //!    returning 403 surfaces `CurseForgeError::FileNotDownloadable` with the
 //!    canonical web URL, AND the ledger remains empty (Pitfall 8 atomicity).
-//! 5. `test_cancel_aborts_install_no_ledger_row` — cancellation mid-install
+//! 5. `test_cancel_aborts_install_no_ledger_row` -- cancellation mid-install
 //!    returns `CurseForgeError::Cancelled` AND the ledger remains empty
 //!    (atomicity invariant: the ledger upsert is gated on a successful
 //!    sha1-verified download; an aborted download MUST NOT leave a row).
@@ -119,7 +119,7 @@ async fn test_x_api_key_present_at_integration_layer() {
 }
 
 // ============================================================================
-// Test 3: Happy install — ledger row written with source=CurseForge, hash_algo=Sha1.
+// Test 3: Happy install -- ledger row written with source=CurseForge, hash_algo=Sha1.
 // ============================================================================
 
 #[tokio::test]
@@ -288,7 +288,7 @@ async fn test_cancel_aborts_install_no_ledger_row() {
     let server = MockServer::start();
     let body = vec![0u8; 1024];
     let sha1 = sha1_hex(&body);
-    // Slow CDN — 2-second delay so we can cancel mid-stream.
+    // Slow CDN -- 2-second delay so we can cancel mid-stream.
     server.mock(|when, then| {
         when.method(GET).path("/cdn/slow.jar");
         then.status(200)

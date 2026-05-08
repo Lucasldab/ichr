@@ -3,7 +3,7 @@
 // This file is included into test files via `mod fixtures { ... include!(...) }`.
 // It does NOT get compiled as a standalone build script.
 //
-// Provides `build_minimal_mrpack` — a synchronous helper that constructs a
+// Provides `build_minimal_mrpack` -- a synchronous helper that constructs a
 // minimal but spec-compliant `.mrpack` zip with:
 // - `modrinth.index.json` (configurable deps, 1+ mod files)
 // - `overrides/config/test.txt` (content: "from overrides")
@@ -69,13 +69,13 @@ pub struct ModEntry<'a> {
 ///
 /// # Parameters
 ///
-/// - `path` — destination path (typically inside a `TempDir`).
-/// - `pack_name` — modpack display name; used for slug derivation.
-/// - `mc_version` — Minecraft version string (`"1.20.4"`, etc.).
-/// - `loader_dep` — optional `(key, version)` pair added to `dependencies`,
+/// - `path` -- destination path (typically inside a `TempDir`).
+/// - `pack_name` -- modpack display name; used for slug derivation.
+/// - `mc_version` -- Minecraft version string (`"1.20.4"`, etc.).
+/// - `loader_dep` -- optional `(key, version)` pair added to `dependencies`,
 ///   e.g. `Some(("fabric-loader", "0.16.9"))`.  Pass `None` for vanilla packs.
-/// - `mods` — slice of `ModEntry` structs describing each file in `files[]`.
-/// - `include_overrides` — when `true`, the zip includes:
+/// - `mods` -- slice of `ModEntry` structs describing each file in `files[]`.
+/// - `include_overrides` -- when `true`, the zip includes:
 ///   - `overrides/config/test.txt` containing `"from overrides"`
 ///   - `client-overrides/options.txt` containing `"from client-overrides"`
 ///

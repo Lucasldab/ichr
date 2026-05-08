@@ -1,6 +1,6 @@
-//! CurseForge API key resolver — PURE 4-tier precedence chain.
+//! CurseForge API key resolver -- PURE 4-tier precedence chain.
 //!
-//! No I/O, no async — every test passes literal Some/None values without
+//! No I/O, no async -- every test passes literal Some/None values without
 //! touching std::env or the filesystem. The thin runtime wrapper that
 //! reads env+config lives at the call site (`CurseForgeService::new`),
 //! which then hands the three Option strings to `resolve_api_key`.
@@ -13,12 +13,12 @@
 //!
 //! Empty strings at any tier are treated as absent (skipped to the next tier).
 //! Per 09-RESEARCH.md §Pitfall 1 lines 936-940: the launcher MUST NOT crash
-//! at startup when no key is configured — `CurseForgeService::new` returns
+//! at startup when no key is configured -- `CurseForgeService::new` returns
 //! Ok with `api_key_present=false` and the F keybind is silently disabled.
 //!
 //! SECURITY INVARIANT (09-RESEARCH.md §Pitfall 6 lines 966-970): the api_key
 //! value is NEVER passed to a structured-log macro field. CI grep guards
-//! enforce this — see 09-02-PLAN.md acceptance criteria.
+//! enforce this -- see 09-02-PLAN.md acceptance criteria.
 
 use thiserror::Error;
 
@@ -28,7 +28,7 @@ use thiserror::Error;
 /// Per 09-RESEARCH.md §"API Key Strategy" line 186.
 pub const COMPILED_IN_DEFAULT: Option<&str> = option_env!("ICHR_CURSEFORGE_API_KEY_DEFAULT");
 
-/// API-key resolution failure. Single variant — the caller surfaces it as
+/// API-key resolution failure. Single variant -- the caller surfaces it as
 /// `api_key_present=false` rather than crashing the launcher.
 #[derive(Debug, Error)]
 pub enum ApiKeyError {

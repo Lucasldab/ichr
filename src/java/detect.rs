@@ -1,9 +1,9 @@
-//! System Java detection — scans PATH and common install locations, probes
+//! System Java detection -- scans PATH and common install locations, probes
 //! each candidate with `java -version` (stderr), and returns a deduplicated
 //! list of working runtimes.
 //!
 //! # Security notes
-//! - Subprocess is spawned directly (`Command::new(path)`) — never via a shell.
+//! - Subprocess is spawned directly (`Command::new(path)`) -- never via a shell.
 //! - Each probe is capped at 5 s; timed-out candidates are silently skipped.
 //! - `kill_on_drop(true)` prevents orphan processes when the future is dropped.
 
@@ -100,7 +100,7 @@ pub fn scan_common_dirs() -> Vec<PathBuf> {
             }
         }
 
-        // sdkman candidates — each candidate dir is a JDK/JRE version
+        // sdkman candidates -- each candidate dir is a JDK/JRE version
         if let Some(home) = std::env::var_os("HOME") {
             let sdkman_root = PathBuf::from(home)
                 .join(".sdkman")
@@ -171,7 +171,7 @@ pub fn dedupe_by_canonical(paths: Vec<PathBuf>) -> Vec<PathBuf> {
 /// - the stderr output cannot be parsed by [`parse_java_major`].
 ///
 /// # Security
-/// The binary is invoked directly — no shell wrapper is used.
+/// The binary is invoked directly -- no shell wrapper is used.
 #[tracing::instrument(skip_all)]
 pub async fn query_java_version(java: &Path) -> Result<u32, AppError> {
     let mut cmd = tokio::process::Command::new(java);
@@ -327,7 +327,7 @@ mod tests {
         let paths = vec![real_file.clone(), link_file];
         let deduped = dedupe_by_canonical(paths);
 
-        // Both resolve to the same canonical path — only one should remain
+        // Both resolve to the same canonical path -- only one should remain
         assert_eq!(deduped.len(), 1);
         assert_eq!(deduped[0], real_file);
     }
@@ -359,7 +359,7 @@ mod tests {
         // Non-existent paths cannot be canonicalized; treat each as distinct.
         let p1 = PathBuf::from("/nonexistent/path/to/java");
         let p2 = PathBuf::from("/another/nonexistent/java");
-        let p3 = p1.clone(); // same path — should be deduped
+        let p3 = p1.clone(); // same path -- should be deduped
 
         let deduped = dedupe_by_canonical(vec![p1.clone(), p2.clone(), p3]);
         // p1 and p3 are the same path string; p2 is different
@@ -401,7 +401,7 @@ mod tests {
         // We can't easily swap the timeout constant, but we can confirm that a
         // process which produces no stderr output and never exits is treated as
         // an error (either immediate spawn failure or eventual timeout error).
-        // Use a very short artificial delay — we just need the subprocess that
+        // Use a very short artificial delay -- we just need the subprocess that
         // generates no valid `java -version` output.
         let fake_java = PathBuf::from("/bin/true"); // exits immediately, no stderr
         let result = query_java_version(&fake_java).await;
@@ -425,7 +425,7 @@ mod tests {
     async fn scan_system_javas_live_host() {
         let results = scan_system_javas().await;
         if results.is_empty() {
-            tracing::warn!("No system Java found on this host — skipping live integration test");
+            tracing::warn!("No system Java found on this host -- skipping live integration test");
             return;
         }
         for sj in &results {

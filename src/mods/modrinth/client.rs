@@ -1,16 +1,16 @@
-//! Modrinth REST API v2 client — hand-rolled per STACK.md "hand-roll" decision.
+//! Modrinth REST API v2 client -- hand-rolled per STACK.md "hand-roll" decision.
 //!
 //! Six endpoints over `https://api.modrinth.com`. Mirrors `FabricMetaClient`
 //! (src/loader/fabric.rs) for constructor + tracing + error-mapping + httpmock-test
 //! conventions.
 //!
-//! ASSUMPTION A1 from 08-RESEARCH.md — `MOD_DOWNLOAD_CONCURRENCY = 6` is safe
+//! ASSUMPTION A1 from 08-RESEARCH.md -- `MOD_DOWNLOAD_CONCURRENCY = 6` is safe
 //! below the 300 req/min cap. Verify in human checkpoint.
 //!
-//! ASSUMPTION A2 from 08-RESEARCH.md — `ichr/0.1 (+https://github.com/.../ichr)`
+//! ASSUMPTION A2 from 08-RESEARCH.md -- `ichr/0.1 (+https://github.com/.../ichr)`
 //! UA satisfies Modrinth's "uniquely identifying" requirement. Verify in human checkpoint.
 //!
-//! PITFALL 1: Modrinth returns 403 against the default reqwest UA — every request
+//! PITFALL 1: Modrinth returns 403 against the default reqwest UA -- every request
 //! MUST carry `crate::mojang::client::USER_AGENT`. Set at client-build time, NOT
 //! per-request.
 
@@ -26,11 +26,11 @@ pub const DEFAULT_MODRINTH_BASE: &str = "https://api.modrinth.com";
 pub const MODRINTH_BASE_URL_ENV: &str = "ICHR_MODRINTH_BASE_URL";
 pub const SEARCH_DEFAULT_LIMIT: u32 = 20;
 
-/// Maximum allowed file size for a single mod download — defense in depth
+/// Maximum allowed file size for a single mod download -- defense in depth
 /// against a tampered API response advertising a multi-GB file (08-RESEARCH.md
 /// §Security Domain row "Denial-of-service via huge size field"). Largest
 /// known legitimate mod is ~10MB; cap at 256MB (25× headroom). The cap is
-/// enforced by the 08-06 installer, NOT this client — declared here as a
+/// enforced by the 08-06 installer, NOT this client -- declared here as a
 /// re-exportable constant so installer + tests share one definition.
 pub const MAX_MOD_FILE_BYTES: u64 = 256 * 1024 * 1024;
 
@@ -77,7 +77,7 @@ impl ModrinthClient {
 
     // --- Endpoints -----------------------------------------------------------
 
-    /// `GET /v2/search` — project search with facets.
+    /// `GET /v2/search` -- project search with facets.
     ///
     /// 08-RESEARCH.md §Endpoint #1.
     ///
@@ -139,7 +139,7 @@ impl ModrinthClient {
             .collect())
     }
 
-    /// `GET /v2/search` with an explicit `project_type` — used by `PackService`
+    /// `GET /v2/search` with an explicit `project_type` -- used by `PackService`
     /// to search for `"resourcepack"` or `"shader"` projects.
     ///
     /// HIGH-1 invariant: the `project_type` facet is emitted UNCONDITIONALLY,
@@ -201,7 +201,7 @@ impl ModrinthClient {
             .collect())
     }
 
-    /// `GET /v2/project/{id|slug}` — single project detail.
+    /// `GET /v2/project/{id|slug}` -- single project detail.
     ///
     /// 08-RESEARCH.md §Endpoint #2.
     #[tracing::instrument(skip_all, fields(id_or_slug))]
@@ -217,7 +217,7 @@ impl ModrinthClient {
         }
         let url = format!("{}/v2/project/{}", self.base_url, id_or_slug);
         let bytes = self.send_get_bytes(&url).await?;
-        // Wire shape — see 08-RESEARCH.md §Endpoint #2 line 98.
+        // Wire shape -- see 08-RESEARCH.md §Endpoint #2 line 98.
         #[derive(serde::Deserialize)]
         struct ProjectWire {
             id: String,
@@ -248,8 +248,8 @@ impl ModrinthClient {
         let p: ProjectWire = serde_json::from_slice(&bytes)
             .map_err(|e| ModrinthError::Parse(format!("project {url}: {e}")))?;
         // Author: Modrinth project response does NOT include the author name
-        // directly — only a `team` ID. UI-SPEC §Mod Browser Detail Pane shows
-        // `by {author}`; for v1 we put an empty string — the live smoke in 08-09
+        // directly -- only a `team` ID. UI-SPEC §Mod Browser Detail Pane shows
+        // `by {author}`; for v1 we put an empty string -- the live smoke in 08-09
         // verifies this is acceptable; if not, follow-up fetches /v2/team/{id}/members.
         // Documented as a known minor gap.
         let cats = if p.additional_categories.is_empty() {
@@ -276,9 +276,9 @@ impl ModrinthClient {
         })
     }
 
-    /// `GET /v2/projects?ids=[...]` — batch-fetch (id, title) pairs.
+    /// `GET /v2/projects?ids=[...]` -- batch-fetch (id, title) pairs.
     ///
-    /// Used by the dep-resolver title-hydration pass (closes GAP-8-D —
+    /// Used by the dep-resolver title-hydration pass (closes GAP-8-D --
     /// without this, `ResolvedDep.project_title` is empty and the dep-confirm
     /// modal + Installed Mods List surface opaque project_ids).
     ///
@@ -287,8 +287,8 @@ impl ModrinthClient {
     /// ~10 deps per resolve so we do not chunk. Issues a single round-trip
     /// regardless of the BFS diamond shape (dedupe before call).
     ///
-    /// The response projection is intentionally minimal — only `id` + `title`
-    /// — because the BFS resolver only needs the title for display. Other
+    /// The response projection is intentionally minimal -- only `id` + `title`
+    /// -- because the BFS resolver only needs the title for display. Other
     /// project fields (description, license, categories) flow through
     /// `get_project` on the detail-pane code path.
     #[tracing::instrument(skip_all, fields(n = ids.len()))]
@@ -314,7 +314,7 @@ impl ModrinthClient {
             .map_err(|e| ModrinthError::Parse(format!("get_projects_batch {url}: {e}")))
     }
 
-    /// `GET /v2/project/{id}/version` — filtered version list.
+    /// `GET /v2/project/{id}/version` -- filtered version list.
     ///
     /// 08-RESEARCH.md §Endpoint #3. Always sets `include_changelog=false`.
     #[tracing::instrument(skip_all, fields(project_id, mc, loaders_count = loaders.len()))]
@@ -348,7 +348,7 @@ impl ModrinthClient {
             .map_err(|e| ModrinthError::Parse(format!("list_versions {url}: {e}")))
     }
 
-    /// `GET /v2/version/{id}` — single version.
+    /// `GET /v2/version/{id}` -- single version.
     ///
     /// 08-RESEARCH.md §Endpoint #4. Used by 08-04 dep resolver when a dep pins
     /// a specific version_id (Q2 from 08-RESEARCH.md).
@@ -365,11 +365,11 @@ impl ModrinthClient {
             .map_err(|e| ModrinthError::Parse(format!("get_version {url}: {e}")))
     }
 
-    /// `GET /v2/version_file/{hash}?algorithm=sha512` — hash → version.
+    /// `GET /v2/version_file/{hash}?algorithm=sha512` -- hash → version.
     ///
     /// 08-RESEARCH.md §Endpoint #5. Returns Ok(None) on 404. Caller uses this
     /// to resolve "is this manually-dropped JAR a known Modrinth version?"
-    /// (Q3 from 08-RESEARCH.md, deferred to v2 — the method exists for
+    /// (Q3 from 08-RESEARCH.md, deferred to v2 -- the method exists for
     /// forward-compat).
     #[tracing::instrument(
         skip_all,
@@ -453,7 +453,7 @@ fn rate_limit_from(resp: &reqwest::Response) -> ModrinthError {
 }
 
 // ============================================================================
-// === Tests (httpmock 0.8.3 — already in [dev-dependencies])              ===
+// === Tests (httpmock 0.8.3 -- already in [dev-dependencies])              ===
 // ============================================================================
 #[cfg(test)]
 mod tests {
@@ -491,7 +491,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_user_agent_is_project_ua_not_default_reqwest() {
-        // PITFALL 1 — Modrinth blocks default reqwest UA with 403.
+        // PITFALL 1 -- Modrinth blocks default reqwest UA with 403.
         let server = MockServer::start();
         let m = server.mock(|when, then| {
             when.method(GET)
@@ -538,7 +538,7 @@ mod tests {
         assert_eq!(hits[0].project_id, "AANobbMI");
         assert!(
             !hits[0].already_installed,
-            "client never sets this true — caller stamps"
+            "client never sets this true -- caller stamps"
         );
     }
 
@@ -780,7 +780,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_projects_batch_returns_id_title_pairs() {
-        // Closes GAP-8-D — this endpoint feeds the dep-resolver title-hydration
+        // Closes GAP-8-D -- this endpoint feeds the dep-resolver title-hydration
         // pass that populates ResolvedDep.project_title.
         let server = MockServer::start();
         let m = server.mock(|when, then| {

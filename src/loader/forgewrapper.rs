@@ -1,9 +1,9 @@
-//! ForgeWrapper.jar — bundled MS-PL binary asset extracted on first install.
+//! ForgeWrapper.jar -- bundled MS-PL binary asset extracted on first install.
 //!
 //! Vendored from https://github.com/ZekerZhayard/ForgeWrapper at tag `1.6.0`
 //! (see `assets/forge_wrapper/README.md` for SHA-256 + license attribution).
 //!
-//! At launch time (Phase 12 — deferred), the wrapper's `Main` class is the
+//! At launch time (Phase 12 -- deferred), the wrapper's `Main` class is the
 //! JVM entry point. Install time (Phase 7) does NOT use ForgeWrapper as of
 //! 07.3-01 (GAP-7-A-v3): ForgeWrapper `Main` is a LAUNCH-time entry point
 //! that reads Mojang launch argv (`--fml.mcVersion`, `--launchTarget`, etc.)
@@ -30,7 +30,7 @@ use crate::persistence::paths::AppPaths;
 pub const FORGE_WRAPPER_JAR: &[u8] =
     include_bytes!("../../assets/forge_wrapper/ForgeWrapper-mmc4.jar");
 
-/// Expected SHA-256 (lowercase hex) — must match the file in
+/// Expected SHA-256 (lowercase hex) -- must match the file in
 /// `assets/forge_wrapper/`. Updated by the vendor task.
 ///
 /// [Rule 1 deviation note]: The plan used a fictional "mmc4" tag (~85KB);
@@ -41,7 +41,7 @@ pub const FORGE_WRAPPER_SHA256: &str =
 /// Filename used both for the embedded jar and the on-disk extracted copy.
 pub const FORGE_WRAPPER_FILENAME: &str = "ForgeWrapper-mmc4.jar";
 
-/// Fully-qualified ForgeWrapper entry-point class — used ONLY at LAUNCH
+/// Fully-qualified ForgeWrapper entry-point class -- used ONLY at LAUNCH
 /// time (Phase 12). Install-time invocation does NOT route through
 /// ForgeWrapper as of 07.3-01 (see GAP-7-A-v3 in 07-UAT.md and
 /// `.planning/debug/forge-installer-deep-bytecode-diagnosis.md`).
@@ -55,7 +55,7 @@ pub const FORGE_WRAPPER_FILENAME: &str = "ForgeWrapper-mmc4.jar";
 /// `mainClass.main(args)`. It has NO install-only mode and CANNOT be
 /// invoked at install time (empty argv → IndexOutOfBoundsException).
 ///
-/// At launch time (Phase 12 — deferred): used as the `mainClass` field
+/// At launch time (Phase 12 -- deferred): used as the `mainClass` field
 /// in the produced version JSON when launching modded MC. `Main` then
 /// resolves modlauncher via `setupBootstrapLauncher` and reflectively
 /// invokes the modded game.

@@ -1,6 +1,6 @@
 //! Fabric meta API HTTP client. (8.4-marker)
 //!
-//! Endpoints (verified 2026-04-26 — see 06-RESEARCH.md §API Reference):
+//! Endpoints (verified 2026-04-26 -- see 06-RESEARCH.md §API Reference):
 //!   GET /v2/versions/loader
 //!   GET /v2/versions/loader/{game_version}/{loader_version}/profile/json
 //!
@@ -17,7 +17,7 @@ pub const DEFAULT_FABRIC_META_BASE: &str = "https://meta.fabricmc.net";
 pub const FABRIC_META_BASE_URL_ENV: &str = "ICHR_FABRIC_META_BASE_URL";
 
 // -----------------------------------------------------------------------
-// Wire types — Fabric meta response shapes (private; map to LoaderVersionEntry)
+// Wire types -- Fabric meta response shapes (private; map to LoaderVersionEntry)
 // -----------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
@@ -177,13 +177,13 @@ impl FabricMetaClient {
 }
 
 // -----------------------------------------------------------------------
-// to_mojang_shape — translate fabric-meta wire shape to Mojang on-disk shape.
+// to_mojang_shape -- translate fabric-meta wire shape to Mojang on-disk shape.
 //
 // Phase 8.4 (round-4 BLOCKER closure GAP-LIBRARY-SHAPE-08): the launcher's
 // Library struct deserialises ONLY the Mojang shape (downloads.artifact.{path,
 // url, sha1?, size?}). Phase 6 used to write the verbatim fabric-meta wire
 // shape (top-level url/sha1/size per library, no `downloads` block) into
-// versions/{loader-id}/{loader-id}.json — silently dropping every library's
+// versions/{loader-id}/{loader-id}.json -- silently dropping every library's
 // hash + url on the launcher's deserialise step, leaving downloads.artifact
 // == None, leaving the loader's own JAR off the classpath, leaving JVM unable
 // to find KnotClient. This translator runs at the atomic_write boundary so
@@ -208,7 +208,7 @@ pub fn to_mojang_shape(raw_bytes: &[u8]) -> Result<Vec<u8>, LoaderError> {
     })?;
 
     let Some(libs_value) = obj.get_mut("libraries") else {
-        // No libraries field — pass through unchanged (Mojang accepts this).
+        // No libraries field -- pass through unchanged (Mojang accepts this).
         return serde_json::to_vec(&root).map_err(|e| LoaderError::MetaParse {
             loader: "fabric",
             reason: format!("translate: serialize: {e}"),
@@ -291,7 +291,7 @@ fn fabric_default_repo(name: &str) -> &'static str {
 }
 
 // -----------------------------------------------------------------------
-// Tests — httpmock-driven, no env-var mutation
+// Tests -- httpmock-driven, no env-var mutation
 // -----------------------------------------------------------------------
 
 #[cfg(test)]

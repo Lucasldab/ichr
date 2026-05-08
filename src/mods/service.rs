@@ -578,7 +578,7 @@ mod tests {
         let svc = ModrinthService::with_client(make_client(&server));
         let td = TempDir::new().unwrap();
         let paths = test_paths(&td);
-        // Mod uses .jar (is_safe_mod_filename), packs use .zip (is_safe_pack_filename) —
+        // Mod uses .jar (is_safe_mod_filename), packs use .zip (is_safe_pack_filename) --
         // upsert_mod enforces .jar; upsert_pack enforces .zip. Use the right one per kind.
         crate::mods::ledger::upsert_mod(
             &paths,

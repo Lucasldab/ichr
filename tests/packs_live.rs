@@ -34,13 +34,13 @@ use tokio_util::sync::CancellationToken;
 
 // ─── Pin constants ─────────────────────────────────────────────────────────────
 
-/// Faithful 32x — resource pack pinned 2026-05-08.
+/// Faithful 32x -- resource pack pinned 2026-05-08.
 const FAITHFUL_PROJECT_ID: &str = "w0TnApzs";
 const FAITHFUL_SLUG: &str = "faithful-32x";
 const FAITHFUL_VERSION_ID: &str = "kIpbQNcv";
 const FAITHFUL_MC_VERSION: &str = "1.20.4";
 
-/// Complementary Reimagined — shader pack pinned 2026-05-08.
+/// Complementary Reimagined -- shader pack pinned 2026-05-08.
 const COMPLEMENTARY_PROJECT_ID: &str = "HVnmMxH1";
 const COMPLEMENTARY_SLUG: &str = "complementary-reimagined";
 const COMPLEMENTARY_VERSION_ID: &str = "836bPNGo";
@@ -78,7 +78,7 @@ async fn make_instance(paths: &AppPaths, slug: &str) {
 ///   - Version selected by version_id-first, versions.first() fallback (pin drift resilient)
 ///   - Failure messages include copy-pasteable curl diagnostics for re-pinning
 #[tokio::test]
-#[ignore = "requires internet — downloads Faithful 32x from cdn.modrinth.com"]
+#[ignore = "requires internet -- downloads Faithful 32x from cdn.modrinth.com"]
 async fn live_install_faithful_32x() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::var("ICHR_SKIP_LIVE").is_ok() {
         eprintln!("[packs_live] skipped (ICHR_SKIP_LIVE set)");
@@ -92,7 +92,7 @@ async fn live_install_faithful_32x() -> Result<(), Box<dyn std::error::Error>> {
 
     let svc = PackService::new()?;
 
-    // 1. Search — match by slug first, fall back to project_id.
+    // 1. Search -- match by slug first, fall back to project_id.
     let hits = svc
         .search(
             "faithful 32x",
@@ -125,7 +125,7 @@ async fn live_install_faithful_32x() -> Result<(), Box<dyn std::error::Error>> {
         hit.project_id, hit.slug
     );
 
-    // 2. List versions — prefer pinned version_id, fall back to first.
+    // 2. List versions -- prefer pinned version_id, fall back to first.
     let version_entries = svc
         .list_versions(
             &hit.project_id,
@@ -169,7 +169,7 @@ async fn live_install_faithful_32x() -> Result<(), Box<dyn std::error::Error>> {
 
     let drain = tokio::spawn(async move {
         while let Some(ichr::tasks::TaskEvent::Progress { pct, msg, .. }) = rx.recv().await {
-            eprintln!("[packs_live:faithful] {pct:3}% — {msg}");
+            eprintln!("[packs_live:faithful] {pct:3}% -- {msg}");
         }
     });
 
@@ -227,7 +227,7 @@ async fn live_install_faithful_32x() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     eprintln!(
-        "[packs_live] SUCCESS — installed {} (sha1_short={})",
+        "[packs_live] SUCCESS -- installed {} (sha1_short={})",
         row.file_name,
         &r.sha512[..16.min(r.sha512.len())]
     );
@@ -242,7 +242,7 @@ async fn live_install_faithful_32x() -> Result<(), Box<dyn std::error::Error>> {
 /// Same slug-first / version_id-first fallback pattern as Faithful 32x.
 /// Asserts dest in shaderpacks/ + ledger row with kind=Shader.
 #[tokio::test]
-#[ignore = "requires internet — downloads Complementary Reimagined from cdn.modrinth.com"]
+#[ignore = "requires internet -- downloads Complementary Reimagined from cdn.modrinth.com"]
 async fn live_install_complementary_reimagined() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::var("ICHR_SKIP_LIVE").is_ok() {
         eprintln!("[packs_live] skipped (ICHR_SKIP_LIVE set)");
@@ -256,7 +256,7 @@ async fn live_install_complementary_reimagined() -> Result<(), Box<dyn std::erro
 
     let svc = PackService::new()?;
 
-    // 1. Search — match by slug first, fall back to project_id.
+    // 1. Search -- match by slug first, fall back to project_id.
     let hits = svc
         .search(
             "complementary reimagined",
@@ -289,7 +289,7 @@ async fn live_install_complementary_reimagined() -> Result<(), Box<dyn std::erro
         hit.project_id, hit.slug
     );
 
-    // 2. List versions — prefer pinned version_id, fall back to first.
+    // 2. List versions -- prefer pinned version_id, fall back to first.
     let version_entries = svc
         .list_versions(
             &hit.project_id,
@@ -333,7 +333,7 @@ async fn live_install_complementary_reimagined() -> Result<(), Box<dyn std::erro
 
     let drain = tokio::spawn(async move {
         while let Some(ichr::tasks::TaskEvent::Progress { pct, msg, .. }) = rx.recv().await {
-            eprintln!("[packs_live:complementary] {pct:3}% — {msg}");
+            eprintln!("[packs_live:complementary] {pct:3}% -- {msg}");
         }
     });
 
@@ -387,7 +387,7 @@ async fn live_install_complementary_reimagined() -> Result<(), Box<dyn std::erro
     );
 
     eprintln!(
-        "[packs_live] SUCCESS — installed {} (sha1_short={})",
+        "[packs_live] SUCCESS -- installed {} (sha1_short={})",
         row.file_name,
         &r.sha512[..16.min(r.sha512.len())]
     );

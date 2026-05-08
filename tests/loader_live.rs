@@ -1,4 +1,4 @@
-//! Live Fabric + Quilt install smoke tests — gated by `#[ignore]`.
+//! Live Fabric + Quilt install smoke tests -- gated by `#[ignore]`.
 //! Run with: `cargo test --test loader_live -- --ignored --nocapture`
 //!
 //! Hits the real meta APIs and downloads real loader libraries. Requires
@@ -42,7 +42,7 @@ fn make_progress_drain() -> mpsc::Sender<ichr::tasks::TaskEvent> {
 }
 
 #[tokio::test]
-#[ignore = "requires internet access — see module docs"]
+#[ignore = "requires internet access -- see module docs"]
 async fn live_fabric_install_1_21_4() {
     let td = TempDir::new().unwrap();
     let paths = make_paths(&td);
@@ -56,7 +56,7 @@ async fn live_fabric_install_1_21_4() {
     let token = CancellationToken::new();
 
     println!("[loader_live] starting Fabric install: mc={mc}, loader={loader_version}");
-    // JobId(0) — JobId is a tuple struct with no Default impl; 0 is the sentinel for ad-hoc callers.
+    // JobId(0) -- JobId is a tuple struct with no Default impl; 0 is the sentinel for ad-hoc callers.
     let job_id = JobId(0);
     svc.install_loader(
         &paths,
@@ -101,11 +101,11 @@ async fn live_fabric_install_1_21_4() {
         lib.display()
     );
 
-    println!("[loader_live] Fabric SUCCESS — version_id={expected_id}");
+    println!("[loader_live] Fabric SUCCESS -- version_id={expected_id}");
 }
 
 #[tokio::test]
-#[ignore = "requires internet access — see module docs"]
+#[ignore = "requires internet access -- see module docs"]
 async fn live_quilt_install_1_21_4() {
     let td = TempDir::new().unwrap();
     let paths = make_paths(&td);
@@ -115,7 +115,7 @@ async fn live_quilt_install_1_21_4() {
     write_vanilla_manifest(&paths, slug, mc).await;
     let svc = LoaderService::new().expect("LoaderService::new");
 
-    // Pick the newest Quilt version dynamically — Quilt's beta release churns.
+    // Pick the newest Quilt version dynamically -- Quilt's beta release churns.
     // Fetching the list avoids pinning a specific version that may be removed upstream.
     let versions = svc
         .list_loader_versions(LoaderType::Quilt, mc)
@@ -131,7 +131,7 @@ async fn live_quilt_install_1_21_4() {
     let progress = make_progress_drain();
     let token = CancellationToken::new();
 
-    // JobId(0) — JobId is a tuple struct with no Default impl; 0 is the sentinel for ad-hoc callers.
+    // JobId(0) -- JobId is a tuple struct with no Default impl; 0 is the sentinel for ad-hoc callers.
     let job_id = JobId(0);
     svc.install_loader(
         &paths,
@@ -177,7 +177,7 @@ async fn live_quilt_install_1_21_4() {
     );
 
     println!(
-        "[loader_live] Quilt SUCCESS — version_id={}",
+        "[loader_live] Quilt SUCCESS -- version_id={}",
         loader.version_id
     );
 }

@@ -89,7 +89,7 @@ impl LoaderService {
     /// 2. `remove_dir_all(versions/{loader.version_id}/)` (NotFound is non-fatal).
     /// 3. `manifest.loader = None` and write_instance_manifest.
     ///
-    /// Does NOT touch `libraries/` — Maven layout is shared across instances.
+    /// Does NOT touch `libraries/` -- Maven layout is shared across instances.
     #[tracing::instrument(skip_all, fields(slug = %slug))]
     pub async fn remove_loader(&self, paths: &AppPaths, slug: &str) -> Result<(), LoaderError> {
         let mut manifest = crate::instance::store::read_instance_manifest(paths, slug)
@@ -118,14 +118,14 @@ impl LoaderService {
     ///
     /// For Forge/NeoForge: subprocess pipeline (re-attach check → download
     /// installer JAR → stage + ForgeWrapper → run installer → harvest → write
-    /// manifest LAST). Requires `jre_path` — obtain via
+    /// manifest LAST). Requires `jre_path` -- obtain via
     /// `JavaService::resolve_jre_for_mc_version_install` before calling.
     ///
     /// For Fabric/Quilt callers, pass a dummy path (e.g. `Path::new(".")`) until
     /// Wave 5 wires up proper JRE resolution in `run.rs`.
     ///
     /// Cancellation: token checked at every await; returns `LoaderError::Cancelled`
-    /// without modifying instance.json (atomicity invariant — Pitfall 7).
+    /// without modifying instance.json (atomicity invariant -- Pitfall 7).
     #[allow(clippy::too_many_arguments)]
     #[tracing::instrument(skip_all, fields(slug = %slug, loader = ?loader_type, version = %loader_version))]
     pub async fn install_loader(
@@ -142,7 +142,7 @@ impl LoaderService {
     ) -> Result<(), LoaderError> {
         match loader_type {
             LoaderType::Fabric | LoaderType::Quilt => {
-                // Existing Phase 6 pipeline — `jre_path` is unused for HTTP-only loaders.
+                // Existing Phase 6 pipeline -- `jre_path` is unused for HTTP-only loaders.
                 let _ = jre_path;
                 install_loader_impl(
                     self,
@@ -235,7 +235,7 @@ async fn install_subprocess_loader(
     }
 
     // ------------------------------------------------------------------
-    // STEP 1 — Re-attach pre-check (D-04)
+    // STEP 1 -- Re-attach pre-check (D-04)
     // If predicted version JSON exists AND all declared libraries are on disk,
     // skip steps 2-5 and jump straight to manifest write.
     // ------------------------------------------------------------------
@@ -289,7 +289,7 @@ async fn install_subprocess_loader(
     }
 
     // ------------------------------------------------------------------
-    // STEP 2 — Download installer JAR (skip if already cached)
+    // STEP 2 -- Download installer JAR (skip if already cached)
     // ------------------------------------------------------------------
     send_progress!(5, "Downloading installer");
     let installer_url = match loader_type {
@@ -368,7 +368,7 @@ async fn install_subprocess_loader(
     }
 
     // ------------------------------------------------------------------
-    // STEP 3 — Build staging dir
+    // STEP 3 -- Build staging dir
     // ------------------------------------------------------------------
     let staging = staging::StagingDir::create(paths, slug).await?;
     let staging_root = staging.root().to_path_buf();
@@ -388,7 +388,7 @@ async fn install_subprocess_loader(
         }
 
         // --------------------------------------------------------------
-        // STEP 4 — Run installer subprocess via installer-JAR-direct invocation
+        // STEP 4 -- Run installer subprocess via installer-JAR-direct invocation
         // --------------------------------------------------------------
         send_progress!(30, "Running installer");
         let unix_ts = std::time::SystemTime::now()
@@ -402,7 +402,7 @@ async fn install_subprocess_loader(
             let _ = tokio::fs::create_dir_all(parent).await;
         }
 
-        // GAP-7-A umbrella (single gap, FOUR rounds — three retracted, one shipping):
+        // GAP-7-A umbrella (single gap, FOUR rounds -- three retracted, one shipping):
         //   round-1 (07-04, GAP-7-A): Main + no -D properties + bogus
         //                              --installer=/--instance= flags →
         //                              NoClassDefFoundError on modlauncher.
@@ -476,7 +476,7 @@ async fn install_subprocess_loader(
         }
 
         // --------------------------------------------------------------
-        // STEP 5 — Harvest
+        // STEP 5 -- Harvest
         // 07-WARNING-4 fix: pass vanilla_mc_id so harvest excludes vanilla dir.
         // --------------------------------------------------------------
         let harvested =
@@ -504,14 +504,14 @@ async fn install_subprocess_loader(
     let harvested = match outcome {
         Ok(h) => h,
         Err(e) => {
-            // Steps 3-5 failed — clean staging, propagate.
+            // Steps 3-5 failed -- clean staging, propagate.
             staging::cleanup_staging(&staging_root).await;
             return Err(e);
         }
     };
 
     // ------------------------------------------------------------------
-    // STEP 6 — Manifest write LAST (atomicity invariant — Pitfall 7)
+    // STEP 6 -- Manifest write LAST (atomicity invariant -- Pitfall 7)
     // The instance.json loader field is NEVER written if any step above
     // failed or was cancelled.
     // ------------------------------------------------------------------
@@ -525,7 +525,7 @@ async fn install_subprocess_loader(
     .await?;
     send_progress!(100, "Done");
 
-    // STEP 7 — Cleanup staging (post-success best-effort)
+    // STEP 7 -- Cleanup staging (post-success best-effort)
     staging::cleanup_staging(&staging_root).await;
     Ok(())
 }
@@ -612,7 +612,7 @@ async fn install_loader_impl(
     // If we can predict the version_id from the known Fabric/Quilt ID
     // format AND the version JSON + all library paths from a prior
     // install are present on disk, skip Steps 1-3 entirely (no HTTP
-    // fetches at all) — go straight to Step 4.
+    // fetches at all) -- go straight to Step 4.
     //
     // The predicted format ("fabric-loader-{v}-{mc}" / "quilt-loader-{v}-{mc}")
     // matches what the meta APIs return for the `id` field. If this
@@ -630,7 +630,7 @@ async fn install_loader_impl(
         .unwrap_or(false)
     {
         // Parse the on-disk version JSON to extract library list without
-        // calling the meta API — avoids a network round-trip on re-attach.
+        // calling the meta API -- avoids a network round-trip on re-attach.
         try_reattach_from_disk(paths, loader_type, &predicted_version_id).await
     } else {
         None
@@ -644,7 +644,7 @@ async fn install_loader_impl(
             "loader re-attach: all artifacts already on disk (fast path)"
         );
         send_progress(95, "Re-attaching existing loader".to_string()).await;
-        // Jump directly to Step 4 — no downloads, no profile fetch.
+        // Jump directly to Step 4 -- no downloads, no profile fetch.
         check_cancel!();
         let mut manifest = crate::instance::store::read_instance_manifest(paths, slug)
             .await
@@ -675,7 +675,7 @@ async fn install_loader_impl(
 
     // Both profiles carry (id, raw_bytes, libraries).
     // Consume canonical `crate::loader::types::LoaderLibrary` directly from
-    // both client profiles — no per-loader bridge struct (no NormLib).
+    // both client profiles -- no per-loader bridge struct (no NormLib).
     let (profile_id, raw_bytes, libs, http) = match loader_type {
         LoaderType::Fabric => {
             let p: FabricProfile = svc.fabric.fetch_profile(mc_version, loader_version).await?;
@@ -683,7 +683,7 @@ async fn install_loader_impl(
         }
         LoaderType::Quilt => {
             let p: QuiltProfile = svc.quilt.fetch_profile(mc_version, loader_version).await?;
-            // Quilt's no-hash invariant is parse-time (asserted by 06-04-01) —
+            // Quilt's no-hash invariant is parse-time (asserted by 06-04-01) --
             // every sha1/sha256/sha512/md5 is already None on these entries.
             (p.id, p.raw_bytes, p.libraries, svc.quilt.http().clone())
         }
@@ -804,7 +804,7 @@ async fn install_loader_impl(
     }
 
     // -----------------------------------------------------------------
-    // Step 4: write instance manifest — LAST (atomicity invariant)
+    // Step 4: write instance manifest -- LAST (atomicity invariant)
     // instance.json is NEVER written if cancelled before this point.
     // -----------------------------------------------------------------
     check_cancel!();
@@ -830,8 +830,8 @@ async fn install_loader_impl(
 }
 
 // -----------------------------------------------------------------
-// Internal helpers — operate directly on canonical LoaderLibrary
-// (no NormLib bridge struct — canonical type consumed directly)
+// Internal helpers -- operate directly on canonical LoaderLibrary
+// (no NormLib bridge struct -- canonical type consumed directly)
 // -----------------------------------------------------------------
 
 fn loader_label(t: LoaderType) -> &'static str {
@@ -883,7 +883,7 @@ fn predict_version_id(loader_type: LoaderType, loader_version: &str, mc_version:
 /// extracts each library's maven coord (`name`), and checks the per-coord
 /// JAR exists. Returns `Some((version_id, libs))` on full presence; `None`
 /// otherwise. The returned LoaderLibrary entries have ONLY `name` populated
-/// — re-attach callers must NOT depend on sha1/url/size being Some for
+/// -- re-attach callers must NOT depend on sha1/url/size being Some for
 /// post-reattach reads.
 async fn try_reattach_from_disk(
     paths: &AppPaths,
@@ -895,7 +895,7 @@ async fn try_reattach_from_disk(
 
     // Phase 8.4 GAP-LIBRARY-SHAPE-08: on-disk JSON is now Mojang shape; the
     // re-attach existence check only needs the maven coord (`name`) per library
-    // entry — derived path comes from maven_coord_to_path(&lib.name) below,
+    // entry -- derived path comes from maven_coord_to_path(&lib.name) below,
     // which is what download_one_library uses to write the file in the first
     // place. The Mojang-shape `downloads.artifact.path` field would yield the
     // SAME relative path; either is acceptable. We derive from `name` to keep
@@ -938,7 +938,7 @@ async fn try_reattach_from_disk(
 }
 
 /// Re-attach detection: version JSON present AND every library present on disk.
-/// Returns true only when all artifacts exist — a partial install returns false
+/// Returns true only when all artifacts exist -- a partial install returns false
 /// and triggers a full download pass.
 async fn is_already_installed(
     paths: &AppPaths,
@@ -985,7 +985,7 @@ async fn download_one_library(
                 if ok {
                     return Ok(());
                 }
-                // Hash mismatch on existing file — fall through to re-download.
+                // Hash mismatch on existing file -- fall through to re-download.
             }
             None => {
                 // Quilt (or hashless Fabric entry): no hash → existence is sufficient (Pattern 6).
@@ -1021,7 +1021,7 @@ async fn download_one_library(
         })?
         .to_vec();
 
-    // Verify SHA1 BEFORE writing — fail fast (T-06-11).
+    // Verify SHA1 BEFORE writing -- fail fast (T-06-11).
     if let Some(expected) = &lib.sha1 {
         let got = sha1_hex(&bytes);
         if !got.eq_ignore_ascii_case(expected) {
@@ -1223,7 +1223,7 @@ mod tests {
         crate::instance::store::write_instance_manifest(&paths, &m)
             .await
             .unwrap();
-        // No loader, no versions/ dir — should still be Ok
+        // No loader, no versions/ dir -- should still be Ok
         svc.remove_loader(&paths, slug).await.unwrap();
     }
 
@@ -1418,7 +1418,7 @@ mod tests {
 
         // Register both profile and library mocks for the first install.
         // After the first install, we assert the profile mock was called exactly
-        // once — the second install should skip the meta API entirely (re-attach).
+        // once -- the second install should skip the meta API entirely (re-attach).
         let profile_mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/v2/versions/loader/1.21.4/0.16.9/profile/json");
@@ -1475,7 +1475,7 @@ mod tests {
             .await
             .unwrap();
 
-        // Second install — should NOT fetch profile again (re-attach via disk check)
+        // Second install -- should NOT fetch profile again (re-attach via disk check)
         let (tx2, _rx2) = mpsc::channel(64);
         svc.install_loader(
             &paths,
@@ -1554,7 +1554,7 @@ mod tests {
     #[tokio::test]
     async fn test_install_cancelled_before_completion_returns_cancelled() {
         let server = MockServer::start();
-        // No mocks needed — token fires before any HTTP call
+        // No mocks needed -- token fires before any HTTP call
         let td = TempDir::new().unwrap();
         let paths = make_paths(&td);
         let svc = make_service(&server);
@@ -1770,7 +1770,7 @@ mod forge_neoforge_tests {
         let svc = make_svc();
         let (tx, _rx) = mpsc::channel(64);
         let token = CancellationToken::new();
-        // jre_path is irrelevant — re-attach short-circuits before subprocess.
+        // jre_path is irrelevant -- re-attach short-circuits before subprocess.
         let bogus_jre = std::path::PathBuf::from("/does/not/exist/java");
 
         let r = svc
@@ -1818,7 +1818,7 @@ mod forge_neoforge_tests {
         let svc = make_svc();
         let (tx, _rx) = mpsc::channel(64);
         let token = CancellationToken::new();
-        token.cancel(); // cancel immediately — before any network or FS
+        token.cancel(); // cancel immediately -- before any network or FS
 
         let bogus_jre = std::path::PathBuf::from("/bin/sh");
         let r = svc
@@ -1899,7 +1899,7 @@ mod forge_neoforge_tests {
             token_c.cancel();
         });
 
-        // Using /bin/sh as jre — it will fail when given JVM args (non-zero exit
+        // Using /bin/sh as jre -- it will fail when given JVM args (non-zero exit
         // or immediate error). Either way the install fails before writing manifest.
         let bogus_jre = std::path::PathBuf::from("/bin/sh");
         let r = svc
@@ -1927,7 +1927,7 @@ mod forge_neoforge_tests {
             m.loader
         );
 
-        // Staging dir should be cleaned (best-effort — might linger on some
+        // Staging dir should be cleaned (best-effort -- might linger on some
         // error paths, so tolerate empty dir too).
         let staging_base = paths.data_dir.join("staging");
         if staging_base.exists() {

@@ -1,4 +1,4 @@
-//! Pack drop-from-path modal — text-entry for a local .zip file path.
+//! Pack drop-from-path modal -- text-entry for a local .zip file path.
 //!
 //! Cloned-and-parameterised from `modpack_import_path_modal.rs` per Phase 11 plan 04.
 //! Title adapts by PackKind:
@@ -34,8 +34,8 @@ pub fn render_pack_drop_path_modal(f: &mut Frame, area: Rect, state: &AppState) 
         .split(modal_area);
 
     let prompt = match kind {
-        PackKind::Resource => "Install resource pack — enter .zip file path:",
-        PackKind::Shader => "Install shader pack — enter .zip file path:",
+        PackKind::Resource => "Install resource pack -- enter .zip file path:",
+        PackKind::Shader => "Install shader pack -- enter .zip file path:",
     };
     let title = match kind {
         PackKind::Resource => "Add Resource Pack (Enter to install / Esc to cancel)",

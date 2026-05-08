@@ -1,4 +1,4 @@
-//! Live Modrinth install smoke test — gated by `#[ignore]`.
+//! Live Modrinth install smoke test -- gated by `#[ignore]`.
 //!
 //! Run with: `cargo nextest run --run-ignored only -E 'test(modrinth_live)'`
 //! (or `cargo test --test modrinth_live -- --ignored --nocapture`)
@@ -28,7 +28,7 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 #[tokio::test]
-#[ignore = "requires internet access — see module docs"]
+#[ignore = "requires internet access -- see module docs"]
 // Renamed from `live_install_sodium_with_deps_fabric_1_20_4` as part of the
 // Phase 8.1 GAP-8-A closure (2026-05-07). Sodium's current Modrinth metadata
 // declares zero dependencies, which made the original dep-resolve assertion
@@ -93,7 +93,7 @@ async fn live_install_continuity_with_deps_fabric_1_20_4() {
         continuity.project_id
     );
 
-    // 2. List versions for Continuity. Prefer the pinned WMwDkIY8 (3.0.0+1.20.2 —
+    // 2. List versions for Continuity. Prefer the pinned WMwDkIY8 (3.0.0+1.20.2 --
     //    valid for 1.20.4); fall back to the first 1.20.4-compatible release.
     let versions = svc
         .list_versions(&continuity.project_id, Some(mc), Some(&loader_info))
@@ -126,7 +126,7 @@ async fn live_install_continuity_with_deps_fabric_1_20_4() {
     assert!(
         !new_required.is_empty(),
         "Continuity should require at least one new dep (Fabric API) on 1.20.4 + fabric. \
-         If this fails, the fixture has drifted again — verify with: \
+         If this fails, the fixture has drifted again -- verify with: \
          curl https://api.modrinth.com/v2/version/{} | jq '.dependencies'",
         chosen.version_id,
     );
@@ -137,7 +137,7 @@ async fn live_install_continuity_with_deps_fabric_1_20_4() {
         graph.total_new_files,
     );
 
-    // 4. Install — drain progress events into /dev/null.
+    // 4. Install -- drain progress events into /dev/null.
     let (tx, mut rx) = mpsc::channel(64);
     tokio::spawn(async move { while rx.recv().await.is_some() {} });
     let token = CancellationToken::new();
@@ -245,7 +245,7 @@ async fn live_install_continuity_with_deps_fabric_1_20_4() {
     );
 
     println!(
-        "[modrinth_live] SUCCESS — installed {} mods, toggled, uninstalled cleanly",
+        "[modrinth_live] SUCCESS -- installed {} mods, toggled, uninstalled cleanly",
         mods.len()
     );
 }

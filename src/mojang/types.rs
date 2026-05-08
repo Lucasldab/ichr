@@ -1,7 +1,7 @@
 //! Mojang version manifest and version JSON serde types.
 //!
 //! All structs use `#[serde(default)]` on optional fields for forward-compat
-//! (unknown fields are silently ignored — no `deny_unknown_fields`).
+//! (unknown fields are silently ignored -- no `deny_unknown_fields`).
 //! See PITFALLS.md Pitfall 5 and 02-RESEARCH.md §1–§5.
 
 use serde::{Deserialize, Serialize};
@@ -52,13 +52,13 @@ pub struct VersionJson {
     /// field on disk and inherit it via `inherits_from` from the vanilla parent.
     /// Demoted to `Option` so a real loader JSON deserialises cleanly. Use the
     /// `ResolvedVersion` struct (post-`resolve_inherits`) when the field MUST
-    /// be present — the type system then enforces it.
+    /// be present -- the type system then enforces it.
     #[serde(default)]
     pub asset_index: Option<AssetIndex>,
-    /// See `asset_index` doc-comment — same Option/inherit semantics.
+    /// See `asset_index` doc-comment -- same Option/inherit semantics.
     #[serde(default)]
     pub assets: Option<String>,
-    /// See `asset_index` doc-comment — same Option/inherit semantics.
+    /// See `asset_index` doc-comment -- same Option/inherit semantics.
     #[serde(default)]
     pub downloads: Option<VersionDownloads>,
     #[serde(default)]
@@ -272,11 +272,11 @@ pub struct AssetObject {
 }
 
 // ---------------------------------------------------------------------------
-// ResolvedVersion — post-inheritsFrom-merge invariant: required fields populated.
+// ResolvedVersion -- post-inheritsFrom-merge invariant: required fields populated.
 // Produced by `resolve_inherits` and consumed by the launcher pipeline.
 // The launcher pipeline (Steps 5-10 of `launch_instance`) reads ONLY this
 // struct; it must not deserialize a raw on-disk JSON into ResolvedVersion
-// (the type system's narrow shape is the whole point — it guarantees no
+// (the type system's narrow shape is the whole point -- it guarantees no
 // caller accidentally reads a vanilla-only field off a loader's JSON).
 // ---------------------------------------------------------------------------
 
@@ -290,7 +290,7 @@ pub struct ResolvedVersion {
     /// MC id where the JAR actually lives on disk). For a Fabric instance
     /// inheriting `1.20.4`, this is `"1.20.4"`. For a vanilla-only install
     /// (no `inheritsFrom`), this equals `id`. Used by the classpath builder
-    /// to construct `paths.version_jar(&self.root_id)` — the loader's
+    /// to construct `paths.version_jar(&self.root_id)` -- the loader's
     /// `paths.version_jar(&self.id)` would resolve to a non-existent file
     /// because Phase 6's loader install only writes `{loader-id}.json`
     /// (never `{loader-id}.jar`); the JAR is inherited from vanilla.

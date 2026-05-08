@@ -34,7 +34,7 @@ pub fn init(paths: &AppPaths) -> anyhow::Result<WorkerGuard> {
     }
 
     // Open append-create so multiple runs accumulate history.
-    // No rotation yet — Phase 12 or v2 may add `tracing-appender::rolling`.
+    // No rotation yet -- Phase 12 or v2 may add `tracing-appender::rolling`.
     let file = OpenOptions::new()
         .create(true)
         .append(true)

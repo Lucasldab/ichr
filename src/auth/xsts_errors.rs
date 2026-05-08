@@ -9,7 +9,7 @@
 //! Codes documented at https://minecraft.wiki/w/Microsoft_authentication
 //! (cross-referenced with Prism Launcher's xstsErrors.cpp table).
 //!
-//! This module is PURE SYNC — no async, no I/O, no reqwest. It is the
+//! This module is PURE SYNC -- no async, no I/O, no reqwest. It is the
 //! simplest auth module and is used as a spike target for early testing
 //! in Phase 4.
 

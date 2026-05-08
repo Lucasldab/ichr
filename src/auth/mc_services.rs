@@ -2,14 +2,14 @@
 //!
 //! After XSTS succeeds, the chain exchanges the XSTS token for a
 //! Minecraft services access token, verifies entitlement (the MS
-//! account must actually own Minecraft Java Edition — pitfall 5),
+//! account must actually own Minecraft Java Edition -- pitfall 5),
 //! and fetches the player profile (UUID + display name).
 //!
 //! Pitfalls enforced here:
 //!   - pitfall 5: `check_entitlement` treats `items: []` as a hard error
 //!     with a user-facing message (`AuthError::NoMinecraftLicense`)
 //!   - pitfall 16: no token values in `tracing::` macro arguments
-//!   - identityToken format: `"XBL3.0 x=<uhs>;<xsts_token>"` — verbatim
+//!   - identityToken format: `"XBL3.0 x=<uhs>;<xsts_token>"` -- verbatim
 //!     (anti-pattern 4 in research: wrong RelyingParty OR wrong format
 //!     produces an invalid MC token that Minecraft servers reject).
 
@@ -30,7 +30,7 @@ pub struct McLoginResponse {
 }
 
 /// Parsed entitlement response. Only the `items` field is consulted; we
-/// deliberately do NOT verify the signature — per Microsoft's documentation
+/// deliberately do NOT verify the signature -- per Microsoft's documentation
 /// that is server-side validation and the signature format changes.
 #[derive(Debug, Clone, Deserialize)]
 pub struct EntitlementResponse {
@@ -54,7 +54,7 @@ pub struct McProfile {
 /// Step 5 of the chain: exchange XSTS token for a Minecraft access token.
 ///
 /// The POST body contains `"identityToken":"XBL3.0 x={user_hash};{xsts_token}"`.
-/// This exact format is required — wrong prefix or separator produces a valid
+/// This exact format is required -- wrong prefix or separator produces a valid
 /// HTTP 200 but an MC token that game servers reject.
 #[tracing::instrument(name = "mc_login", skip_all)]
 pub async fn login_with_xbox(

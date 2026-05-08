@@ -1,4 +1,4 @@
-//! CurseForge install-failed modal — mirrors `mod_install_failed_modal.rs`
+//! CurseForge install-failed modal -- mirrors `mod_install_failed_modal.rs`
 //! plus the load-bearing `web_url` block per 09-RESEARCH.md §"downloadUrl
 //! null UX" lines 254-271.
 //!
@@ -121,7 +121,7 @@ You can download the file from CurseForge in your browser, then drop it into the
             .wrap(Wrap { trim: false });
         f.render_widget(body_p, split[3]);
     } else {
-        // Body for non-restricted errors — repeat error_message for context.
+        // Body for non-restricted errors -- repeat error_message for context.
         let body_p = Paragraph::new(error_message.as_str())
             .style(
                 Style::default()

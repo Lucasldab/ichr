@@ -44,7 +44,7 @@ async fn register_all_mocks(server: &MockServer) {
             );
         })
         .await;
-    // 2b. token (refresh) — used by resolve_msa_tokens_for_launch
+    // 2b. token (refresh) -- used by resolve_msa_tokens_for_launch
     server
         .mock_async(|when, then| {
             when.method(POST)
@@ -198,7 +198,7 @@ async fn test_auth_chain_xsts_error_surfaces_readable_message() {
                 .body(r#"{"Token":"x","DisplayClaims":{"xui":[{"uhs":"u"}]}}"#);
         })
         .await;
-    // XSTS 401 — no Xbox profile
+    // XSTS 401 -- no Xbox profile
     server
         .mock_async(|when, then| {
             when.method(POST).path("/xsts/authorize");

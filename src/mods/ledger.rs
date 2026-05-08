@@ -1,13 +1,13 @@
-//! Per-instance mod ledger — TOML sidecar at `instance_dir/installed-mods.toml`.
+//! Per-instance mod ledger -- TOML sidecar at `instance_dir/installed-mods.toml`.
 //!
 //! - 7 functions: read_ledger / write_ledger / upsert_mod / remove_mod /
 //!   toggle_enabled / uninstall / per_instance_lock.
 //! - All mutation operations atomically update BOTH the disk file (.jar
 //!   rename or removal) AND the ledger row, serialized per-instance via a
-//!   `tokio::sync::Mutex<()>` map (Pitfall 8 protocol — held only during
+//!   `tokio::sync::Mutex<()>` map (Pitfall 8 protocol -- held only during
 //!   read→mutate→write, never across HTTP).
 //!
-//! ASSUMPTION A4 from 08-RESEARCH.md — sidecar TOML is the right pattern
+//! ASSUMPTION A4 from 08-RESEARCH.md -- sidecar TOML is the right pattern
 //! (vs. extending instance.json). Verify in human checkpoint.
 //!
 //! Mirrors `src/auth/store.rs::{save_accounts, load_accounts}` (TOML
@@ -37,7 +37,7 @@ use crate::persistence::paths::AppPaths;
 // === Per-instance lock map (Pitfall 8)                                    ===
 // ============================================================================
 
-/// Per-instance lock map — serializes ledger mutations for one slug.
+/// Per-instance lock map -- serializes ledger mutations for one slug.
 /// The outer std::sync mutex protects the map; the inner tokio mutex
 /// serializes mutation operations for a single instance.
 fn instance_locks() -> &'static std::sync::Mutex<HashMap<String, Arc<Mutex<()>>>> {
@@ -139,8 +139,8 @@ pub async fn upsert_mod(
 }
 
 /// Insert or replace a pack row in the per-instance ledger.
-/// Mirrors `upsert_mod` exactly — same per-instance lock, same read→mutate→write,
-/// same replace-on-mod_id semantics — but validates filename via
+/// Mirrors `upsert_mod` exactly -- same per-instance lock, same read→mutate→write,
+/// same replace-on-mod_id semantics -- but validates filename via
 /// `is_safe_pack_filename` (which accepts `.zip` instead of `.jar`).
 /// Per 11-RESEARCH.md §"Upsert Validation Gate" + Researcher Q4 (keep
 /// ledger logic together).
@@ -154,7 +154,7 @@ pub async fn upsert_pack(
     slug: &str,
     row: InstalledModRow,
 ) -> Result<(), ModrinthError> {
-    // V5 input validation — pack flavor (.zip + SPACE allowed).
+    // V5 input validation -- pack flavor (.zip + SPACE allowed).
     if !is_safe_pack_filename(&row.file_name) {
         return Err(io_err(format!("unsafe ledger filename: {}", row.file_name)));
     }
@@ -186,7 +186,7 @@ pub async fn remove_mod(paths: &AppPaths, slug: &str, mod_id: &str) -> Result<()
 }
 
 /// Atomically toggle a mod between `.jar` and `.jar.disabled`.
-/// File rename happens BEFORE ledger write — if rename fails, ledger is unchanged.
+/// File rename happens BEFORE ledger write -- if rename fails, ledger is unchanged.
 /// Returns the NEW enabled state.
 #[tracing::instrument(name = "mods::toggle_enabled", skip_all, fields(slug = %slug, mod_id))]
 pub async fn toggle_enabled(
@@ -238,7 +238,7 @@ pub async fn toggle_enabled(
 }
 
 /// Remove a mod's file AND its ledger row. File removal happens BEFORE ledger
-/// write — if file removal fails (other than NotFound), the ledger is unchanged.
+/// write -- if file removal fails (other than NotFound), the ledger is unchanged.
 ///
 /// Defensive behavior: if the on-disk file is already missing (user manually
 /// deleted), we still drop the ledger row. This keeps the ledger consistent
@@ -267,7 +267,7 @@ pub async fn uninstall(paths: &AppPaths, slug: &str, mod_id: &str) -> Result<(),
         mods_dir.join(disabled_filename(&row.file_name))
     };
 
-    // Best-effort remove — file may already be missing (user manually deleted);
+    // Best-effort remove -- file may already be missing (user manually deleted);
     // we still drop the ledger row in that case. Surface only non-NotFound errors.
     match tokio::fs::remove_file(&target).await {
         Ok(()) => {}

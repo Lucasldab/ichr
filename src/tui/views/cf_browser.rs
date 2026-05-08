@@ -1,20 +1,20 @@
-//! CurseForge mod browser — full-screen split-pane CurseForge browser.
+//! CurseForge mod browser -- full-screen split-pane CurseForge browser.
 //!
 //! Source: 09-RESEARCH.md §"TUI Integration Plumbing" + 09-PATTERNS.md
 //! §`src/tui/views/cf_browser.rs` (deltas off `mod_browser.rs`).
 //!
 //! Layout mirrors `mod_browser.rs` (Phase 8 analog) verbatim:
-//!  - Length(3) header — block title + filter chips
-//!  - Length(3) search bar — string-buffer input (no ratatui-textarea)
-//!  - Min(1)   body — Percentage(40)/Percentage(60) horizontal split
-//!  - Length(1) footer — DIM keybind hint
+//!  - Length(3) header -- block title + filter chips
+//!  - Length(3) search bar -- string-buffer input (no ratatui-textarea)
+//!  - Min(1)   body -- Percentage(40)/Percentage(60) horizontal split
+//!  - Length(1) footer -- DIM keybind hint
 //!
 //! Differences from Phase 8 ModBrowser:
 //!  - Wire types are CurseForge (`CurseForgeSearchHit`, `CurseForgeProjectDetail`).
 //!  - `loader_filter` is `Option<i32>` (CurseForge ModLoaderType enum).
 //!  - Search placeholder mentions CurseForge.
 //!  - Detail pane uses `authors` list (CurseForge bundles authors with the
-//!    project response — no separate fetch).
+//!    project response -- no separate fetch).
 
 use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
@@ -96,7 +96,7 @@ pub fn render_cf_browser(f: &mut Frame, area: Rect, state: &AppState) {
     };
 
     let header_line = Line::from(vec![
-        Span::styled(format!("CurseForge Mods — {slug}    "), Style::default()),
+        Span::styled(format!("CurseForge Mods -- {slug}    "), Style::default()),
         Span::styled(format!("[{mc_chip_text}]"), mc_chip_style),
         Span::raw("  "),
         Span::styled(format!("[{loader_chip_text}]"), loader_chip_style),
@@ -104,7 +104,7 @@ pub fn render_cf_browser(f: &mut Frame, area: Rect, state: &AppState) {
     let header_para = Paragraph::new(header_line).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(format!(" CurseForge Mods — {slug} ")),
+            .title(format!(" CurseForge Mods -- {slug} ")),
     );
     f.render_widget(header_para, chunks[0]);
 
@@ -173,7 +173,7 @@ fn render_results_pane(
 
     let placeholder = match fetch_state {
         ModBrowserFetchState::Loading => Some("Searching CurseForge..."),
-        ModBrowserFetchState::Error(_) => Some("Failed to reach CurseForge — check network"),
+        ModBrowserFetchState::Error(_) => Some("Failed to reach CurseForge -- check network"),
         ModBrowserFetchState::Ready if results.is_empty() => Some("No mods found"),
         ModBrowserFetchState::Ready => None,
     };
@@ -290,7 +290,7 @@ fn render_detail_pane(
             "Downloads: {}",
             thousands(d.download_count)
         )));
-        // CurseForge mod response does not carry "latest version" inline —
+        // CurseForge mod response does not carry "latest version" inline --
         // direct the user to the file picker.
         lines.push(Line::raw("Latest: see Files (Enter)"));
         if !d.links.website_url.is_empty() {
@@ -307,7 +307,7 @@ fn render_detail_pane(
         if let ModBrowserFetchState::Error(_) = fetch_state {
             lines.push(Line::raw(""));
             lines.push(Line::from(Span::styled(
-                "Could not load details — check network".to_string(),
+                "Could not load details -- check network".to_string(),
                 Style::default()
                     .fg(Color::DarkGray)
                     .add_modifier(Modifier::DIM),
@@ -635,7 +635,7 @@ mod tests {
 
     /// GAP-8-C / 08.1-04: bracketed-paste payload from the terminal must map
     /// to a single `CfBrowserPasteSearch` action carrying the whole pasted
-    /// string — same contract as the Modrinth analog.
+    /// string -- same contract as the Modrinth analog.
     #[test]
     fn paste_event_emits_paste_search_action() {
         let s = state_with_search("");

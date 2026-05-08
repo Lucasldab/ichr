@@ -76,7 +76,7 @@ pub fn evaluate_rules(rules: &[Rule], ctx: &RuleContext) -> bool {
 }
 
 /// True iff every entry in `features_obj` whose value is `true` is present
-/// in `enabled`. Unknown keys treated conservatively — if the value is
+/// in `enabled`. Unknown keys treated conservatively -- if the value is
 /// `true` but the key is not in `enabled`, return false.
 fn features_all_satisfied(features_obj: &serde_json::Value, enabled: &HashSet<String>) -> bool {
     let Some(obj) = features_obj.as_object() else {

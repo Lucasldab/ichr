@@ -88,7 +88,7 @@ pub fn render_version_picker(f: &mut Frame, area: Rect, state: &AppState) {
         .borders(Borders::ALL)
         .title("Versions (Enter / Esc)");
     if let Some(err) = error {
-        error_block = error_block.title(format!("Versions — {err}"));
+        error_block = error_block.title(format!("Versions -- {err}"));
     }
 
     let items: Vec<ListItem> = filtered
@@ -105,7 +105,7 @@ pub fn render_version_picker(f: &mut Frame, area: Rect, state: &AppState) {
         .collect();
 
     let list = List::new(items).block(error_block);
-    // Note: CreateStep::VersionPicker currently has no `selected` cursor field —
+    // Note: CreateStep::VersionPicker currently has no `selected` cursor field --
     // the row highlight is hard-coded to row 0 above. Render stateful for the
     // ratatui auto-scroll API (uniform with the other 7 list views) and anchor
     // at index 0; behaviour is unchanged until a future plan adds a cursor.

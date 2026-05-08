@@ -1,4 +1,4 @@
-//! CurseForge service facade — composes the HTTP client, API-key resolver,
+//! CurseForge service facade -- composes the HTTP client, API-key resolver,
 //! download-url fallback, hash-algo-parameterized installer, and ledger into
 //! the surface the TUI consumes.
 //!
@@ -193,10 +193,10 @@ impl CurseForgeService {
     ///
     /// Pipeline (Pitfall 8 atomicity protocol):
     ///   1. resolve URL via 09-04 helper (handles inline + downloadUrl-null fallback)
-    ///   2. extract SHA-1 from file.hashes (algo==1) — error if absent
+    ///   2. extract SHA-1 from file.hashes (algo==1) -- error if absent
     ///   3. acquire per-instance ledger lock (cross-source: shared with Phase 8 Modrinth)
     ///   4. download to <file>.tmp with SHA-1 verify via download_one_with_hash_algo
-    ///   5. upsert ledger row (BEFORE rename — Pitfall 8)
+    ///   5. upsert ledger row (BEFORE rename -- Pitfall 8)
     ///   6. atomic rename .tmp → final.jar
     ///   7. release lock
     ///
@@ -220,7 +220,7 @@ impl CurseForgeService {
         let client = self.client.as_ref().ok_or(CurseForgeError::NoApiKey)?;
 
         // Pitfall 8 atomicity protocol: the per-instance ledger lock is acquired
-        // INSIDE `upsert_mod` (Phase 8 invariant — `tokio::sync::Mutex` is NOT
+        // INSIDE `upsert_mod` (Phase 8 invariant -- `tokio::sync::Mutex` is NOT
         // reentrant, so taking it here AND inside `upsert_mod` deadlocks). We
         // touch the lock map at the start so the entry exists for the slug, and
         // serialization between Modrinth + CurseForge installs on the same
@@ -289,7 +289,7 @@ impl CurseForgeService {
             other => CurseForgeError::Http(other.to_string()),
         })?;
 
-        // 5. Build + upsert ledger row (BEFORE rename — Pitfall 8).
+        // 5. Build + upsert ledger row (BEFORE rename -- Pitfall 8).
         let row = InstalledModRow {
             mod_id: mod_detail.id.to_string(),
             project_slug: mod_detail.slug.clone(),
@@ -553,8 +553,8 @@ mod tests {
     // The 3 sub-cases (a)/(b)/(c) operate on the AppConfigSlim parser directly,
     // exercising the load-bearing logic in `read_config_curseforge_key` without
     // mocking AppPaths::resolve. Case (c) (file absent) is structurally
-    // equivalent — read_config_curseforge_key short-circuits at the
-    // .ok().and_then(...) chain — and is verified by the live smoke in 09-08.
+    // equivalent -- read_config_curseforge_key short-circuits at the
+    // .ok().and_then(...) chain -- and is verified by the live smoke in 09-08.
 
     #[test]
     fn test_app_config_slim_parses_curseforge_key_when_present() {

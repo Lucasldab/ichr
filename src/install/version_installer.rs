@@ -1,4 +1,4 @@
-//! Version install orchestrator — stub; full implementation in Task 2-06-02.
+//! Version install orchestrator -- stub; full implementation in Task 2-06-02.
 
 use std::collections::HashMap;
 use std::sync::Arc;

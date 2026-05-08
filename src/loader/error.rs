@@ -56,7 +56,7 @@ pub enum LoaderError {
     #[error("Failed to populate staging directory: {reason}")]
     StagingPopulate { reason: String },
 
-    /// Post-install harvest failed — staging didn't produce the expected
+    /// Post-install harvest failed -- staging didn't produce the expected
     /// `versions/<id>/` tree, version JSON malformed, or library walk failed.
     #[error("Failed to harvest install output: {reason}")]
     HarvestFailed { reason: String },

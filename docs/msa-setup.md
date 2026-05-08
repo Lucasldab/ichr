@@ -11,13 +11,13 @@ You need to register your own Azure AD app and point ichr at its client ID via t
 3. Fill in:
    - **Name:** anything (e.g., `ichr-<yourhandle>`).
    - **Supported account types:** choose **Personal Microsoft accounts only**.
-   - **Redirect URI:** leave blank — device-code flow doesn't use one.
-4. Click **Register**. The overview page now shows an **Application (client) ID** — a GUID like `11111111-2222-3333-4444-555555555555`.
+   - **Redirect URI:** leave blank -- device-code flow doesn't use one.
+4. Click **Register**. The overview page now shows an **Application (client) ID** -- a GUID like `11111111-2222-3333-4444-555555555555`.
 5. In the left nav: **Authentication** → scroll to **Advanced settings** → set **Allow public client flows** to **Yes** → **Save**.
 
 ## Point ichr at your app
 
-Easiest — create a `.env` file in the project root. ichr auto-loads it at startup via `dotenvy`:
+Easiest -- create a `.env` file in the project root. ichr auto-loads it at startup via `dotenvy`:
 
 ```bash
 echo 'ICHR_MSA_CLIENT_ID=11111111-2222-3333-4444-555555555555' > .env
@@ -26,7 +26,7 @@ cargo run --release
 
 `.env` is gitignored by default.
 
-Alternative — export in the shell (no `.env` file):
+Alternative -- export in the shell (no `.env` file):
 
 ```bash
 # Linux / macOS
@@ -48,8 +48,8 @@ In ichr: press `A` → `a` → the device-code modal should now show a `user_cod
 
 ## Security notes
 
-- The client ID is not a secret — it identifies your app but carries no authority on its own. Safe to commit / share.
-- Your refresh and access tokens live either in your OS keychain (libsecret / DPAPI) or in an AES-256-GCM encrypted file at `~/.config/ichr/accounts.enc` (Linux) or `%APPDATA%\ichr\accounts.enc` (Windows). The encryption key is derived from your machine identifier — tokens will not decrypt on a different machine.
+- The client ID is not a secret -- it identifies your app but carries no authority on its own. Safe to commit / share.
+- Your refresh and access tokens live either in your OS keychain (libsecret / DPAPI) or in an AES-256-GCM encrypted file at `~/.config/ichr/accounts.enc` (Linux) or `%APPDATA%\ichr\accounts.enc` (Windows). The encryption key is derived from your machine identifier -- tokens will not decrypt on a different machine.
 - ichr never logs token values. Tracing spans on auth functions use `skip_all` so nothing sensitive reaches the log file.
 
 ## Troubleshooting

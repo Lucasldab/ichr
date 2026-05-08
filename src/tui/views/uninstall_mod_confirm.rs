@@ -1,8 +1,8 @@
-//! Uninstall mod confirm — inline overlay.
+//! Uninstall mod confirm -- inline overlay.
 //!
 //! Source: 08-UI-SPEC.md §"Uninstall Confirm" lines 404-419.
 //! Mirrors `delete_confirm.rs` BUT drops the Red text per UI-SPEC line 419
-//! ("uninstalling a mod is reversible — Red is reserved for type-switch
+//! ("uninstalling a mod is reversible -- Red is reserved for type-switch
 //! warnings and incompatible-dep warnings only").
 
 use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
@@ -38,7 +38,7 @@ pub fn render_uninstall_mod_confirm(f: &mut Frame, area: Rect, state: &AppState)
 
     f.render_widget(Clear, modal_area);
 
-    // Body lines per UI-SPEC lines 411-413. NO Red anywhere — body style only.
+    // Body lines per UI-SPEC lines 411-413. NO Red anywhere -- body style only.
     let lines = vec![
         Line::from(format!("Uninstall {display_name} from {slug}?")),
         Line::from("The mod file will be deleted from .minecraft/mods/."),

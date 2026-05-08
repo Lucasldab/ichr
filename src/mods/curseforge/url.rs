@@ -1,4 +1,4 @@
-//! Pure CurseForge web URL builder — no I/O.
+//! Pure CurseForge web URL builder -- no I/O.
 //!
 //! Used by the install path's `downloadUrl: null` fallback (09-RESEARCH.md
 //! §"downloadUrl null UX" line 252). When the API returns a null download
@@ -38,7 +38,7 @@ mod tests {
 
     #[test]
     fn test_empty_slug_does_not_panic() {
-        // Per 09-RESEARCH.md line 285 — empty slug yields a syntactically-valid
+        // Per 09-RESEARCH.md line 285 -- empty slug yields a syntactically-valid
         // but-broken URL. The user sees the breakage and backs out; we do not panic.
         let url = web_url_for_file("", 1);
         assert!(

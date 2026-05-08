@@ -96,7 +96,7 @@ async fn test_cache_fresh_within_ttl() {
     let path = dir.path().join("manifest.json");
     tokio::fs::write(&path, b"{}").await.unwrap();
 
-    // File just written — should be fresh
+    // File just written -- should be fresh
     let fresh = cache_is_fresh(&path, MANIFEST_CACHE_TTL).await.unwrap();
     assert!(fresh, "newly created file should be within TTL");
 
@@ -149,7 +149,7 @@ async fn test_download_verified_skips_when_already_correct() {
     let expected_sha1 = sha1_hex_of_bytes(data);
 
     let client = MojangClient::new().unwrap();
-    // URL that will definitely fail if contacted — we guarantee no network call
+    // URL that will definitely fail if contacted -- we guarantee no network call
     let unreachable_url = "http://127.0.0.1:1/nonexistent";
     let result = client
         .download_verified(unreachable_url, &path, &expected_sha1)

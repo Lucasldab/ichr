@@ -1,4 +1,4 @@
-//! Loader install progress modal — step status + LineGauge + log-tail + cancel hint.
+//! Loader install progress modal -- step status + LineGauge + log-tail + cancel hint.
 //!
 //! Mirrors `download_pane.rs` LineGauge pattern with the modal centering
 //! shape from `java_picker_modal.rs`.
@@ -53,7 +53,7 @@ pub fn render_loader_install_progress_modal(f: &mut Frame, area: Rect, state: &A
     f.render_widget(Clear, modal_area);
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(format!(" Installing {kind} {version} — {slug} "));
+        .title(format!(" Installing {kind} {version} -- {slug} "));
     let inner = block.inner(modal_area);
     f.render_widget(block, modal_area);
 
@@ -113,7 +113,7 @@ pub fn render_loader_install_progress_modal(f: &mut Frame, area: Rect, state: &A
         .style(Style::default().add_modifier(Modifier::DIM));
     f.render_widget(header, chunks[6]);
 
-    // Row 7: log_tail Paragraph — ratatui's renderer escapes control sequences,
+    // Row 7: log_tail Paragraph -- ratatui's renderer escapes control sequences,
     // so raw subprocess bytes cannot break out of the modal Rect (T-07-16).
     let tail_p = Paragraph::new(log_tail.as_str())
         .style(Style::default().add_modifier(Modifier::DIM))

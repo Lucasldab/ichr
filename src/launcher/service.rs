@@ -1,4 +1,4 @@
-//! Launch orchestrator — loads an instance, composes the command, spawns
+//! Launch orchestrator -- loads an instance, composes the command, spawns
 //! Minecraft, and updates the manifest on exit. Emits TaskEvents at
 //! each step so the TUI progress indicator can track the launch.
 //!
@@ -54,14 +54,14 @@ pub async fn launch_instance(
     token: CancellationToken,
     job_id: JobId,
 ) -> Result<u64, AppError> {
-    // Step 1 — load instance manifest
+    // Step 1 -- load instance manifest
     send_progress(&tx, job_id, 1, "loading instance").await;
     let manifest = read_instance_manifest(paths, slug).await?;
 
     // GAP-8-E (Phase 8.1 gap closure): when a loader is installed, the launch
     // entry point is the loader's version JSON (which carries `inheritsFrom`
     // back to the vanilla MC version). Without this, modded instances silently
-    // launch as vanilla — mods in `.minecraft/mods/` are never loaded because
+    // launch as vanilla -- mods in `.minecraft/mods/` are never loaded because
     // the JVM is invoked with the vanilla main class and classpath.
     let launch_version_id: &str = match manifest.loader.as_ref() {
         Some(loader) => loader.version_id.as_str(),
@@ -80,7 +80,7 @@ pub async fn launch_instance(
     // missing client JAR will surface from the spawn layer when the JVM
     // fails to find the class on its classpath.
 
-    // Step 3 — load root version JSON from disk (no network unless migration runs)
+    // Step 3 -- load root version JSON from disk (no network unless migration runs)
     send_progress(&tx, job_id, 10, "loading version JSON").await;
 
     // Phase 8.4 GAP-LIBRARY-SHAPE-08: lazy migration of pre-8.4 flat-shape
@@ -94,18 +94,18 @@ pub async fn launch_instance(
 
     let root_version = read_version_json_from_disk(paths, launch_version_id).await?;
 
-    // Step 4 — walk inheritsFrom chain from disk only; call pure-sync resolve_inherits
+    // Step 4 -- walk inheritsFrom chain from disk only; call pure-sync resolve_inherits
     send_progress(&tx, job_id, 15, "resolving inheritsFrom chain").await;
     let parents = collect_parents_from_disk(paths, &root_version).await?;
     let version = resolve_inherits(&root_version, &parents)?;
 
-    // Step 5 — resolve Java runtime (Phase 5: per-instance + auto-download)
+    // Step 5 -- resolve Java runtime (Phase 5: per-instance + auto-download)
     send_progress(&tx, job_id, 25, "resolving Java runtime").await;
     let java = java_service
         .resolve_jre_for_launch(paths, &manifest, &version)
         .await?;
 
-    // Step 6 — compose the LaunchCommand
+    // Step 6 -- compose the LaunchCommand
     send_progress(&tx, job_id, 30, "composing command").await;
     let ctx = RuleContext::current();
     let cmd = match auth_ctx {
@@ -125,13 +125,13 @@ pub async fn launch_instance(
         }
     };
 
-    // Step 7 — verify Java binary exists on disk before spawning
+    // Step 7 -- verify Java binary exists on disk before spawning
     send_progress(&tx, job_id, 35, "checking java binary").await;
     if !tokio::fs::try_exists(&java).await.unwrap_or(false) {
         return Err(AppError::JavaNotFound);
     }
 
-    // Step 8 — on Windows write @argfile and replace jvm_args with the @-reference;
+    // Step 8 -- on Windows write @argfile and replace jvm_args with the @-reference;
     //           on Linux pass jvm_args through unmodified
     send_progress(&tx, job_id, 40, "preparing argfile").await;
     let effective_jvm_args: Vec<String> = if cfg!(target_os = "windows") {
@@ -143,11 +143,11 @@ pub async fn launch_instance(
         cmd.jvm_args.clone()
     };
 
-    // Step 9 — mark launch started (sets last_played_at; play_time untouched until exit)
+    // Step 9 -- mark launch started (sets last_played_at; play_time untouched until exit)
     send_progress(&tx, job_id, 45, "marking launch started").await;
     mark_launch_started(paths, slug).await?;
 
-    // Step 10 — spawn Minecraft and wait
+    // Step 10 -- spawn Minecraft and wait
     send_progress(&tx, job_id, 50, "spawning Minecraft").await;
     let outcome = run_process(
         &cmd.java_bin,
@@ -162,17 +162,17 @@ pub async fn launch_instance(
 
     match outcome {
         Ok(launch_outcome) => {
-            // Step 11 — clean exit: update play time and return duration
+            // Step 11 -- clean exit: update play time and return duration
             send_progress(&tx, job_id, 100, "exited cleanly").await;
             update_play_time(paths, slug, launch_outcome.duration_ms).await?;
             Ok(launch_outcome.duration_ms)
         }
         Err(AppError::Cancelled) => {
-            // Step 12 — cancelled: propagate without updating play time
+            // Step 12 -- cancelled: propagate without updating play time
             Err(AppError::Cancelled)
         }
         Err(e) => {
-            // Step 13 — LaunchFailed or SpawnFailed: propagate as-is
+            // Step 13 -- LaunchFailed or SpawnFailed: propagate as-is
             Err(e)
         }
     }
@@ -198,7 +198,7 @@ async fn read_version_json_from_disk(
     Ok(v)
 }
 
-/// Walk `root.inherits_from` from disk ONLY — no network. Populates a
+/// Walk `root.inherits_from` from disk ONLY -- no network. Populates a
 /// `HashMap<id, VersionJson>` for every ancestor in the chain and returns it
 /// for `resolve_inherits` (which is pure-sync).
 ///
@@ -206,7 +206,7 @@ async fn read_version_json_from_disk(
 /// map; `resolve_inherits` enforces MAX_INHERITS_DEPTH (= 3) as a hard cap.
 ///
 /// If any parent JSON is absent from disk, returns `AppError::VersionNotInstalled`
-/// — launch must not hit the network (Phase 2 install pre-fetched all parents).
+/// -- launch must not hit the network (Phase 2 install pre-fetched all parents).
 async fn collect_parents_from_disk(
     paths: &AppPaths,
     root: &VersionJson,
@@ -215,10 +215,10 @@ async fn collect_parents_from_disk(
     let mut current = root.inherits_from.clone();
     while let Some(parent_id) = current {
         if parents.contains_key(&parent_id) {
-            // Cycle detected — resolve_inherits will reject with InheritsFromCycle
+            // Cycle detected -- resolve_inherits will reject with InheritsFromCycle
             break;
         }
-        // Phase 8.4 NOTE: parent JSON migration is intentionally skipped — vanilla
+        // Phase 8.4 NOTE: parent JSON migration is intentionally skipped -- vanilla
         // MC parents are Mojang shape (Mojang ships them); Fabric/Quilt loader
         // JSONs do not inheritsFrom other loaders. If a future case introduces a
         // multi-hop loader chain whose intermediate JSON is flat-shape, add a
@@ -231,13 +231,13 @@ async fn collect_parents_from_disk(
 }
 
 // -----------------------------------------------------------------------
-// Phase 8.4 GAP-LIBRARY-SHAPE-08 — lazy in-place migration of flat-shape
+// Phase 8.4 GAP-LIBRARY-SHAPE-08 -- lazy in-place migration of flat-shape
 // loader JSONs left on disk by pre-8.4 installs.
 // -----------------------------------------------------------------------
 
 /// Heuristic: a flat fabric-meta/quilt-meta shape has top-level `url` per
 /// library AND no `downloads` block per library. Returns true on first
-/// library entry only — sufficient because Phase 6 wrote them all from the
+/// library entry only -- sufficient because Phase 6 wrote them all from the
 /// same upstream API, so the entire libraries array is uniformly one shape
 /// or the other.
 fn is_flat_fabric_meta_shape(v: &serde_json::Value) -> bool {
@@ -379,7 +379,7 @@ pub async fn __test_migrate_loader_json_in_place_if_needed(
     migrate_loader_json_in_place_if_needed(paths, version_id, fabric_client, quilt_client).await
 }
 
-/// Send a `TaskEvent::Progress` to `tx`. Failures are silently ignored —
+/// Send a `TaskEvent::Progress` to `tx`. Failures are silently ignored --
 /// a dropped receiver is a legitimate shutdown signal, not an error.
 async fn send_progress(tx: &mpsc::Sender<TaskEvent>, id: JobId, pct: u8, msg: &str) {
     let _ = tx
@@ -442,7 +442,7 @@ mod tests {
 
     /// GAP-8-E regression (reconciled in Phase 8.2 GAP-LAUNCH-JAR-08): a
     /// manifest carrying `loader=Some(_)` MUST cause the launcher to look up
-    /// the loader's version_id (e.g. `fabric-loader-0.16.9-1.20.4`) — NOT
+    /// the loader's version_id (e.g. `fabric-loader-0.16.9-1.20.4`) -- NOT
     /// `manifest.mc_version_id` (vanilla).
     ///
     /// Setup: vanilla `1.20.4/1.20.4.jar` is pre-created on disk; NO version
@@ -458,14 +458,14 @@ mod tests {
     /// removed. The launcher progresses to Step 3
     /// (`read_version_json_from_disk(paths, launch_version_id)`), which fires
     /// `VersionNotInstalled { slug: version_id.to_string() }` when the loader
-    /// JSON is absent — i.e. `slug == "fabric-loader-0.16.9-1.20.4"` (the
+    /// JSON is absent -- i.e. `slug == "fabric-loader-0.16.9-1.20.4"` (the
     /// loader version_id, NOT the instance slug).
     ///
     /// Asserting `slug == "fabric-loader-0.16.9-1.20.4"` is what gives this
     /// test teeth post-fix: it proves the launcher resolved to the LOADER
     /// version_id (not vanilla). A wildcard `VersionNotInstalled { .. }` match
     /// would pass under the original GAP-8-E bug too (which fired with
-    /// `slug == "1.21.4"` from a vanilla-only read) — so the slug-equality
+    /// `slug == "1.21.4"` from a vanilla-only read) -- so the slug-equality
     /// assertion remains the real regression guard, just at a new firing
     /// site (Step 3 instead of the now-removed Step 2 guard).
     #[tokio::test]
@@ -490,7 +490,7 @@ mod tests {
             .unwrap();
 
         // Manifest declares a Fabric loader. NO loader version JSON exists on
-        // disk — this is the lever that fires `VersionNotInstalled` from
+        // disk -- this is the lever that fires `VersionNotInstalled` from
         // Step 3 (`read_version_json_from_disk`) with the LOADER version_id
         // as the slug, proving the launcher routed via `launch_version_id`.
         let mut m = InstanceManifest::new("modded".into(), "modded".into(), "1.20.4".into());
@@ -527,7 +527,7 @@ mod tests {
                     "expected VersionNotInstalled at Step 3 \
                      read_version_json_from_disk with slug=loader_version_id \
                      (proving the launcher looked up the loader's JSON, not \
-                     vanilla); got slug={slug:?} — under the pre-08.2-01 \
+                     vanilla); got slug={slug:?} -- under the pre-08.2-01 \
                      buggy code this would have been \"modded\" (firing from \
                      the now-removed Step 2 jar guard)",
                 );
@@ -543,7 +543,7 @@ mod tests {
     /// vanilla dir has both `.jar` AND `.json` with `inheritsFrom=None`),
     /// `launch_instance` MUST progress past Steps 2-4 (jar/json existence,
     /// inheritsFrom resolve) and fail at Step 5 or later for an unrelated
-    /// reason — NOT with `VersionNotInstalled` fired from a jar-existence
+    /// reason -- NOT with `VersionNotInstalled` fired from a jar-existence
     /// guard.
     ///
     /// This is the test the original 08.1-01 plan should have shipped. The
@@ -553,12 +553,12 @@ mod tests {
     /// is real.
     ///
     /// GAP-LAUNCH-PARSE-08 (Phase 8.3 round-3): the loader JSON literal in
-    /// this test was UNFATTENED — assetIndex, assets, and downloads were
+    /// this test was UNFATTENED -- assetIndex, assets, and downloads were
     /// REMOVED from the loader child literal in this round (they were added
     /// by the 8.2-01 deviation note 3, which masked the bug). This restores
     /// a production-shape fixture: real Fabric/Quilt/Forge/NeoForge loader
     /// JSONs lack those three fields (inherited from vanilla via inheritsFrom).
-    /// If this test fails to parse, the fix is wrong — DO NOT fatten the
+    /// If this test fails to parse, the fix is wrong -- DO NOT fatten the
     /// fixture; fix the type system instead.
     ///
     /// Implementation note: we set `ICHR_JAVA` to a non-existent path so
@@ -566,7 +566,7 @@ mod tests {
     /// (Step 5 succeeds), `compose` succeeds (pure-sync), and Step 7 then
     /// fails with `JavaNotFound` because the path doesn't exist on disk.
     /// This is deterministic and avoids any network calls. Critically, the
-    /// post-fix code MUST reach Step 5+ — only the bug would short-circuit
+    /// post-fix code MUST reach Step 5+ -- only the bug would short-circuit
     /// at Step 2 with `VersionNotInstalled`.
     #[tokio::test]
     async fn test_launch_modded_passes_jar_check_with_realistic_fixture() {
@@ -586,7 +586,7 @@ mod tests {
             .await
             .unwrap();
 
-        // Minimum vanilla VersionJson — must parse as VersionJson and serve
+        // Minimum vanilla VersionJson -- must parse as VersionJson and serve
         // as a leaf parent (inherits_from = None). Modeled on the
         // `vjson_stub` helper in tests/mojang_protocol.rs (which has the
         // same minimum-parseable shape this struct demands: id, type,
@@ -624,7 +624,7 @@ mod tests {
         // resolve_inherits walks `inherits_from`, fetches the parent from
         // the parents map, and merges. PRODUCTION SHAPE: real Fabric/Quilt/
         // Forge/NeoForge loader JSONs DO NOT declare assetIndex, assets,
-        // or downloads — those fields are inherited from the vanilla parent
+        // or downloads -- those fields are inherited from the vanilla parent
         // via the inheritsFrom chain. The 8.2-01 round committed a
         // FATTENED literal (with those three fields baked in) which masked
         // the BLOCKER bug at parse time. The literal below restores the
@@ -701,7 +701,7 @@ mod tests {
             Err(AppError::VersionNotInstalled { slug }) => panic!(
                 "GAP-LAUNCH-JAR-08 REGRESSION: launch_instance returned \
                  VersionNotInstalled (slug={slug:?}) on a realistic loader \
-                 fixture — the launcher should have progressed past Steps \
+                 fixture -- the launcher should have progressed past Steps \
                  2-4. Either the Step 2 guard was re-introduced or the \
                  fixture layout drifted from what Phase 6 writes."
             ),

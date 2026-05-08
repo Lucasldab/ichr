@@ -48,7 +48,7 @@ struct XuiEntry {
 struct XstsErrorBody {
     #[serde(rename = "XErr")]
     x_err: u64,
-    /// Present in the MS response but not used — we always call `map_xerr`
+    /// Present in the MS response but not used -- we always call `map_xerr`
     /// for a consistent user-facing message instead of forwarding the raw text.
     #[serde(rename = "Message")]
     #[allow(dead_code)]
@@ -200,7 +200,7 @@ pub async fn authenticate_xsts(
 }
 
 /// Truncate a string to `n` chars for safe inclusion in error messages.
-/// Does not attempt to redact — caller must ensure the string is safe
+/// Does not attempt to redact -- caller must ensure the string is safe
 /// (e.g. only pass status text or error body outside token contexts).
 fn truncate_for_msg(s: &str, n: usize) -> String {
     if s.len() <= n {

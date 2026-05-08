@@ -41,5 +41,5 @@ pub fn maven_group_artifact(name: &str) -> &str {
             }
         }
     }
-    name // fallback: malformed name — return as-is
+    name // fallback: malformed name -- return as-is
 }

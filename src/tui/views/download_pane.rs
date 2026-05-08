@@ -8,7 +8,7 @@ use crate::tui::app::AppState;
 
 pub fn render_download_pane(f: &mut Frame, area: Rect, state: &AppState) {
     if state.active_jobs.is_empty() {
-        let idle = Paragraph::new(Span::raw("idle — press c to create an instance"))
+        let idle = Paragraph::new(Span::raw("idle -- press c to create an instance"))
             .block(Block::default().borders(Borders::ALL).title("Downloads"));
         f.render_widget(idle, area);
         return;

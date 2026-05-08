@@ -2,9 +2,9 @@
 //!
 //! Layered:
 //!   * Pure composition (`command`, `substitute`, `classpath`, `offline`,
-//!     `argfile`) — synchronous functions, no I/O, unit-testable on
+//!     `argfile`) -- synchronous functions, no I/O, unit-testable on
 //!     fixtures.
-//!   * IO layer (`spawn`, `service`) — async, owns process lifecycle,
+//!   * IO layer (`spawn`, `service`) -- async, owns process lifecycle,
 //!     drains stdio to the per-instance log file, updates the manifest.
 //!
 //! See `.planning/phases/03-launcher-process-and-offline-launch/03-RESEARCH.md`

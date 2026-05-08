@@ -1,4 +1,4 @@
-//! Live integration test — gated by #[ignore]. Run manually:
+//! Live integration test -- gated by #[ignore]. Run manually:
 //!
 //!     cargo test --test version_install_integration -- --ignored
 //!

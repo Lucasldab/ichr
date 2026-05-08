@@ -1,7 +1,7 @@
 //! Offline authentication context.
 //!
 //! Generates a deterministic UUID matching Java's
-//! `UUID.nameUUIDFromBytes(("OfflinePlayer:" + username).getBytes(UTF_8))` —
+//! `UUID.nameUUIDFromBytes(("OfflinePlayer:" + username).getBytes(UTF_8))` --
 //! a version-3 (MD5-based name) UUID per RFC 4122 §4.3.
 //!
 //! Uses the `md-5` crate (RustCrypto family, import name `md5`).
@@ -9,7 +9,7 @@
 
 use md5::{Digest, Md5};
 
-/// Offline auth fields — everything `SubstitutionContext` needs for an
+/// Offline auth fields -- everything `SubstitutionContext` needs for an
 /// unauthenticated (offline) launch.
 #[derive(Debug, Clone)]
 pub struct OfflineAuth {
@@ -62,7 +62,7 @@ pub fn offline_auth(username: &str) -> OfflineAuth {
     }
 }
 
-/// MSA auth fields — adapter from `crate::auth::MsaTokens` to the fields
+/// MSA auth fields -- adapter from `crate::auth::MsaTokens` to the fields
 /// consumed by `SubstitutionContext`. Keeps all auth-field production in
 /// one place alongside the offline equivalent (`OfflineAuth`).
 #[derive(Debug, Clone)]
@@ -77,7 +77,7 @@ pub struct MsaAuth {
     pub xuid: String,
     /// XSTS user hash (uhs) from `MsaTokens.user_hash` (same value as `xuid`).
     pub xbox_user_hash: String,
-    /// MSA client ID — from `crate::auth::device_code::client_id()`.
+    /// MSA client ID -- from `crate::auth::device_code::client_id()`.
     pub clientid: String,
     /// Always `"msa"` for this variant. Offline uses `"legacy"`.
     pub user_type: String,

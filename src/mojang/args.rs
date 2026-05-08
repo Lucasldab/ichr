@@ -30,7 +30,7 @@ pub fn resolve_game_args(version: &ResolvedVersion, ctx: &RuleContext) -> Vec<St
 /// Pre-1.13 versions have NO `arguments.jvm` block in their JSON. The
 /// launcher (Phase 3) supplies the canonical legacy set (-cp / -Djava.library.path
 /// / etc.) at launch time. For Phase 2, when the version provides no JVM
-/// args, return an empty Vec — Phase 3 will fall back to its hard-coded
+/// args, return an empty Vec -- Phase 3 will fall back to its hard-coded
 /// legacy baseline if the returned vec is empty.
 pub fn resolve_jvm_args(version: &ResolvedVersion, ctx: &RuleContext) -> Vec<String> {
     if let Some(args) = version.arguments.as_ref() {

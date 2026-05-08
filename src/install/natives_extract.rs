@@ -2,7 +2,7 @@
 //! per-instance natives directory. Applies `extract.exclude` entries and
 //! guards against ZIP path-traversal.
 //!
-//! Uses `spawn_blocking` — the `zip` crate is synchronous CPU work.
+//! Uses `spawn_blocking` -- the `zip` crate is synchronous CPU work.
 
 use std::path::Path;
 

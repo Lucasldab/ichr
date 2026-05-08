@@ -1,4 +1,4 @@
-//! Launch-failed modal — surfaces AppError::LaunchFailed's `message`
+//! Launch-failed modal -- surfaces AppError::LaunchFailed's `message`
 //! (the ring-buffer log tail from launcher::spawn) plus the error headline.
 //!
 //! Phase 3 v1 is non-scrollable. A scrollable log viewer is v2 (LOG-01).

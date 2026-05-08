@@ -2,11 +2,11 @@
 //! See 09-RESEARCH.md §Endpoint Reference (lines 96-148).
 //!
 //! Per 09-PATTERNS.md §`src/mods/curseforge/types.rs`: every CurseForge
-//! wire field uses camelCase (opposite of Modrinth's snake_case) — every
+//! wire field uses camelCase (opposite of Modrinth's snake_case) -- every
 //! Optional field carries `#[serde(default, skip_serializing_if = "Option::is_none")]`
 //! per the `LoaderLibrary` precedent.
 //!
-//! All types are pure data — no I/O, no async. Serde-derive on every type.
+//! All types are pure data -- no I/O, no async. Serde-derive on every type.
 
 use serde::{Deserialize, Serialize};
 
@@ -18,10 +18,10 @@ use serde::{Deserialize, Serialize};
 ///
 /// Wire shape: element of the `data` array returned by
 /// `GET /v1/mods/search?gameId=432&classId=6&...`. Field set is the strict
-/// subset the UI needs — categories are kept so the right-pane can render
+/// subset the UI needs -- categories are kept so the right-pane can render
 /// labels without a follow-up `/v1/mods/{id}` round-trip.
 ///
-/// `already_installed` is **not** a CurseForge wire field — it is stamped
+/// `already_installed` is **not** a CurseForge wire field -- it is stamped
 /// client-side after consulting the per-instance ledger. `#[serde(skip)]`
 /// keeps it out of any serialised wire payload (caches, fixtures, etc.).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -96,7 +96,7 @@ pub struct CurseForgeLinks {
 
 /// One file entry on a CurseForge mod.
 ///
-/// **CRITICAL:** `download_url` is `Option<String>` — `null` iff the author
+/// **CRITICAL:** `download_url` is `Option<String>` -- `null` iff the author
 /// has disabled third-party distribution. This nullability is the
 /// load-bearing fact for MOD-04 (the FileNotDownloadable UX path).
 /// Per 09-RESEARCH.md §"downloadUrl null UX" lines 252-289.
@@ -120,7 +120,7 @@ pub struct CurseForgeFileEntry {
     pub file_length: u64,
     #[serde(rename = "downloadCount", default)]
     pub download_count: u64,
-    /// **NULLABLE** — `null` iff author has disabled third-party distribution.
+    /// **NULLABLE** -- `null` iff author has disabled third-party distribution.
     /// Per 09-RESEARCH.md §"downloadUrl null UX" lines 252-289.
     #[serde(rename = "downloadUrl", default)]
     pub download_url: Option<String>,

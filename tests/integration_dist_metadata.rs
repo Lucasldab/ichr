@@ -29,7 +29,7 @@ fn cargo_metadata_declares_required_publish_fields() {
     for field in ["repository", "homepage", "readme", "description", "license"] {
         assert!(
             !pkg[field].is_null(),
-            "Cargo.toml [package].{field} is null — required for crates.io publish"
+            "Cargo.toml [package].{field} is null -- required for crates.io publish"
         );
     }
     assert!(

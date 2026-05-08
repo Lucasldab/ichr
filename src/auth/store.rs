@@ -5,7 +5,7 @@
 //! Two storage tiers:
 //!
 //!   - **Secrets** (refresh tokens): `keyring::Entry::new("ichr", id)`
-//!     → on any keyring error (libsecret daemon absent, etc. — pitfall 21)
+//!     → on any keyring error (libsecret daemon absent, etc. -- pitfall 21)
 //!     → encrypted entry in `{config_dir}/accounts.enc` (AES-256-GCM with
 //!     a 32-byte key derived from /etc/machine-id + a domain separator).
 //!
@@ -38,7 +38,7 @@ pub struct StoreConfig {
     pub accounts_enc_path: PathBuf,
     /// Path to plain-JSON account metadata file: `{config_dir}/accounts.json`.
     pub accounts_json_path: PathBuf,
-    /// If true, skip keyring entirely — always use the encrypted file.
+    /// If true, skip keyring entirely -- always use the encrypted file.
     /// Used in CI / headless tests where libsecret is not available.
     pub force_fallback: bool,
 }
@@ -55,7 +55,7 @@ impl StoreConfig {
 }
 
 // ============================================================================
-// Secret tier — refresh tokens.
+// Secret tier -- refresh tokens.
 // ============================================================================
 
 /// Store a refresh token for `account_id`. Returns the backend actually used.
@@ -80,7 +80,7 @@ pub async fn store_refresh_token(
         match keyring_result {
             Ok(()) => return Ok(StorageBackend::Keyring),
             Err(e) => {
-                tracing::warn!(error = %e, "keyring unavailable — falling back to encrypted file");
+                tracing::warn!(error = %e, "keyring unavailable -- falling back to encrypted file");
             }
         }
     }
@@ -145,7 +145,7 @@ pub async fn delete_refresh_token(config: &StoreConfig, account_id: &str) -> Res
 
 /// Encrypted file format: JSON map of { account_id: base64(nonce || ciphertext) }.
 /// The map itself is plaintext JSON; the *values* are encrypted blobs.
-/// This keeps per-account granularity — adding one account doesn't require
+/// This keeps per-account granularity -- adding one account doesn't require
 /// re-encrypting others.
 async fn store_in_encrypted_file(
     config: &StoreConfig,
@@ -249,7 +249,7 @@ async fn write_encrypted_map(
 ///
 /// Linux: `/etc/machine-id` (32 hex chars). If absent, try
 /// `/var/lib/dbus/machine-id`. If neither, fall back to a hash of
-/// `$HOME` (acceptable per research A6 — less secure but functional).
+/// `$HOME` (acceptable per research A6 -- less secure but functional).
 ///
 /// Windows: the keyring path uses DPAPI so the fallback should never
 /// trigger. If it does (e.g., in a test with force_fallback), derive
@@ -289,13 +289,13 @@ fn read_machine_id() -> Vec<u8> {
     if let Ok(userprofile) = std::env::var("USERPROFILE") {
         return userprofile.into_bytes();
     }
-    // Deterministic-but-low-entropy fallback — at least the same value
+    // Deterministic-but-low-entropy fallback -- at least the same value
     // across runs on the same host.
     b"ichr-no-machine-id".to_vec()
 }
 
 // ============================================================================
-// Metadata tier — Account records (plain JSON).
+// Metadata tier -- Account records (plain JSON).
 // ============================================================================
 
 /// Atomically write the account list to `accounts.json` (non-secret).
@@ -382,7 +382,7 @@ mod tests {
         let s = String::from_utf8_lossy(&raw);
         assert!(
             !s.contains(secret),
-            "plaintext token found in encrypted file — file contents: {s}"
+            "plaintext token found in encrypted file -- file contents: {s}"
         );
     }
 

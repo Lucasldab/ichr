@@ -1,4 +1,4 @@
-//! Live NeoForge install smoke test — `#[ignore]`-gated.
+//! Live NeoForge install smoke test -- `#[ignore]`-gated.
 //!
 //! Run with: `cargo test --test loader_neoforge_live -- --ignored --nocapture`
 //!
@@ -46,7 +46,7 @@ fn make_progress_drain(label: &'static str) -> mpsc::Sender<TaskEvent> {
 }
 
 #[tokio::test]
-#[ignore = "requires internet access — see module docs"]
+#[ignore = "requires internet access -- see module docs"]
 async fn live_neoforge_install_1_21_4() {
     let td = TempDir::new().expect("tempdir");
     let paths = make_paths(&td);
@@ -204,17 +204,17 @@ async fn live_neoforge_install_1_21_4() {
     );
 
     println!(
-        "[neoforge_live] SUCCESS — installed NeoForge {} (id={})",
+        "[neoforge_live] SUCCESS -- installed NeoForge {} (id={})",
         loader_version, loader.version_id
     );
 }
 
-/// GAP-7-B canary — exercises the LIVE JSON endpoint (no env override).
+/// GAP-7-B canary -- exercises the LIVE JSON endpoint (no env override).
 ///
 /// Capture command (re-run if upstream shape drifts):
 ///     curl -s 'https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge'
 ///
-/// This test asserts SHAPE invariants only — never specific version counts
+/// This test asserts SHAPE invariants only -- never specific version counts
 /// (NeoForge ships new builds weekly). If this test fails:
 ///   1. Re-run the capture command above and inspect the response shape.
 ///   2. If `isSnapshot` is missing or renamed, update
@@ -222,14 +222,14 @@ async fn live_neoforge_install_1_21_4() {
 ///   3. Re-capture `tests/fixtures/neoforge_meta_versions.json` (Phase 7.1-01
 ///      docs the exact `python3 -c` trim command).
 #[tokio::test]
-#[ignore = "requires internet access — see module docs"]
+#[ignore = "requires internet access -- see module docs"]
 async fn live_neoforge_meta_lists_versions() {
     use ichr::loader::neoforge_meta::NeoForgeMetaClient;
 
     let client = NeoForgeMetaClient::new()
         .expect("NeoForgeMetaClient::new (no env override; production endpoints)");
 
-    // The 1.21.4 prefix is a current MC version — production must list ≥1.
+    // The 1.21.4 prefix is a current MC version -- production must list ≥1.
     let versions = client
         .list_loader_versions("1.21.4")
         .await
@@ -237,7 +237,7 @@ async fn live_neoforge_meta_lists_versions() {
 
     assert!(
         !versions.is_empty(),
-        "live endpoint returned 0 versions for MC 1.21.4 — endpoint shape may have drifted; \
+        "live endpoint returned 0 versions for MC 1.21.4 -- endpoint shape may have drifted; \
          re-capture tests/fixtures/neoforge_meta_versions.json and re-verify the parser"
     );
     assert!(
@@ -260,7 +260,7 @@ async fn live_neoforge_meta_lists_versions() {
     }
 }
 
-/// GAP-7-C end-to-end pin — asserts NeoForge install for MC 1.21.4
+/// GAP-7-C end-to-end pin -- asserts NeoForge install for MC 1.21.4
 /// reaches 100% progress (NOT just `Ok(())`). The round-1 GAP-7-C
 /// trigger panicked at 85% with `InvalidMavenCoord { coord: "net.neoforged:mergetool:2.0.0:api" }`;
 /// post-07.2-02 the install reaches 100% and writes the manifest.
@@ -276,7 +276,7 @@ async fn live_neoforge_meta_lists_versions() {
 ///     curl -s 'https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge'
 /// Re-capture `tests/fixtures/neoforge_meta_versions.json` per 07.1-01.
 #[tokio::test]
-#[ignore = "requires internet access — see module docs"]
+#[ignore = "requires internet access -- see module docs"]
 async fn live_neoforge_install_1_21_4_reaches_100_percent() {
     let td = TempDir::new().expect("tempdir");
     let paths = make_paths(&td);
@@ -314,7 +314,7 @@ async fn live_neoforge_install_1_21_4_reaches_100_percent() {
     .await
     .expect("install_version vanilla");
 
-    // 3) JRE — NeoForge 1.21.x needs Java 21 (java-runtime-delta)
+    // 3) JRE -- NeoForge 1.21.x needs Java 21 (java-runtime-delta)
     let java_svc = JavaService::new().expect("JavaService::new");
     let _ = java_svc
         .install_mojang(&paths, "java-runtime-delta")
@@ -341,7 +341,7 @@ async fn live_neoforge_install_1_21_4_reaches_100_percent() {
         .map(|v| v.version.clone())
         .unwrap_or_else(|| versions[0].version.clone());
 
-    // 5) Custom progress collector — captures every Progress event so we
+    // 5) Custom progress collector -- captures every Progress event so we
     //    can assert on the 100% milestone after install_loader returns.
     let (tx, mut rx) = mpsc::channel::<TaskEvent>(256);
     let collected = std::sync::Arc::new(std::sync::Mutex::new(Vec::<u8>::new()));
@@ -376,7 +376,7 @@ async fn live_neoforge_install_1_21_4_reaches_100_percent() {
             let msg = e.to_string();
             if msg.contains("InvalidMavenCoord") && msg.contains(":api") {
                 panic!(
-                    "GAP-7-C regression detected — harvest rejected a 4-segment \
+                    "GAP-7-C regression detected -- harvest rejected a 4-segment \
                      classifier-bearing Maven coord. Did src/loader/maven.rs revert \
                      to splitn(3, ':')? Or is_safe_maven_segment failing on the \
                      classifier? Full error: {msg}"
@@ -428,12 +428,12 @@ async fn live_neoforge_install_1_21_4_reaches_100_percent() {
     let neoforge_libs_dir = paths.libraries_dir().join("net").join("neoforged");
     assert!(
         neoforge_libs_dir.is_dir(),
-        "NeoForge libraries dir missing — harvest did not copy libraries: {}",
+        "NeoForge libraries dir missing -- harvest did not copy libraries: {}",
         neoforge_libs_dir.display()
     );
 
     println!(
-        "[neoforge_100pct] SUCCESS — installed NeoForge {} (id={}); reached 100%",
+        "[neoforge_100pct] SUCCESS -- installed NeoForge {} (id={}); reached 100%",
         loader_version, loader.version_id
     );
 }

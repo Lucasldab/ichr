@@ -19,7 +19,7 @@ pub enum CurseForgeError {
     #[error("CurseForge response parse failed: {0}")]
     Parse(String),
 
-    /// Hash verification of a downloaded mod file failed (Pitfall 3 — case-insensitive compare).
+    /// Hash verification of a downloaded mod file failed (Pitfall 3 -- case-insensitive compare).
     /// `algo` discriminates SHA-1 (CurseForge default) vs SHA-256 (rare).
     #[error("{algo} mismatch for {url}: expected {expected}, got {got}")]
     ShaMismatch {
@@ -43,21 +43,21 @@ pub enum CurseForgeError {
         file_id: u64,
     },
 
-    /// `/v1/mods/{modId}` returned 404 — the mod has been deleted from CurseForge.
+    /// `/v1/mods/{modId}` returned 404 -- the mod has been deleted from CurseForge.
     /// Distinct from FileNotDownloadable per 09-RESEARCH.md Pitfall 5 line 287.
     #[error("CurseForge mod not found: {mod_id}")]
     ModNotFound { mod_id: u64 },
 
-    /// API key resolution failed at `CurseForgeService::new()` — no env var,
+    /// API key resolution failed at `CurseForgeService::new()` -- no env var,
     /// no config.toml entry, no compiled-in default. The launcher continues
     /// to function for everything else; the `F` keybind is silently disabled.
     /// Per 09-RESEARCH.md §"API Key Strategy" line 178 + Pitfall 1 line 936.
     #[error("No CurseForge API key configured. Set CURSEFORGE_API_KEY env var, or [api_keys] curseforge in config.toml.")]
     NoApiKey,
 
-    /// CurseForge returned 429 — rate limit hit. v1 surfaces only; no auto-retry
+    /// CurseForge returned 429 -- rate limit hit. v1 surfaces only; no auto-retry
     /// per 09-RESEARCH.md §Pitfall 7 line 972 (defer to v2).
-    #[error("CurseForge rate limit hit — retry after {retry_after_secs}s")]
+    #[error("CurseForge rate limit hit -- retry after {retry_after_secs}s")]
     RateLimited { retry_after_secs: u64 },
 
     /// User cancelled install via Esc / CancellationToken.

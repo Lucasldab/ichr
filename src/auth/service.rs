@@ -1,4 +1,4 @@
-//! High-level Account facade — composes device_code + chain + store for the TUI.
+//! High-level Account facade -- composes device_code + chain + store for the TUI.
 //!
 //! The TUI calls exactly three operations on `AccountService`:
 //!
@@ -65,7 +65,7 @@ impl AccountService {
         }
     }
 
-    /// Test constructor — inject configs directly.
+    /// Test constructor -- inject configs directly.
     pub fn new_with_config(chain_config: AuthChainConfig, store_config: StoreConfig) -> Self {
         Self {
             chain_config,
@@ -104,7 +104,7 @@ impl AccountService {
             })
             .await;
 
-        // Step 2: poll for token — translate the lower-level progress
+        // Step 2: poll for token -- translate the lower-level progress
         // events into higher-level Progress events.
         let (dc_tx, mut dc_rx) = mpsc::channel::<DeviceCodeProgress>(16);
         let et_clone = event_tx.clone();
@@ -258,7 +258,7 @@ impl AccountService {
     }
 
     /// Resolve the current MsaTokens for the given account_id.
-    /// Always refreshes via `chain::ensure_valid_mc_token` — MC tokens expire
+    /// Always refreshes via `chain::ensure_valid_mc_token` -- MC tokens expire
     /// in 24h so a fresh chain walk at each launch is the simplest correct policy.
     ///
     /// Updates the persisted refresh_token + account expiry timestamps
@@ -514,7 +514,7 @@ mod tests {
             "first added account should auto-activate"
         );
 
-        // Drain events — at least one Started + >= 1 Progress.
+        // Drain events -- at least one Started + >= 1 Progress.
         let mut saw_started = false;
         let mut saw_progress = false;
         while let Ok(ev) = rx.try_recv() {

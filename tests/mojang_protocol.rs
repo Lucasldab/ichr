@@ -170,7 +170,7 @@ fn test_parse_snapshot_version_json() {
             .is_empty(),
         "assetIndex.sha1 must be populated in snapshot"
     );
-    // The snapshot uses either modern or legacy arg format — accept either
+    // The snapshot uses either modern or legacy arg format -- accept either
     assert!(
         v.arguments.is_some() || v.minecraft_arguments.is_some(),
         "snapshot must have either arguments or minecraftArguments"
@@ -181,7 +181,7 @@ fn test_parse_snapshot_version_json() {
 // Task 2-02-02: Rules, natives, inheritsFrom tests (tests 8–19)
 // ---------------------------------------------------------------------------
 
-/// Build a minimal Rule from a JSON literal — avoids hand-constructing serde_json::Value.
+/// Build a minimal Rule from a JSON literal -- avoids hand-constructing serde_json::Value.
 fn rule_from_json(json: &str) -> Rule {
     serde_json::from_str(json).expect("rule JSON must parse")
 }
@@ -246,7 +246,7 @@ fn test_library_rules_disallow_on_osx_means_include_on_linux() {
         rule_from_json(r#"{"action":"disallow","os":{"name":"osx"}}"#),
     ];
     let linux_ctx = RuleContext::for_os_arch(OsName::Linux, Arch::X86_64);
-    // allow all, then disallow osx — on linux the disallow doesn't match, so result is allow
+    // allow all, then disallow osx -- on linux the disallow doesn't match, so result is allow
     assert!(
         evaluate_rules(&rules, &linux_ctx),
         "allow-all + disallow-osx must be true on linux"

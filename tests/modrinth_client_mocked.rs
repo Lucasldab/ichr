@@ -3,7 +3,7 @@
 //! Validates three load-bearing invariants of the install pipeline that the
 //! per-module unit tests cannot observe in isolation:
 //!
-//! 1. `test_install_respects_concurrency_cap` — parallel install respects
+//! 1. `test_install_respects_concurrency_cap` -- parallel install respects
 //!    `MOD_DOWNLOAD_CONCURRENCY = 6`. Verified by **timing**: with
 //!    `N = 3 * cap` jobs that each take ~`delay` ms in the mock, total wall
 //!    time MUST be at least `~3 * delay` (3 batches). A broken cap (no
@@ -13,13 +13,13 @@
 //!    response-completion hook).
 //!    Covers Pitfall 8 + ASSUMPTION A1 (08-RESEARCH.md §Validation Architecture).
 //!
-//! 2. `test_cancel_aborts_install_no_ledger_write` — cancellation mid-install
+//! 2. `test_cancel_aborts_install_no_ledger_write` -- cancellation mid-install
 //!    returns `ModrinthError::Cancelled` and writes STRICTLY FEWER ledger
 //!    rows than the plan length. Atomicity guard: if cancel arrives before a
 //!    given file's `upsert_mod` lands, that mod MUST NOT appear in the
 //!    ledger. (Threat T-08-09-03 + dep on installer.rs:316 cancel checks.)
 //!
-//! 3. `test_resolve_dependencies_through_full_service_stack` — the
+//! 3. `test_resolve_dependencies_through_full_service_stack` -- the
 //!    `ModrinthService::resolve_dependencies` path composes correctly through
 //!    `ModrinthClient` over a mock that returns a Sodium root version with one
 //!    Required dep (Fabric API). Asserts the dep graph contains at least one
@@ -79,8 +79,8 @@ async fn test_install_respects_concurrency_cap() {
     // working, total wall time MUST be at least ~3 batches × delay. Without the
     // cap (or with cap >= N), we would observe ~1 batch.
     //
-    // We also track in-flight via the matcher closure — increment on entry,
-    // record max — but do NOT decrement (httpmock does not expose a response-
+    // We also track in-flight via the matcher closure -- increment on entry,
+    // record max -- but do NOT decrement (httpmock does not expose a response-
     // complete hook). The counter is a soft cross-check: the high-water mark
     // observed within a batch should never exceed `cap` (proven indirectly
     // because the install pipeline only issues HTTP after acquiring a permit).
@@ -196,7 +196,7 @@ async fn test_install_respects_concurrency_cap() {
 
     // Load-bearing assertion: with 3 batches of `delay_ms`, total must be at
     // least 2.5 × delay (allow 0.5-batch slack for network/scheduler jitter).
-    // A broken cap would finish in ~1 batch (~delay_ms) — far below this gate.
+    // A broken cap would finish in ~1 batch (~delay_ms) -- far below this gate.
     let min_expected = Duration::from_millis(((n / cap) as u64 - 1) * delay_ms + delay_ms / 2);
     assert!(
         elapsed >= min_expected,
@@ -205,7 +205,7 @@ async fn test_install_respects_concurrency_cap() {
         batches = n / cap
     );
 
-    // Cross-check (diagnostic only — matcher-side counter is unreliable
+    // Cross-check (diagnostic only -- matcher-side counter is unreliable
     // because we cannot hook the actual response-completion event in
     // httpmock 0.8). The matcher fires when a request arrives; the spawned
     // decrement runs `delay_ms + 50` later. If the install pipeline issues
@@ -326,7 +326,7 @@ async fn test_cancel_aborts_install_no_ledger_write() {
         "expected Err(Cancelled), got {res:?}"
     );
 
-    // Ledger must contain STRICTLY FEWER than `n` rows — every uncompleted
+    // Ledger must contain STRICTLY FEWER than `n` rows -- every uncompleted
     // download leaves no ledger row (atomicity invariant). With 2s response
     // delay and 150ms cancel, the expected count is 0; tolerate up to n-1 in
     // case the harness is unusually slow.
@@ -340,7 +340,7 @@ async fn test_cancel_aborts_install_no_ledger_write() {
             l.mods.len()
         );
     }
-    // (If ledger does not exist at all, that is the "ideal" outcome — every
+    // (If ledger does not exist at all, that is the "ideal" outcome -- every
     // download was aborted before the first ledger upsert. No assertion needed.)
 }
 
@@ -416,7 +416,7 @@ async fn test_resolve_dependencies_through_full_service_stack() {
     // GET /v2/projects?ids=[...] → title hydration (closes GAP-8-D).
     // The resolver dedupes ids before this call; only `dep_project_id` is in
     // the dep set (root is excluded from `deps`). Accept any ids order via
-    // query_param_exists — order depends on internal collection traversal.
+    // query_param_exists -- order depends on internal collection traversal.
     server.mock(|when, then| {
         when.method(GET)
             .path("/v2/projects")
@@ -492,7 +492,7 @@ async fn test_dep_resolve_titles_propagate_to_ledger_display_name() {
     let dep_pid = "P-fabric";
     let root_pid = "P-sodium";
 
-    // Mock /v2/version/{root_id} — Sodium with one Required dep on P-fabric.
+    // Mock /v2/version/{root_id} -- Sodium with one Required dep on P-fabric.
     {
         let server_url = server.base_url();
         let sodium_sha_for_root = sodium_sha.clone();
@@ -527,7 +527,7 @@ async fn test_dep_resolve_titles_propagate_to_ledger_display_name() {
         });
     }
 
-    // Mock /v2/project/P-fabric/version — one Fabric API version.
+    // Mock /v2/project/P-fabric/version -- one Fabric API version.
     {
         let server_url = server.base_url();
         let fabric_sha_for_dep = fabric_sha.clone();
@@ -560,8 +560,8 @@ async fn test_dep_resolve_titles_propagate_to_ledger_display_name() {
         });
     }
 
-    // Mock /v2/projects?ids=[...] — title hydration endpoint (closes GAP-8-D).
-    // Note: the resolver only batch-fetches titles for `deps`, NOT the root —
+    // Mock /v2/projects?ids=[...] -- title hydration endpoint (closes GAP-8-D).
+    // Note: the resolver only batch-fetches titles for `deps`, NOT the root --
     // root_pid is not in the dep set. We still return both ids in the response
     // body so the test exercises the realistic shape Modrinth would return if
     // we ever batch root + deps together later.
@@ -578,7 +578,7 @@ async fn test_dep_resolve_titles_propagate_to_ledger_display_name() {
         );
     });
 
-    // CDN mocks — bodies whose sha512 matches the manifest entries above.
+    // CDN mocks -- bodies whose sha512 matches the manifest entries above.
     {
         let body = sodium_body.clone();
         server.mock(move |when, then| {
@@ -671,7 +671,7 @@ async fn test_dep_resolve_titles_propagate_to_ledger_display_name() {
 }
 
 // ============================================================================
-// Test 5: GAP-FACETS-EMPTY-08 — empty loader + non-empty MC produces NO empty
+// Test 5: GAP-FACETS-EMPTY-08 -- empty loader + non-empty MC produces NO empty
 // AND group in the outbound facets URL parameter
 // ============================================================================
 
@@ -681,7 +681,7 @@ async fn test_dep_resolve_titles_propagate_to_ledger_display_name() {
 /// leaves the MC filter set to a specific version, the search URL must
 /// NOT contain a URL-encoded empty AND group `%5B%5D` (= `[]`). Modrinth
 /// treats an empty inner OR-array inside the outer AND as "match nothing",
-/// returning zero hits — the user-visible UAT 3a symptom.
+/// returning zero hits -- the user-visible UAT 3a symptom.
 ///
 /// This test catches the bug at the network boundary, complementing the
 /// pure-function tests in src/mods/filter.rs (which now lock the

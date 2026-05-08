@@ -42,7 +42,7 @@ impl Arch {
     }
 }
 
-/// const-context byte-wise string equality — Rust 1.88 lacks const `str::eq`.
+/// const-context byte-wise string equality -- Rust 1.88 lacks const `str::eq`.
 const fn str_eq(a: &str, b: &str) -> bool {
     let a = a.as_bytes();
     let b = b.as_bytes();
@@ -69,14 +69,14 @@ pub enum OsName {
 impl OsName {
     /// Resolve the current OS at compile time.
     ///
-    /// Panics on an unsupported OS (macOS, BSD, etc.) — out of scope for v1.
+    /// Panics on an unsupported OS (macOS, BSD, etc.) -- out of scope for v1.
     pub const fn current() -> Self {
         if cfg!(target_os = "linux") {
             OsName::Linux
         } else if cfg!(target_os = "windows") {
             OsName::Windows
         } else {
-            panic!("Unsupported OS — only Linux and Windows are v1 targets");
+            panic!("Unsupported OS -- only Linux and Windows are v1 targets");
         }
     }
 

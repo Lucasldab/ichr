@@ -2,7 +2,7 @@
 //!
 //! Provides `SubstitutionContext` (a flat struct of every variable) and
 //! `substitute(template, ctx)` which performs a single linear sweep of
-//! `String::replace` calls — no shell escaping, no regex, no nesting.
+//! `String::replace` calls -- no shell escaping, no regex, no nesting.
 //!
 //! All args are ultimately passed to `tokio::process::Command::args` as
 //! separate `OsString` elements, so shell-escaping would be incorrect here.
@@ -42,15 +42,15 @@ pub struct SubstitutionContext {
     pub version_type: String,
 
     // --- Paths --------------------------------------------------------------
-    /// `AppPaths::instance_minecraft_dir(slug)` — the `.minecraft` working dir.
+    /// `AppPaths::instance_minecraft_dir(slug)` -- the `.minecraft` working dir.
     pub game_directory: PathBuf,
-    /// `AppPaths::assets_dir()` — shared Mojang asset objects root.
+    /// `AppPaths::assets_dir()` -- shared Mojang asset objects root.
     pub assets_root: PathBuf,
-    /// `version.asset_index.id` — the asset index name (e.g. `"17"`).
+    /// `version.asset_index.id` -- the asset index name (e.g. `"17"`).
     pub assets_index_name: String,
-    /// `AppPaths::instance_natives_dir(slug)` — per-instance extracted natives.
+    /// `AppPaths::instance_natives_dir(slug)` -- per-instance extracted natives.
     pub natives_directory: PathBuf,
-    /// `AppPaths::libraries_dir()` — shared Maven-layout libraries root.
+    /// `AppPaths::libraries_dir()` -- shared Maven-layout libraries root.
     pub library_directory: PathBuf,
 
     // --- Classpath (filled during JVM arg composition) ----------------------
@@ -58,7 +58,7 @@ pub struct SubstitutionContext {
     pub classpath: String,
 
     // --- Platform -----------------------------------------------------------
-    /// `':'` on Linux, `';'` on Windows — the classpath entry separator.
+    /// `':'` on Linux, `';'` on Windows -- the classpath entry separator.
     pub classpath_separator: char,
     /// Mojang arch string: `"x86_64"` or `"arm64"`.
     pub arch: String,
@@ -70,9 +70,9 @@ pub struct SubstitutionContext {
     pub launcher_version: String,
 
     // --- Optional / unimplemented in v1 -------------------------------------
-    /// `""` — `has_custom_resolution` feature not active in v1.
+    /// `""` -- `has_custom_resolution` feature not active in v1.
     pub resolution_width: String,
-    /// `""` — `has_custom_resolution` feature not active in v1.
+    /// `""` -- `has_custom_resolution` feature not active in v1.
     pub resolution_height: String,
 }
 
@@ -80,7 +80,7 @@ pub struct SubstitutionContext {
 /// from `ctx`. Unknown placeholders are left as-is (no crash, no empty
 /// replacement). Paths are converted via `.to_string_lossy()`.
 ///
-/// This is a single linear sweep — Mojang templates never nest `${...}`
+/// This is a single linear sweep -- Mojang templates never nest `${...}`
 /// so order of replacement is irrelevant.
 pub fn substitute(template: &str, ctx: &SubstitutionContext) -> String {
     // Capture lossy path strings before the borrow checker has to juggle them.

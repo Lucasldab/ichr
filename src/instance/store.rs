@@ -40,7 +40,7 @@ pub async fn write_instance_manifest(
 }
 
 /// Record that a launch is about to begin: set `last_played_at` to now.
-/// `total_play_time_ms` is not touched — that is updated on exit.
+/// `total_play_time_ms` is not touched -- that is updated on exit.
 pub async fn mark_launch_started(
     paths: &AppPaths,
     slug: &str,
@@ -80,7 +80,7 @@ pub async fn update_play_time(
 /// Sort order: `last_played_at` DESC (most recent first; `None` last),
 /// tiebreaker by `display_name` ASC.
 ///
-/// Invalid or unreadable `instance.json` files are logged and skipped — NOT fatal.
+/// Invalid or unreadable `instance.json` files are logged and skipped -- NOT fatal.
 pub async fn list_instance_manifests(paths: &AppPaths) -> Result<Vec<InstanceManifest>, AppError> {
     let instances_dir = paths.instances_dir();
     if !tokio::fs::try_exists(&instances_dir).await? {

@@ -4,9 +4,9 @@
 //!
 //! Invariants:
 //!   * No blocking I/O inside `.await` bodies here.
-//!   * `action_tx.send(..)` in background arms uses `let _ =` — receiver
+//!   * `action_tx.send(..)` in background arms uses `let _ =` -- receiver
 //!     being dropped is a valid shutdown signal.
-//!   * `execute_effects` match is EXHAUSTIVE over Effect variants — no dead
+//!   * `execute_effects` match is EXHAUSTIVE over Effect variants -- no dead
 //!     branches, no SpawnVersionInstall arm.
 
 use std::sync::Arc;
@@ -42,7 +42,7 @@ use crate::services::{
 use crate::tasks::{TaskEvent, TaskManager, DEFAULT_MAX_CONCURRENT};
 
 /// Apply the version filter + case-insensitive substring search. Always
-/// excludes `old_beta` and `old_alpha` — those are out of Phase 2 scope per
+/// excludes `old_beta` and `old_alpha` -- those are out of Phase 2 scope per
 /// ROADMAP "Out of Scope".
 pub fn filter_version_list<'a>(
     versions: &'a [VersionEntry],
@@ -132,7 +132,7 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
     // Phase 9 (09-07): seed AppState with the CurseForge api-key flag so the
     // F keybind can no-op silently and instance_list can render the title hint.
     // Use struct-update syntax to satisfy clippy::field_reassign_with_default
-    // (Phase 1 precedent — same pattern as arch/os).
+    // (Phase 1 precedent -- same pattern as arch/os).
     let mut state = AppState {
         cf_api_key_present: cf_service.api_key_present(),
         ..AppState::default()
@@ -257,7 +257,7 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         ActiveView::JavaPickerModal { .. } => {
             super::views::java_picker_modal::map_java_picker_event(ev)
         }
-        // Phase 6: loader modals — event mappers wired in 06-08.
+        // Phase 6: loader modals -- event mappers wired in 06-08.
         ActiveView::LoaderPickerModal { .. } => {
             super::views::loader_picker_modal::map_loader_picker_event(ev)
         }
@@ -352,7 +352,7 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
                     if state.running_instances.contains_key(&m.slug) {
-                        // Already running — no-op (T-03-05-01 belt-and-suspenders).
+                        // Already running -- no-op (T-03-05-01 belt-and-suspenders).
                         return None;
                     }
                     return Some(Action::LaunchInstance {
@@ -477,7 +477,7 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             // `M` (uppercase) opens the Modrinth mod browser. Pitfall 8 guard:
             // silent no-op while a previous mod install is in flight for the same
             // instance. The update() arm in app.rs enforces this too (defense in
-            // depth) — see test_open_mod_browser_blocked_when_install_in_flight.
+            // depth) -- see test_open_mod_browser_blocked_when_install_in_flight.
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
                     if !state.running_mod_jobs.contains_key(&m.slug) {
@@ -514,7 +514,7 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             // startup. Pitfall 8 guard (inherited from Phase 8): silent no-op
             // while a previous mod install is in flight for the same instance.
             // The update() arm in app.rs enforces both guards too (defense in
-            // depth) — see test_cf_open_no_op_when_api_key_absent.
+            // depth) -- see test_cf_open_no_op_when_api_key_absent.
             if let ActiveView::InstanceList { selected } = &state.active_view {
                 if let Some(m) = state.instances.get(*selected) {
                     if state.cf_api_key_present && !state.running_mod_jobs.contains_key(&m.slug) {
@@ -813,9 +813,9 @@ fn map_group_inline_event(ev: CtEvent, state: &AppState) -> Option<Action> {
 }
 
 /// Execute declarative side-effects. Keeps `update` pure.
-/// Match is exhaustive — no SpawnVersionInstall arm, no dead-code branches.
+/// Match is exhaustive -- no SpawnVersionInstall arm, no dead-code branches.
 ///
-/// `state` is the just-updated state (after `update()` ran) — read-only.
+/// `state` is the just-updated state (after `update()` ran) -- read-only.
 /// Used by Effect::LaunchInstance to look up the instance display_name (username).
 #[allow(clippy::too_many_arguments)]
 async fn execute_effects(
@@ -836,7 +836,7 @@ async fn execute_effects(
     for eff in effects {
         match eff {
             Effect::Quit => {
-                // No additional work — should_quit flag drives loop exit.
+                // No additional work -- should_quit flag drives loop exit.
             }
 
             Effect::FetchInstances => {
@@ -1116,7 +1116,7 @@ async fn execute_effects(
                                 .await;
                         }
                         Err(crate::auth::AuthError::UserCancelled) => {
-                            // Cancellation is expected — silently return to AccountsList.
+                            // Cancellation is expected -- silently return to AccountsList.
                             let _ = tx.send(Action::CloseAccounts).await;
                         }
                         Err(e) => {
@@ -1305,7 +1305,7 @@ async fn execute_effects(
 
                     // Phase 7 (D-06): resolve the JRE for the installer subprocess BEFORE
                     // calling install_loader. The vanilla version JSON must already be on
-                    // disk (Phase 2/3 install_version) — if not, surface a typed error.
+                    // disk (Phase 2/3 install_version) -- if not, surface a typed error.
                     let jre_path = match java
                         .resolve_jre_for_mc_version_install(&paths2, &mc_version)
                         .await
@@ -1374,7 +1374,7 @@ async fn execute_effects(
             }
 
             Effect::CancelLoaderInstall { slug: _ } => {
-                // The token.cancel() already happened in update() — this arm is a
+                // The token.cancel() already happened in update() -- this arm is a
                 // no-op hook for symmetry with KillProcess. The install task
                 // observes the cancellation token and returns LoaderError::Cancelled.
             }
@@ -1392,7 +1392,7 @@ async fn execute_effects(
                             let _ = tx
                                 .send(Action::LoaderInstallFailed {
                                     slug,
-                                    loader: LoaderType::Fabric, // placeholder — remove failure modal copy doesn't depend on type
+                                    loader: LoaderType::Fabric, // placeholder -- remove failure modal copy doesn't depend on type
                                     version: String::new(),
                                     error: e.to_string(),
                                     log_tail: String::new(),
@@ -1403,10 +1403,10 @@ async fn execute_effects(
                 });
             }
 
-            // Phase 8 (08-08): Modrinth integration effect arms — wired below.
+            // Phase 8 (08-08): Modrinth integration effect arms -- wired below.
             // Install progress (`Effect::InstallModWithDeps`) flows through the
             // existing `download_pane` via `Action::Task(TaskEvent::Progress)`,
-            // NOT a blocking install modal — UI-SPEC §11 invariant.
+            // NOT a blocking install modal -- UI-SPEC §11 invariant.
             Effect::SearchModrinth {
                 slug,
                 query,
@@ -1487,7 +1487,7 @@ async fn execute_effects(
                                 project_id = %project_id,
                                 "Modrinth list_versions failed",
                             );
-                            // Surface as empty list — the version-picker empty-state
+                            // Surface as empty list -- the version-picker empty-state
                             // copy ("No versions match...") will render.
                             let _ = tx
                                 .send(Action::ModVersionsLoaded {
@@ -1531,7 +1531,7 @@ async fn execute_effects(
                         }
                         Err(e) => {
                             // Surface dep-resolution failures via the install-failed
-                            // modal — same UX surface as a download error.
+                            // modal -- same UX surface as a download error.
                             let _ = tx
                                 .send(Action::ModInstallFailed {
                                     slug,
@@ -1560,7 +1560,7 @@ async fn execute_effects(
 
                 // Forwarder: ModrinthService emits TaskEvent::Progress through `lt_tx`.
                 // Translate each event into Action::Task so it flows through the
-                // existing `state.active_jobs` → `download_pane` LineGauge — NOT
+                // existing `state.active_jobs` → `download_pane` LineGauge -- NOT
                 // a blocking install modal (UI-SPEC §11).
                 let (lt_tx, mut lt_rx) = mpsc::channel::<TaskEvent>(64);
                 {
@@ -1618,7 +1618,7 @@ async fn execute_effects(
                                 .await;
                         }
                         Err(crate::mods::error::ModrinthError::Cancelled) => {
-                            // Treat cancellation as a clean completion (Phase 6 precedent —
+                            // Treat cancellation as a clean completion (Phase 6 precedent --
                             // run.rs lines 962-967 for LoaderInstall). The user already
                             // returned to ModBrowser via the cancel path.
                             let _ = tx
@@ -1727,17 +1727,17 @@ async fn execute_effects(
                 });
             }
 
-            // Phase 9 (09-07): CurseForge effect arms — LOCKED design with 4
+            // Phase 9 (09-07): CurseForge effect arms -- LOCKED design with 4
             // SEPARATE arms (SearchCurseForge / FetchCfMod / ListCfFiles /
             // InstallCfMod). Mirrors Phase 8's separate-fetch-then-list pattern
             // (FetchModDetail + ListModVersions). Do NOT collapse into a
-            // combined `OpenCfFilePicker` effect — the design relies on the
+            // combined `OpenCfFilePicker` effect -- the design relies on the
             // Action ping-pong: CfBrowserOpenDetail → FetchCfMod →
             // CfBrowserDetailLoaded → ListCfFiles → CfFilePickerLoaded.
             //
             // Install progress (`Effect::InstallCfMod`) flows through the
             // existing `download_pane` via `Action::Task(TaskEvent::Progress)`,
-            // NOT a blocking install modal — UI-SPEC §11 invariant inherited
+            // NOT a blocking install modal -- UI-SPEC §11 invariant inherited
             // from Phase 8.
             Effect::SearchCurseForge {
                 slug,
@@ -1810,7 +1810,7 @@ async fn execute_effects(
                 // Mirrors Phase 8 ListModVersions: the spawned task fetches BOTH
                 // the project detail (needed for CfFilePickerLoaded.mod_detail)
                 // AND the file list. One extra get_mod round-trip per file-picker
-                // open (~50ms) — acceptable for v1; deferred caching to v2.
+                // open (~50ms) -- acceptable for v1; deferred caching to v2.
                 let svc = Arc::clone(&cf_service);
                 let tx = action_tx.clone();
                 let loader_info = synthetic_loader_info_from_cf_type(loader);
@@ -1866,7 +1866,7 @@ async fn execute_effects(
                 // Forwarder: cf_service emits TaskEvent::Progress through
                 // `lt_tx`. Translate each event into Action::Task so it flows
                 // through the existing `state.active_jobs` → `download_pane`
-                // LineGauge — NOT a blocking install modal (UI-SPEC §11).
+                // LineGauge -- NOT a blocking install modal (UI-SPEC §11).
                 let (lt_tx, mut lt_rx) = mpsc::channel::<TaskEvent>(64);
                 {
                     let tx_fwd = tx.clone();
@@ -1912,7 +1912,7 @@ async fn execute_effects(
                             let _ = tx.send(Action::CfModInstalled { slug, mod_id }).await;
                         }
                         Err(crate::mods::curseforge::error::CurseForgeError::Cancelled) => {
-                            // Silent — the cancel path already pruned
+                            // Silent -- the cancel path already pruned
                             // running_mod_jobs (if applicable). Phase 6/8 precedent.
                             let _ = tx.send(Action::CfModInstalled { slug, mod_id }).await;
                         }
@@ -2031,7 +2031,7 @@ async fn execute_effects(
                         Err(crate::modpack::error::ModpackError::Cancelled) => {
                             // HIGH-2 regression fix: dispatch ModpackImportCancelled
                             // (NOT ModpackImported{slug:""}, which would call remove("")
-                            // — a no-op against the real-slug HashMap key, leaving a
+                            // -- a no-op against the real-slug HashMap key, leaving a
                             // stale CancellationToken in running_modpack_imports).
                             // The dedicated ModpackImportCancelled arm calls clear()
                             // regardless of which slug was assigned before cancel.
@@ -2052,7 +2052,7 @@ async fn execute_effects(
             }
 
             Effect::CancelModpackImport => {
-                // The token.cancel() already happened in update() — this arm is a
+                // The token.cancel() already happened in update() -- this arm is a
                 // no-op hook for symmetry with CancelLoaderInstall. The import task
                 // observes the cancellation token and returns ModpackError::Cancelled;
                 // service-side cleanup (remove_dir_all) ran in import_mrpack's outer arm.
@@ -2133,7 +2133,7 @@ async fn execute_effects(
                         }
                     }
                 });
-                // Suppress unused token warning — it's a handle for future cancel support.
+                // Suppress unused token warning -- it's a handle for future cancel support.
                 let _ = token;
             }
 

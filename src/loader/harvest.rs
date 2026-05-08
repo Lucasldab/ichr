@@ -4,7 +4,7 @@
 //!
 //! Atomicity: the merged version JSON is written via `atomic_write`
 //! (Phase 2 tmp+rename pattern). The instance manifest's `loader` field
-//! is written LAST by the caller (`LoaderService::install_loader`) — never here.
+//! is written LAST by the caller (`LoaderService::install_loader`) -- never here.
 //!
 //! **07-RESEARCH.md Open Question 4 (harvest variation):** We use the
 //! "any non-vanilla dir" rule (NOT a string-substring forge-name heuristic)
@@ -60,9 +60,9 @@ struct ProducedVersion {
 
 /// Walk `<staging>/versions/` to find the produced loader version dir;
 /// parse its JSON; identify the library tree under `<staging>/libraries/`.
-/// Does NOT touch shared paths — caller copies via `copy_libraries_into_shared`.
+/// Does NOT touch shared paths -- caller copies via `copy_libraries_into_shared`.
 ///
-/// **Algorithm (07-RESEARCH.md Q4 fix — "any non-MC dir" rule; no string-heuristic on loader names):**
+/// **Algorithm (07-RESEARCH.md Q4 fix -- "any non-MC dir" rule; no string-heuristic on loader names):**
 /// 1. Collect all subdirectory names in `<staging>/versions/` whose name is NOT `vanilla_mc_id`.
 /// 2. If `expected_loader_id` is Some and present in candidates → pick it (anchored fast path).
 /// 3. Else if exactly one candidate → pick it (common case).
@@ -163,7 +163,7 @@ pub async fn harvest_install(
             tracing::warn!(
                 src = %source_path.display(),
                 coord = %lib.name,
-                "library declared in version JSON but not present in staging — skipping"
+                "library declared in version JSON but not present in staging -- skipping"
             );
             continue;
         }
@@ -181,7 +181,7 @@ pub async fn harvest_install(
     })
 }
 
-/// Copy harvested libraries into `paths.libraries_dir()`. Idempotent —
+/// Copy harvested libraries into `paths.libraries_dir()`. Idempotent --
 /// files already present with matching SHA1 are skipped; otherwise written
 /// via `atomic_write`. Bounded by `LIB_CONCURRENCY` (8) semaphore.
 /// Cancellation-aware: returns `LoaderError::Cancelled` on token fire.
@@ -251,7 +251,7 @@ async fn copy_one_library(paths: &AppPaths, lib: &HarvestedLibrary) -> Result<()
             if ok {
                 return Ok(());
             }
-            // Mismatch — fall through to overwrite.
+            // Mismatch -- fall through to overwrite.
         } else {
             return Ok(());
         }
@@ -293,7 +293,7 @@ async fn copy_one_library(paths: &AppPaths, lib: &HarvestedLibrary) -> Result<()
 }
 
 /// Atomic write of the merged version JSON bytes into the shared versions tree.
-/// Uses `atomic_write` (tmp + rename — Phase 2 pattern, Pitfall 7 prevention).
+/// Uses `atomic_write` (tmp + rename -- Phase 2 pattern, Pitfall 7 prevention).
 #[tracing::instrument(skip_all, fields(version_id = %version_id))]
 pub async fn write_version_json(
     paths: &AppPaths,
@@ -323,7 +323,7 @@ mod tests {
     }
 
     /// Build a minimal staging tree:
-    ///   versions/<vanilla>/   (empty dir — represents vanilla)
+    ///   versions/<vanilla>/   (empty dir -- represents vanilla)
     ///   versions/<loader_id>/<loader_id>.json
     ///   libraries/              (empty dir)
     async fn make_staging_tree(base: &Path, vanilla_mc_id: &str, loader_id: &str, json: &str) {
@@ -376,7 +376,7 @@ mod tests {
     async fn test_harvest_install_no_loader_dir_returns_harvest_failed() {
         let td = TempDir::new().unwrap();
         let staging = td.path();
-        // Only the vanilla dir — no loader dir.
+        // Only the vanilla dir -- no loader dir.
         tokio::fs::create_dir_all(staging.join("versions").join("1.20.1"))
             .await
             .unwrap();
@@ -400,7 +400,7 @@ mod tests {
     async fn test_harvest_install_rejects_multiple_non_mc_dirs() {
         let td = TempDir::new().unwrap();
         let staging = td.path();
-        // Two loader dirs — ambiguous (no expected_loader_id to anchor).
+        // Two loader dirs -- ambiguous (no expected_loader_id to anchor).
         let id1 = "1.20.1-forge-47.4.20";
         let id2 = "1.20.1-forge-47.4.10";
         let j1 = format!(r#"{{"id":"{id1}","libraries":[]}}"#);
@@ -454,7 +454,7 @@ mod tests {
         };
         let token = CancellationToken::new();
 
-        // First call — should copy.
+        // First call -- should copy.
         copy_libraries_into_shared(&paths, &[lib.clone()], &token)
             .await
             .unwrap();
@@ -462,7 +462,7 @@ mod tests {
         assert!(dst.exists(), "library must be copied");
         assert_eq!(tokio::fs::read(&dst).await.unwrap(), b"FAKE_ASM_JAR");
 
-        // Second call — should skip (file already exists, no SHA).
+        // Second call -- should skip (file already exists, no SHA).
         copy_libraries_into_shared(&paths, &[lib], &token)
             .await
             .unwrap();

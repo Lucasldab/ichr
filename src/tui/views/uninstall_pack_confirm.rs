@@ -1,4 +1,4 @@
-//! Uninstall pack confirm — inline overlay for removing a resource pack or shader pack.
+//! Uninstall pack confirm -- inline overlay for removing a resource pack or shader pack.
 //!
 //! Clone-and-parameterize of `uninstall_mod_confirm.rs` per Phase 11 plan.
 //! Title text adapts based on kind:

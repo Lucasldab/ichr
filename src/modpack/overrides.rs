@@ -64,7 +64,7 @@ pub async fn apply_overrides(
     dest_minecraft_dir: &Path,
     token: &CancellationToken,
 ) -> Result<usize, ModpackError> {
-    // Pre-flight cancel check — spawn_blocking cannot be interrupted once started.
+    // Pre-flight cancel check -- spawn_blocking cannot be interrupted once started.
     if token.is_cancelled() {
         return Err(ModpackError::Cancelled);
     }
@@ -128,7 +128,7 @@ fn extract_one_entry<R: std::io::Read>(
         return Ok(0);
     }
 
-    // Skip symlink entries — never create or follow archive-declared symlinks
+    // Skip symlink entries -- never create or follow archive-declared symlinks
     // (Pitfall 4). The zip crate 8.5.1 exposes `is_symlink()` directly.
     if entry.is_symlink() {
         tracing::warn!(
@@ -158,7 +158,7 @@ fn extract_one_entry<R: std::io::Read>(
     drop(out);
 
     // Normalize Unix permissions to 0o644 regardless of archive metadata
-    // (Pitfall 9 — defense vs. malicious chmod bits in archive).
+    // (Pitfall 9 -- defense vs. malicious chmod bits in archive).
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -430,7 +430,7 @@ mod tests {
         );
         // dest should not have been created (we bail before create_dir_all).
         // (On some platforms create_dir_all is a no-op on an existing dir, so
-        // only assert no *files* were written — not that the dir is absent.)
+        // only assert no *files* were written -- not that the dir is absent.)
         if dest.exists() {
             assert_eq!(
                 std::fs::read_dir(&dest).unwrap().count(),

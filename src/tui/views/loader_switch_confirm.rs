@@ -43,7 +43,7 @@ pub fn render_loader_switch_confirm(f: &mut Frame, area: Rect, state: &AppState)
     };
     lines.push(Line::from(body));
     lines.push(Line::from(Span::styled(
-        "Mods are not affected — only the loader version changes.",
+        "Mods are not affected -- only the loader version changes.",
         Style::default().add_modifier(Modifier::DIM),
     )));
     lines.push(Line::from(Span::styled(

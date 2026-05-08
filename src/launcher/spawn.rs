@@ -1,4 +1,4 @@
-//! Async process spawner — drains stdio into the per-instance log file,
+//! Async process spawner -- drains stdio into the per-instance log file,
 //! maintains a ring buffer of the last N lines for crash-tail
 //! surfacing, and honours CancellationToken.
 //!
@@ -47,7 +47,7 @@ pub async fn run_process(
     log_path: &Path,
     token: CancellationToken,
 ) -> Result<LaunchOutcome, AppError> {
-    // Ensure parent directory of log_path exists — Minecraft won't write
+    // Ensure parent directory of log_path exists -- Minecraft won't write
     // through missing dirs and tokio::fs::OpenOptions will fail otherwise.
     if let Some(parent) = log_path.parent() {
         tokio::fs::create_dir_all(parent)
@@ -55,12 +55,12 @@ pub async fn run_process(
             .map_err(|e| AppError::SpawnFailed(format!("create log dir: {e}")))?;
     }
 
-    // Session header into the log file — append so previous sessions are preserved.
+    // Session header into the log file -- append so previous sessions are preserved.
     write_session_header(log_path)
         .await
         .map_err(|e| AppError::SpawnFailed(format!("log header: {e}")))?;
 
-    // Build the command. `kill_on_drop(true)` is MANDATORY — see
+    // Build the command. `kill_on_drop(true)` is MANDATORY -- see
     // PITFALLS.md Pitfall 4.
     let mut cmd = Command::new(java_bin);
     cmd.args(jvm_args)
@@ -188,7 +188,7 @@ where
     while let Some(line) = lines.next_line().await? {
         file.write_all(line.as_bytes()).await?;
         file.write_all(b"\n").await?;
-        // Brief lock — no .await held across the guard.
+        // Brief lock -- no .await held across the guard.
         let mut guard = ring.lock().expect("ring lock");
         if guard.len() >= LOG_TAIL_LINES {
             guard.pop_front();
@@ -239,7 +239,7 @@ mod tests {
 
     // Ignored on CI: GH Actions ubuntu-latest runner consistently fails to
     // propagate the cancel signal to the spawned `/bin/sh -c "sleep 30"` child
-    // within 15s — the test waits the natural 30s child exit. Reproduces 100%
+    // within 15s -- the test waits the natural 30s child exit. Reproduces 100%
     // on CI, never reproduces on developer laptops or full Linux desktops.
     // Likely a tokio + Actions-runner sandbox interaction.
     // Run locally with `cargo nextest run --include-ignored` to verify cancel
@@ -271,7 +271,7 @@ mod tests {
             matches!(result, Err(AppError::Cancelled)),
             "cancellation must produce AppError::Cancelled; got {result:?}"
         );
-        // 15s tolerance — GH Actions ubuntu-latest under load has exhibited
+        // 15s tolerance -- GH Actions ubuntu-latest under load has exhibited
         // ~30s cancel latency that does not reproduce locally. The test
         // fundamentally guards against "cancel hangs until the child's
         // natural exit" (the inner sleep is 30s); anything well below that

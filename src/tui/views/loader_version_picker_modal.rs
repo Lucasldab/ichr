@@ -1,4 +1,4 @@
-//! Loader version picker — scrollable filtered list with stable-only toggle.
+//! Loader version picker -- scrollable filtered list with stable-only toggle.
 //!
 //! Mirrors `version_picker.rs`. Filter bar + scrollable list + Yellow/DarkGray.
 
@@ -75,7 +75,7 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
     .block(
         Block::default()
             .borders(Borders::ALL)
-            .title(format!(" {kind} Loader versions — {slug} ")),
+            .title(format!(" {kind} Loader versions -- {slug} ")),
     );
     f.render_widget(header, chunks[0]);
 
@@ -116,7 +116,7 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
             {
                 format!("No NeoForge available for MC {mc} (NeoForge requires 1.20.1+)")
             }
-            _ => "No versions found — check network".to_string(),
+            _ => "No versions found -- check network".to_string(),
         }
     } else {
         String::new()

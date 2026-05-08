@@ -19,7 +19,7 @@
 //! (one small HTTP call) and writes it to the TempDir so that `LoaderService`
 //! can resolve the JRE for the Fabric install step without requiring a full MC
 //! installation.  The JRE itself is auto-downloaded by `JavaService` using the
-//! Mojang JRE manifest — an additional ~300 MB on first run (cached in TempDir).
+//! Mojang JRE manifest -- an additional ~300 MB on first run (cached in TempDir).
 
 use tempfile::TempDir;
 use tokio::sync::mpsc;
@@ -48,14 +48,14 @@ const MC_VERSION_JSON_URL: &str =
 /// 1. Pre-fetch the Mojang version JSON for MC 1.21.4 and write it to the
 ///    TempDir so `LoaderService` can resolve the JRE without a full MC install.
 /// 2. Download the `.mrpack` file from cdn.modrinth.com into the TempDir.
-/// 3. Call `ModpackService::import_mrpack` — this downloads 14 client mod JARs,
+/// 3. Call `ModpackService::import_mrpack` -- this downloads 14 client mod JARs,
 ///    applies any overrides, and installs Fabric 0.17.3.
 /// 4. Assert: instance manifest exists + at least one mod JAR installed.
 ///
 /// Total download on first run: ~14 mod JARs + Fabric library JARs + JRE
 /// (≈ 300 MB total; most is the JRE and Fabric API).
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-#[ignore = "requires internet — downloads ~300 MB from cdn.modrinth.com, meta.fabricmc.net, and Mojang endpoints"]
+#[ignore = "requires internet -- downloads ~300 MB from cdn.modrinth.com, meta.fabricmc.net, and Mojang endpoints"]
 async fn live_import_pinned_modpack() {
     let td = TempDir::new().expect("TempDir::new");
     let paths = AppPaths::with_roots(
@@ -111,7 +111,7 @@ async fn live_import_pinned_modpack() {
     assert!(
         status.is_success(),
         "Modrinth CDN returned HTTP {status} for {mrpack_url}; \
-         pin may have drifted — update VERSION_ID in this test (see 10-VALIDATION.md)"
+         pin may have drifted -- update VERSION_ID in this test (see 10-VALIDATION.md)"
     );
 
     let bytes = resp.bytes().await.expect("read .mrpack body");
@@ -139,7 +139,7 @@ async fn live_import_pinned_modpack() {
         let mut labels: Vec<String> = Vec::new();
         while let Some(evt) = rx.recv().await {
             if let ichr::tasks::TaskEvent::Progress { msg, pct, .. } = evt {
-                eprintln!("[live-test] {pct:3}% — {msg}");
+                eprintln!("[live-test] {pct:3}% -- {msg}");
                 labels.push(msg);
             }
         }

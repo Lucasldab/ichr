@@ -73,7 +73,7 @@ async fn test_extract_native_jar_rejects_path_traversal() {
     // Should succeed (skips the traversal entry silently)
     extract_native_jar(&jar, &dest, &[]).await.unwrap();
 
-    // dest dir should be empty — traversal entry was skipped
+    // dest dir should be empty -- traversal entry was skipped
     let entries: Vec<_> = std::fs::read_dir(&dest).unwrap().collect();
     assert!(
         entries.is_empty(),
@@ -254,7 +254,7 @@ fn test_resolve_inherits_with_no_parent_is_noop() {
     let resolved = resolve_inherits(&version, &parents).unwrap();
 
     // When there is no parent, resolve_inherits returns the version unchanged
-    // (post-merge ResolvedVersion has no `inherits_from` field — the chain is
+    // (post-merge ResolvedVersion has no `inherits_from` field -- the chain is
     // resolved). For a vanilla input, root_id == id (the chain has length 1).
     assert_eq!(resolved.id, "1.21.4");
     assert_eq!(

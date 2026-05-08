@@ -1,7 +1,7 @@
 //! Platform path resolution. The **only** module in the crate that calls
 //! `directories::ProjectDirs`.
 //!
-//! All other modules consume paths via `AppPaths` methods — never via
+//! All other modules consume paths via `AppPaths` methods -- never via
 //! environment variables, `cfg!(target_os = ...)`, or the `directories`
 //! crate directly.
 //!
@@ -9,7 +9,7 @@
 //!
 //! On Windows, `ProjectDirs::from("", "", "ichr").data_dir()` returns
 //! `%APPDATA%\ichr\data` (a `\data` subfolder is appended by the
-//! `directories` crate). We accept this suffix rather than stripping it —
+//! `directories` crate). We accept this suffix rather than stripping it --
 //! stripping risks diverging from the crate's own `config_dir`/`cache_dir`
 //! layout and ratatui apps never expose these paths to end users.
 //! See `.planning/research/PITFALLS.md` (Pitfall 6) for the rationale.
@@ -47,7 +47,7 @@ impl AppPaths {
         })
     }
 
-    /// Construct `AppPaths` from explicit directories — for tests that
+    /// Construct `AppPaths` from explicit directories -- for tests that
     /// want to redirect all paths into a `tempfile::TempDir`.
     pub fn with_roots(data_dir: PathBuf, config_dir: PathBuf, cache_dir: PathBuf) -> Self {
         Self {
@@ -190,20 +190,20 @@ impl AppPaths {
     /// The file is APPENDED at each launch; sessions are separated by a
     /// timestamped header written by `launcher::spawn` (plan 03-03).
     /// Minecraft's own `logs/latest.log` is a separate file managed by
-    /// Minecraft's own log4j config — do not conflate.
+    /// Minecraft's own log4j config -- do not conflate.
     pub fn instance_log_file(&self, slug: &str) -> PathBuf {
         self.instance_dir(slug).join("logs").join("ichr.log")
     }
 
     /// Encrypted fallback refresh-token file.
-    /// Path: `{config_dir}/accounts.enc` — AES-256-GCM encrypted blob.
+    /// Path: `{config_dir}/accounts.enc` -- AES-256-GCM encrypted blob.
     /// Used when the keyring secret service is unavailable.
     pub fn accounts_file(&self) -> PathBuf {
         self.config_dir.join("accounts.enc")
     }
 
     /// Non-secret account metadata file.
-    /// Path: `{config_dir}/accounts.json` — JSON array of Account records
+    /// Path: `{config_dir}/accounts.json` -- JSON array of Account records
     /// (ids, usernames, UUIDs, expiry timestamps). Refresh tokens are
     /// stored separately in the keyring or accounts.enc; this file only
     /// holds the metadata needed to render the account picker.

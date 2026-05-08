@@ -20,7 +20,7 @@ fn init_writes_info_to_data_dir_log_file_without_ansi() {
     // Point all three roots at the tempdir; logging only reads `data_dir`.
     let paths = AppPaths::with_roots(root.clone(), root.clone(), root.clone());
 
-    // Act — init, emit, drop guard to flush.
+    // Act -- init, emit, drop guard to flush.
     let guard = logging::init(&paths).expect("logging::init should succeed");
 
     tracing::info!("test-message-abc");

@@ -168,7 +168,7 @@ async fn test_drop_collision_returns_filename_collision() {
 
     let token = CancellationToken::new();
 
-    // First drop — must succeed.
+    // First drop -- must succeed.
     drop_pack_from_path(
         &paths,
         "test-instance",
@@ -179,7 +179,7 @@ async fn test_drop_collision_returns_filename_collision() {
     .await
     .expect("first drop must succeed");
 
-    // Second drop with same filename — must return FilenameCollision.
+    // Second drop with same filename -- must return FilenameCollision.
     // The source file still exists so the size / file-name validation passes.
     let result = drop_pack_from_path(
         &paths,
@@ -536,7 +536,7 @@ async fn test_modrinth_install_shader_pack_end_to_end() {
     );
 }
 
-// ─── Test 7: Toggle resource pack enabled — extension rename round-trip ───────
+// ─── Test 7: Toggle resource pack enabled -- extension rename round-trip ───────
 
 /// Install via drop; toggle disabled (.zip → .zip.disabled); toggle back (.zip).
 /// Verifies ledger enabled flag flips and file is renamed in resourcepacks/.
@@ -869,7 +869,7 @@ async fn test_modrinth_install_oversized_file_rejected() {
     _download_mock.assert_calls(0);
 }
 
-// ─── Test 12: Browser Enter-key install chain — auto-pick latest stable ──────
+// ─── Test 12: Browser Enter-key install chain -- auto-pick latest stable ──────
 
 /// GAP-11-A regression test: pin the auto-pick behaviour of the
 /// `Effect::FetchPackVersions` task chain that backs the pack browser
@@ -882,9 +882,9 @@ async fn test_modrinth_install_oversized_file_rejected() {
 ///   -> dispatch the existing `Effect::InstallPackFromModrinth`
 ///
 /// This test mocks Modrinth with 3 versions in date-descending order:
-///   1. `older_release`  — `version_type: "release"`, `date_published: 2026-02-01`
-///   2. `newer_release`  — `version_type: "release"`, `date_published: 2026-03-01`
-///   3. `unstable_beta`  — `version_type: "beta"`,    `date_published: 2026-04-01`
+///   1. `older_release`  -- `version_type: "release"`, `date_published: 2026-02-01`
+///   2. `newer_release`  -- `version_type: "release"`, `date_published: 2026-03-01`
+///   3. `unstable_beta`  -- `version_type: "beta"`,    `date_published: 2026-04-01`
 ///
 /// `PackService::list_versions` sorts by `date_published` DESC then marks
 /// the FIRST encountered `release` as `is_latest_stable=true`. So the

@@ -28,9 +28,9 @@ pub use crate::domain::account::{Account, AccountKind, StorageBackend};
 /// at launch time to produce a valid `MsaTokens` snapshot.
 #[derive(Debug, Clone)]
 pub enum AuthContext {
-    /// Offline mode — arbitrary username, no MS account.
+    /// Offline mode -- arbitrary username, no MS account.
     Offline { username: String },
-    /// MSA online mode — account_id used to load tokens from store.
+    /// MSA online mode -- account_id used to load tokens from store.
     Msa { account_id: String },
 }
 
@@ -45,7 +45,7 @@ pub struct MsaTokens {
     pub mc_uuid: String,
     /// For SubstitutionContext.auth_player_name.
     pub mc_player_name: String,
-    /// For SubstitutionContext.auth_xuid (the XSTS uhs — same as user_hash).
+    /// For SubstitutionContext.auth_xuid (the XSTS uhs -- same as user_hash).
     pub xuid: String,
     /// For SubstitutionContext.auth_xbox_user_hash (the XSTS uhs).
     pub user_hash: String,
@@ -62,7 +62,7 @@ pub enum AuthError {
     #[error("Device code polling failed: {0}")]
     DeviceCodeFailed(String),
 
-    #[error("Device code expired — please try again")]
+    #[error("Device code expired -- please try again")]
     DeviceCodeExpired,
 
     #[error("User cancelled authentication")]
@@ -83,7 +83,7 @@ pub enum AuthError {
     #[error("Minecraft profile fetch failed: {0}")]
     ProfileFetch(String),
 
-    #[error("Token refresh failed — please re-authenticate")]
+    #[error("Token refresh failed -- please re-authenticate")]
     RefreshFailed,
 
     #[error("Keyring unavailable: {0}")]

@@ -2,7 +2,7 @@
 //! (per 08-UI-SPEC.md §State Machine), and the per-instance ledger schema
 //! (per 08-RESEARCH.md §Pattern 3).
 //!
-//! All types are pure data — no I/O, no async. Serde-derive on every type.
+//! All types are pure data -- no I/O, no async. Serde-derive on every type.
 
 use serde::{Deserialize, Serialize};
 
@@ -66,7 +66,7 @@ pub struct ModrinthVersion {
     pub loaders: Vec<String>,
     #[serde(default)]
     pub downloads: u64,
-    pub date_published: String, // ISO 8601 — used for "latest" tiebreaker
+    pub date_published: String, // ISO 8601 -- used for "latest" tiebreaker
     #[serde(default)]
     pub dependencies: Vec<ModrinthDep>,
     pub files: Vec<ModrinthFile>,
@@ -108,7 +108,7 @@ pub struct ModrinthProjectDetail {
 /// We only need (id, title) pairs to populate `ResolvedDep.project_title`;
 /// the full `ModrinthProjectDetail` (with body, license, etc.) is fetched
 /// on demand from the detail-pane code path. Used by the dep-resolver to
-/// close GAP-8-D — without this, the dep-confirm modal and Installed Mods
+/// close GAP-8-D -- without this, the dep-confirm modal and Installed Mods
 /// List surface opaque project_ids instead of human-readable titles.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProjectIdTitle {
@@ -139,7 +139,7 @@ pub struct ResolvedDep {
     pub is_new_download: bool, // false if already_satisfied / embedded / incompatible
 }
 
-/// Mod-browser fetch state machine. Pure UI state — no serde.
+/// Mod-browser fetch state machine. Pure UI state -- no serde.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModBrowserFetchState {
     Loading,
@@ -151,12 +151,12 @@ pub enum ModBrowserFetchState {
 // === Per-instance ledger (08-RESEARCH.md §Pattern 3 lines 504-553)       ===
 // ============================================================================
 
-/// Source of an installed mod — supports forward-compat with Phase 9 (CurseForge),
+/// Source of an installed mod -- supports forward-compat with Phase 9 (CurseForge),
 /// Phase 10 (modpack), Phase 11 (local file drop), and any future "manual drop" detection.
 ///
 /// Canonical wire format per 08-RESEARCH.md line 517 + 08-UI-SPEC.md line 668:
 /// `"modrinth"` | `"curseforge"` | `"manual"` | `"modpack"` | `"local"` (single-word, no
-/// underscore in `curseforge` — `serde(rename_all = "snake_case")` would emit
+/// underscore in `curseforge` -- `serde(rename_all = "snake_case")` would emit
 /// `curse_forge`, so the `CurseForge` variant carries an explicit `#[serde(rename)]`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -172,7 +172,7 @@ pub enum ModSource {
 
 /// Discriminates mods from resource/shader packs in the shared ledger.
 /// Default == Mod so pre-Phase-11 rows (no `kind` field) deserialize
-/// transparently — mirrors HashAlgo::Sha512 default at types.rs:184.
+/// transparently -- mirrors HashAlgo::Sha512 default at types.rs:184.
 /// Per 11-RESEARCH.md §"Adding `kind: PackKind`" + Phase 9 precedent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -188,21 +188,21 @@ pub enum InstalledItemKind {
 /// Phase 8 (Modrinth) uses Sha512 canonically; Phase 9 (CurseForge) uses
 /// Sha1 by default (with Sha256 as a rare fallback). Default == Sha512 so
 /// pre-Phase-9 ledger files (no `hash_algo` field) deserialize transparently
-/// — see `tests::test_pre_phase9_ledger_loads_with_default_hash_algo`.
+/// -- see `tests::test_pre_phase9_ledger_loads_with_default_hash_algo`.
 ///
 /// Per 09-RESEARCH.md §"Per-Instance Ledger Reuse" lines 297-318.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum HashAlgo {
-    /// Modrinth canonical (Phase 8). Default — pre-Phase-9 ledger rows
+    /// Modrinth canonical (Phase 8). Default -- pre-Phase-9 ledger rows
     /// without a `hash_algo` field deserialize as `Sha512`.
     #[default]
     Sha512,
     /// CurseForge default. The hex value is stored in the existing
-    /// `InstalledModRow.sha512` field — the field name is a Phase 8
+    /// `InstalledModRow.sha512` field -- the field name is a Phase 8
     /// historical-naming carve-out, the discriminator is `hash_algo`.
     Sha1,
-    /// Rare — for future use (CurseForge files occasionally carry SHA-256).
+    /// Rare -- for future use (CurseForge files occasionally carry SHA-256).
     Sha256,
 }
 
@@ -222,7 +222,7 @@ pub struct InstalledModRow {
     pub size: u64,
     /// Hash algorithm discriminator. NEW in Phase 9: `Sha512` (Modrinth)
     /// or `Sha1` (CurseForge). The `sha512` field name is kept stable for
-    /// back-compat — for CurseForge rows, the SHA-1 hex value is stored
+    /// back-compat -- for CurseForge rows, the SHA-1 hex value is stored
     /// in `sha512` with `hash_algo == HashAlgo::Sha1` as the discriminator.
     /// Documented historical-naming carve-out.
     /// `#[serde(default)]` lets pre-Phase-9 ledger files deserialize with
@@ -312,7 +312,7 @@ mod tests {
 
     #[test]
     fn test_modrinth_version_parse_minimal_shape() {
-        // Minimum-fields parse — exercises serde defaults on dependencies.
+        // Minimum-fields parse -- exercises serde defaults on dependencies.
         let json = r#"{
             "id":"abc","project_id":"def","name":"Sodium 0.5.8","version_number":"0.5.8",
             "version_type":"release","game_versions":["1.20.4"],"loaders":["fabric"],
@@ -339,7 +339,7 @@ mod tests {
 
     #[test]
     fn test_modrinth_dep_parse_with_only_version_id() {
-        // Q2 from 08-RESEARCH.md — spec-rare case where only version_id is set.
+        // Q2 from 08-RESEARCH.md -- spec-rare case where only version_id is set.
         let json = r#"{"version_id":"Yp8wLY1P","dependency_type":"optional"}"#;
         let d: ModrinthDep = serde_json::from_str(json).unwrap();
         assert!(d.project_id.is_none());

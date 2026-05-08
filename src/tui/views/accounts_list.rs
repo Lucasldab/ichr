@@ -27,7 +27,7 @@ pub fn render_accounts_list(f: &mut Frame, area: Rect, state: &AppState) {
     };
 
     if state.accounts.is_empty() {
-        let empty = Paragraph::new("No accounts — press `a` to add a Microsoft account.")
+        let empty = Paragraph::new("No accounts -- press `a` to add a Microsoft account.")
             .block(Block::default().borders(Borders::ALL));
         f.render_widget(empty, chunks[1]);
     } else {

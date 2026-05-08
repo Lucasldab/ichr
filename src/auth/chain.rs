@@ -2,11 +2,11 @@
 //!
 //! Two entry points (called by `src/auth/service.rs` in plan 04-07):
 //!
-//! 1. `run_full_auth` — after device-code completes, walk XBL → XSTS →
+//! 1. `run_full_auth` -- after device-code completes, walk XBL → XSTS →
 //!    MC login → entitlement → profile and produce an `Account`
 //!    + `MsaTokens` snapshot.
 //!
-//! 2. `ensure_valid_mc_token` — called at each launch. Always runs
+//! 2. `ensure_valid_mc_token` -- called at each launch. Always runs
 //!    the refresh path (refresh_token → new MSA access_token → re-run
 //!    XBL/XSTS/MC) because Minecraft access tokens expire in 24h and
 //!    we cannot know the wall-clock precisely enough to skip refresh
@@ -76,7 +76,7 @@ impl AuthChainConfig {
 pub struct AuthChainOutput {
     pub account: Account,
     pub tokens: MsaTokens,
-    /// MSA refresh_token — passed to store.rs::save_refresh_token.
+    /// MSA refresh_token -- passed to store.rs::save_refresh_token.
     pub refresh_token: String,
     /// MC access_token unix expiry (typically now + 86400).
     pub mc_token_expires_at: i64,
@@ -89,7 +89,7 @@ pub struct AuthChainOutput {
 ///
 /// Steps executed:
 ///   3. Xbox Live authenticate (`xbox::authenticate_xbox_live`)
-///   4. XSTS authorize (`xbox::authenticate_xsts`) — 401 paths already
+///   4. XSTS authorize (`xbox::authenticate_xsts`) -- 401 paths already
 ///      mapped to `AuthError::XstsDenied` inside xbox.rs.
 ///   5. MC services login_with_xbox
 ///   6. Entitlement check (empty items => `AuthError::NoMinecraftLicense`)
@@ -170,7 +170,7 @@ pub async fn run_full_auth(
 
 /// Refresh path: exchange the stored MSA refresh_token for new MSA
 /// tokens, then re-run the XBL/XSTS/MC chain. Returns the new chain
-/// output (including a fresh refresh_token — Microsoft rotates them).
+/// output (including a fresh refresh_token -- Microsoft rotates them).
 ///
 /// Called at each launch. On `AuthError::RefreshFailed`, caller must
 /// clear the stored account and prompt for re-auth (AUTH-03 behavior).
@@ -243,7 +243,7 @@ mod tests {
                 );
             })
             .await;
-        // Entitlement — both product_minecraft and game_minecraft required
+        // Entitlement -- both product_minecraft and game_minecraft required
         server
             .mock_async(|when, then| {
                 when.method(GET).path("/entitlements/mcstore");

@@ -16,7 +16,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::loader::error::LoaderError;
 use crate::persistence::paths::AppPaths;
 
-/// Required skeleton — installers refuse to install client-side without
+/// Required skeleton -- installers refuse to install client-side without
 /// this file present (Pitfall 2).
 pub const LAUNCHER_PROFILES_SKELETON: &[u8] =
     br#"{"profiles":{},"selectedProfile":"default","clientToken":""}"#;
@@ -33,7 +33,7 @@ impl StagingDir {
     /// Create a uniquely-named staging directory under `{paths.data_dir}/staging/`.
     ///
     /// Uniqueness is guaranteed by combining the Unix timestamp with a
-    /// per-process monotonic counter — two calls within the same second still
+    /// per-process monotonic counter -- two calls within the same second still
     /// produce distinct paths.
     #[tracing::instrument(skip_all, fields(slug = %slug))]
     pub async fn create(paths: &AppPaths, slug: &str) -> Result<Self, LoaderError> {
@@ -67,17 +67,17 @@ impl StagingDir {
         &self.slug
     }
 
-    /// `<root>/libraries` — where the installer drops library JARs.
+    /// `<root>/libraries` -- where the installer drops library JARs.
     pub fn libraries_dir(&self) -> PathBuf {
         self.root.join("libraries")
     }
 
-    /// `<root>/versions` — where the installer drops version JSON + client jar.
+    /// `<root>/versions` -- where the installer drops version JSON + client jar.
     pub fn versions_dir(&self) -> PathBuf {
         self.root.join("versions")
     }
 
-    /// Pitfall 2 fix — write the skeleton `launcher_profiles.json` the
+    /// Pitfall 2 fix -- write the skeleton `launcher_profiles.json` the
     /// installer requires to choose the client install branch.
     pub async fn write_launcher_profiles(&self) -> Result<(), LoaderError> {
         let path = self.root.join("launcher_profiles.json");

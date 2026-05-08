@@ -1,7 +1,7 @@
 //! Structural pin against the bundled ForgeWrapper JAR.
 //!
 //! The pin asserts that `Main.class` (the install-time AND launch-time
-//! JVM entry point — confirmed by debug session 2026-05-07T20:45 against
+//! JVM entry point -- confirmed by debug session 2026-05-07T20:45 against
 //! the upstream `1.6.0` JAR via `javap -public`) contains a
 //! `public static void main(String[] args)` method.
 //!
@@ -86,14 +86,14 @@ fn forgewrapper_main_class_has_main_string_method_signature() {
     // methods are install(File,File,File), getData(File), getWrapper()).
     assert!(
         contains_bytes(&main_bytes, MAIN_NAME_BYTES),
-        "Main.class constant pool missing UTF-8 entry `main` — not a valid \
+        "Main.class constant pool missing UTF-8 entry `main` -- not a valid \
          JVM entry point. GAP-7-A umbrella regression: re-vendored JAR may \
          be stripped or renamed."
     );
     assert!(
         contains_bytes(&main_bytes, MAIN_DESCRIPTOR_BYTES),
         "Main.class constant pool missing method descriptor \
-         `([Ljava/lang/String;)V` — class has no `void main(String[])` \
+         `([Ljava/lang/String;)V` -- class has no `void main(String[])` \
          method, hence not a valid JVM entry point. GAP-7-A-v2 \
          regression: would re-trigger `Main method not found` at \
          install-time JVM launch."
@@ -103,8 +103,8 @@ fn forgewrapper_main_class_has_main_string_method_signature() {
 #[test]
 fn forgewrapper_installer_class_lacks_main_string_method_signature() {
     // Inverse pin: confirm the bytecode-level discrimination actually
-    // works. The Installer class — present in the JAR but not an entry
-    // point — must NOT contain the main(String[]) descriptor. If a future
+    // works. The Installer class -- present in the JAR but not an entry
+    // point -- must NOT contain the main(String[]) descriptor. If a future
     // re-vendoring adds a main() to Installer.class, this test will fail
     // (loud signal) and the developer can decide whether to widen the
     // entry-point class set.
@@ -117,7 +117,7 @@ fn forgewrapper_installer_class_lacks_main_string_method_signature() {
     );
     assert!(
         !contains_bytes(&installer_bytes, MAIN_DESCRIPTOR_BYTES),
-        "Installer.class unexpectedly contains main(String[]) descriptor — \
+        "Installer.class unexpectedly contains main(String[]) descriptor -- \
          upstream may have added a main() entry point. Re-evaluate whether \
          FORGE_WRAPPER_MAIN_CLASS is still the unique entry point."
     );
@@ -127,7 +127,7 @@ fn forgewrapper_installer_class_lacks_main_string_method_signature() {
 fn forgewrapper_main_class_constant_ends_with_dot_main() {
     // Single-constant invariant (replaces the round-2
     // `forgewrapper_class_constants_are_distinct` test which compared
-    // two constants — the second constant is deleted in this plan).
+    // two constants -- the second constant is deleted in this plan).
     assert!(
         FORGE_WRAPPER_MAIN_CLASS.ends_with(".Main"),
         "FORGE_WRAPPER_MAIN_CLASS must end with `.Main`: {FORGE_WRAPPER_MAIN_CLASS}"
@@ -139,7 +139,7 @@ fn forgewrapper_main_class_constant_ends_with_dot_main() {
     );
 }
 
-/// Pins Main.class as the LAUNCH-time entry point — its bytecode constant pool
+/// Pins Main.class as the LAUNCH-time entry point -- its bytecode constant pool
 /// MUST contain the literal UTF-8 sequence `--fml.mcVersion`. This is the FML
 /// argv flag Main parses at line 28 of the upstream source
 /// (https://raw.githubusercontent.com/ZekerZhayard/ForgeWrapper/3c6712d64a42e4ec200909912e72749499aaca79/src/main/java/io/github/zekerzhayard/forgewrapper/installer/Main.java):
@@ -149,12 +149,12 @@ fn forgewrapper_main_class_constant_ends_with_dot_main() {
 /// empty argv produces `IndexOutOfBoundsException: Index 0 out of bounds for
 /// length 0` because `indexOf` returns -1, +1 = 0, `get(0)` on length-0 list
 /// throws. The structurally correct fix (07.3-01) is to NOT invoke Main at
-/// install time — invoke the installer JAR directly via `java -jar <installer>
+/// install time -- invoke the installer JAR directly via `java -jar <installer>
 /// --installClient <staging>`. This pin locks the structural reason install-time
 /// invocation is wrong: Main reads Mojang LAUNCH argv, period.
 ///
 /// If a future re-vendoring removes `--fml.mcVersion` from the constant pool
-/// (would only happen if upstream rewrites Main to not parse FML argv — extremely
+/// (would only happen if upstream rewrites Main to not parse FML argv -- extremely
 /// unlikely), this test fails loudly and the developer can decide whether the
 /// new shape changes the launch-vs-install-time distinction. The Phase 12 launch
 /// wiring will still need this constant-pool fact to compose the version JSON
@@ -174,7 +174,7 @@ fn forgewrapper_main_class_is_launch_time_entry_point() {
     const FML_MC_VERSION: &[u8] = b"--fml.mcVersion";
     assert!(
         contains_bytes(&main_bytes, FML_MC_VERSION),
-        "Main.class constant pool missing UTF-8 entry `--fml.mcVersion` — \
+        "Main.class constant pool missing UTF-8 entry `--fml.mcVersion` -- \
          Main is no longer the FML-argv-parsing launch-time entry point. \
          GAP-7-A-v3 structural pin: re-vendored ForgeWrapper may have moved \
          FML argv parsing elsewhere (or removed it). Re-evaluate whether \

@@ -1,4 +1,4 @@
-//! `ModpackService` — orchestration façade for Modrinth `.mrpack` import.
+//! `ModpackService` -- orchestration façade for Modrinth `.mrpack` import.
 //!
 //! Composes the four sibling modules (parse, download, overrides, plus the
 //! existing LoaderService and JavaService from prior phases) into a single
@@ -8,7 +8,7 @@
 //!
 //! `instance.json` is written LAST (Step 8).  Any failure or cancellation in
 //! Steps 3-7 triggers `tokio::fs::remove_dir_all(&instance_dir)` before the
-//! error is returned — leaving the filesystem as if the import never started.
+//! error is returned -- leaving the filesystem as if the import never started.
 //! This is the Phase 8/9 atomicity invariant applied to modpack imports.
 //!
 //! # 7-step sequence
@@ -54,7 +54,7 @@ use crate::tasks::{JobId, TaskEvent};
 /// Façade for `.mrpack` modpack imports.
 ///
 /// Holds a single `reqwest::Client` with a 30-second timeout and the project
-/// user-agent — mirrors `ModrinthService`/`CurseForgeService` field-by-field
+/// user-agent -- mirrors `ModrinthService`/`CurseForgeService` field-by-field
 /// (PATTERNS.md §1).
 #[derive(Debug)]
 pub struct ModpackService {
@@ -73,7 +73,7 @@ impl ModpackService {
         Ok(Self { http })
     }
 
-    /// Test constructor — accepts a pre-built client.
+    /// Test constructor -- accepts a pre-built client.
     ///
     /// Used by unit tests with `httpmock` to inject a loopback-exempt client
     /// without relying on environment variables.
@@ -96,7 +96,7 @@ impl ModpackService {
     ///
     /// On any failure or cancellation in Steps 3-7, the partially-created
     /// instance directory is removed via `tokio::fs::remove_dir_all` before
-    /// the error is propagated — leaving no half-installed state on disk.
+    /// the error is propagated -- leaving no half-installed state on disk.
     ///
     /// A pre-cancel (before Step 2) returns `Err(Cancelled)` without creating
     /// any instance directory.
@@ -274,7 +274,7 @@ impl ModpackService {
             .await;
 
         // filter_files_for_client is applied inside download_files; pass the
-        // full files vec — download_files handles the env.client filter.
+        // full files vec -- download_files handles the env.client filter.
         let rows = download_files(
             &self.http,
             paths,
@@ -300,7 +300,7 @@ impl ModpackService {
         for row in &rows {
             let final_path = paths.instance_mod_file(slug, &row.file_name);
             // download.rs builds the .tmp path as: final_path + ".tmp"
-            // (not .with_extension — the original extension is preserved).
+            // (not .with_extension -- the original extension is preserved).
             let tmp_path = {
                 let mut s = final_path.clone().into_os_string();
                 s.push(".tmp");
@@ -390,7 +390,7 @@ impl ModpackService {
 /// Returns `(raw_bytes, MrpackIndex)`.  The raw bytes are returned so the
 /// caller retains them for diagnostics if needed.
 ///
-/// Failure before any instance directory is created — parse errors in Step 1
+/// Failure before any instance directory is created -- parse errors in Step 1
 /// never leave partial state on disk (THREAT T-10-05-03).
 async fn read_and_parse_mrpack_index(
     mrpack_path: &Path,
@@ -458,11 +458,11 @@ mod tests {
     /// Build a minimal `.mrpack` zip at `path`.
     ///
     /// Parameters:
-    /// - `mod_url`      — where the single required mod can be downloaded
-    /// - `mod_body`     — bytes the mock server will return
-    /// - `loader_key`   — e.g. `"fabric-loader"` or `""` for vanilla
-    /// - `loader_ver`   — e.g. `"0.16.9"`
-    /// - `override_txt` — content for `overrides/config/test.txt` (empty → no entry)
+    /// - `mod_url`      -- where the single required mod can be downloaded
+    /// - `mod_body`     -- bytes the mock server will return
+    /// - `loader_key`   -- e.g. `"fabric-loader"` or `""` for vanilla
+    /// - `loader_ver`   -- e.g. `"0.16.9"`
+    /// - `override_txt` -- content for `overrides/config/test.txt` (empty → no entry)
     fn build_mrpack(
         path: &Path,
         mod_url: &str,
@@ -584,7 +584,7 @@ mod tests {
         MojangClient::new().expect("build mojang client")
     }
 
-    // ── Test 1: happy path — vanilla pack (no loader), 1 mod, 1 override ─────
+    // ── Test 1: happy path -- vanilla pack (no loader), 1 mod, 1 override ─────
 
     #[tokio::test]
     async fn test_import_inner_happy_path_vanilla() {
@@ -616,13 +616,13 @@ mod tests {
             &mrpack,
             &server.url("/required-mod.jar"),
             mod_body,
-            "", // vanilla — no loader
+            "", // vanilla -- no loader
             "",
             Some(b"override content"),
             &[],
         );
 
-        // Drop sha (we only need it for fixture building — already baked in)
+        // Drop sha (we only need it for fixture building -- already baked in)
         let _ = sha;
 
         let svc = ModpackService::with_client(make_http_client());
@@ -741,7 +741,7 @@ mod tests {
         );
     }
 
-    // ── Test 3: pre-cancel before instance dir — returns Cancelled, no dir ───
+    // ── Test 3: pre-cancel before instance dir -- returns Cancelled, no dir ───
 
     #[tokio::test]
     async fn test_import_pre_cancel_returns_cancelled_no_instance_dir() {
@@ -749,7 +749,7 @@ mod tests {
         let paths = make_paths(&tmp);
         let mrpack = tmp.path().join("test.mrpack");
 
-        // Malformed pack — doesn't matter; cancel fires first
+        // Malformed pack -- doesn't matter; cancel fires first
         build_mrpack(
             &mrpack,
             "https://cdn.modrinth.com/fake.jar",
@@ -806,7 +806,7 @@ mod tests {
 
         // Slow mock: respond with delay to give us time to cancel.
         // httpmock doesn't support artificial delays, so we use a 200 response
-        // but cancel the token immediately after spawning — by the time the
+        // but cancel the token immediately after spawning -- by the time the
         // import_mrpack task calls download_files, the token is already cancelled.
         let _mock = server.mock(|when, then| {
             when.method(GET).path("/slow-mod.jar");
@@ -863,8 +863,8 @@ mod tests {
 
         let result = handle.await.expect("task must not panic");
 
-        // Either the cancel fired (Err(Cancelled)) or — if the download completed
-        // before the cancel — it could succeed (Ok). The key invariant is that
+        // Either the cancel fired (Err(Cancelled)) or -- if the download completed
+        // before the cancel -- it could succeed (Ok). The key invariant is that
         // if it failed, the instance dir is gone.
         match result {
             Err(ModpackError::Cancelled) | Err(_) => {
@@ -875,7 +875,7 @@ mod tests {
                 );
             }
             Ok(_) => {
-                // Download was fast enough to complete before cancel — acceptable.
+                // Download was fast enough to complete before cancel -- acceptable.
             }
         }
     }
@@ -924,7 +924,7 @@ mod tests {
             let count = std::fs::read_dir(&instances_dir).unwrap().count();
             assert_eq!(
                 count, 0,
-                "instances_dir must be empty — no instance created: {instances_dir:?}"
+                "instances_dir must be empty -- no instance created: {instances_dir:?}"
             );
         }
     }
@@ -1026,7 +1026,7 @@ mod tests {
             &[],
         );
 
-        // First run — pre-cancelled (leaves clean filesystem)
+        // First run -- pre-cancelled (leaves clean filesystem)
         {
             let svc = ModpackService::with_client(make_http_client());
             let loader_svc = crate::loader::service::LoaderService::new().unwrap();
@@ -1054,7 +1054,7 @@ mod tests {
             );
         }
 
-        // Second run — same .mrpack, no pre-cancel
+        // Second run -- same .mrpack, no pre-cancel
         {
             let svc = ModpackService::with_client(make_http_client());
             let loader_svc = crate::loader::service::LoaderService::new().unwrap();

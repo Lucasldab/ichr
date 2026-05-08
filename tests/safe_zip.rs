@@ -59,7 +59,7 @@ fn test_rejects_parent_traversal() {
 }
 
 /// Deeper traversal embedded mid-path: `a/../../b/c`.
-/// The `..` appears after a normal segment — still a traversal attempt.
+/// The `..` appears after a normal segment -- still a traversal attempt.
 #[test]
 fn test_rejects_deep_parent_traversal() {
     let td = tempdir().unwrap();
@@ -75,7 +75,7 @@ fn test_rejects_deep_parent_traversal() {
 // Absolute-path rejection tests
 // ---------------------------------------------------------------------------
 
-/// Unix absolute path starts with RootDir component — must be rejected.
+/// Unix absolute path starts with RootDir component -- must be rejected.
 #[test]
 fn test_rejects_absolute_unix_path() {
     let td = tempdir().unwrap();
@@ -91,7 +91,7 @@ fn test_rejects_absolute_unix_path() {
 // CurDir rejection tests
 // ---------------------------------------------------------------------------
 
-/// A leading `./` exposes a CurDir component — the function rejects it.
+/// A leading `./` exposes a CurDir component -- the function rejects it.
 /// Callers (e.g., the modpack overrides extractor) are responsible for
 /// stripping `./` BEFORE calling `safe_extract_path` if they wish to accept
 /// such entries (per Pitfall §Open Questions §1 in 10-RESEARCH.md).
@@ -132,7 +132,7 @@ fn test_rejects_windows_prefix() {
     #[cfg(not(windows))]
     {
         // On Linux, backslash is a filename char. "C:\Windows\..." is one Normal
-        // component — the function accepts it but places the entire backslash-laden
+        // component -- the function accepts it but places the entire backslash-laden
         // string as a single filename component inside base. No filesystem escape.
         if let Some(p) = result {
             assert!(
@@ -143,7 +143,7 @@ fn test_rejects_windows_prefix() {
     }
 }
 
-/// UNC path `\\server\share\foo` — Prefix component on Windows; on Linux the
+/// UNC path `\\server\share\foo` -- Prefix component on Windows; on Linux the
 /// leading `\\` is parsed as a relative path starting with `\` characters
 /// (Normal component), so the exact result is platform-dependent. On Linux
 /// this path is treated as a normal relative path and MAY return Some. The
@@ -186,7 +186,7 @@ fn test_rejects_unc_path() {
 // ---------------------------------------------------------------------------
 
 /// An empty entry name produces a path equal to `base` (no components pushed).
-/// This is the documented behavior — pinned here so callers know not to use
+/// This is the documented behavior -- pinned here so callers know not to use
 /// the bare-base path as a write destination.
 ///
 /// An empty string has no path components, so the loop completes without

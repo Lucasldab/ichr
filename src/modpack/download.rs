@@ -1,10 +1,10 @@
 //! Download orchestration layer for Modrinth `.mrpack` modpack imports.
 //!
 //! Provides:
-//! - `MODPACK_ALLOWLIST` — the 7-host hardcoded allowlist (CONTEXT.md D-04).
-//! - `is_url_allowlisted` — security gate; runs BEFORE any network call.
-//! - `filter_files_for_client` — applies `env.client` filter per PACK-02.
-//! - `download_files` — semaphore-bounded, cancellation-cooperative, SHA-512
+//! - `MODPACK_ALLOWLIST` -- the 7-host hardcoded allowlist (CONTEXT.md D-04).
+//! - `is_url_allowlisted` -- security gate; runs BEFORE any network call.
+//! - `filter_files_for_client` -- applies `env.client` filter per PACK-02.
+//! - `download_files` -- semaphore-bounded, cancellation-cooperative, SHA-512
 //!   verified parallel download orchestrator mirroring
 //!   `src/mods/installer.rs::install_mods_into_instance` (lines 499-638).
 //!
@@ -34,7 +34,7 @@ const _: usize = MOD_DOWNLOAD_CONCURRENCY;
 /// Hardcoded allowlist of download URL hosts permitted in `.mrpack` `files[].downloads`.
 ///
 /// Source: CONTEXT.md D-04 + RESEARCH.md §URL Allowlist (locked for v1).
-/// Expanding this list requires a v2 decision — see Deferred Items in CONTEXT.md.
+/// Expanding this list requires a v2 decision -- see Deferred Items in CONTEXT.md.
 ///
 /// Security: checked BEFORE every network call in `download_files`. A non-allowlisted
 /// host signals a malformed or malicious modpack (Threat T-10-03-01).
@@ -52,7 +52,7 @@ pub const MODPACK_ALLOWLIST: &[&str] = &[
 ///
 /// Returns `Ok(())` if the URL parses and its host is in `MODPACK_ALLOWLIST`.
 /// Returns `Err(ModpackError::DisallowedSource { host, path })` otherwise, where
-/// `path` is the manifest `MrpackFile::path` field — surfaces which file in the
+/// `path` is the manifest `MrpackFile::path` field -- surfaces which file in the
 /// modpack manifest carried the rejecting URL so the user can identify it.
 ///
 /// Fail semantics:
@@ -63,7 +63,7 @@ pub const MODPACK_ALLOWLIST: &[&str] = &[
 /// Loopback exemption: `http://127.0.0.1:*` and `http://localhost:*` are
 /// permitted under `cfg(debug_assertions)` so that httpmock-backed tests
 /// (both inline and external in `tests/`) can serve mod jars over loopback.
-/// Release builds (`cargo build --release` — `debug_assertions = false`)
+/// Release builds (`cargo build --release` -- `debug_assertions = false`)
 /// drop the exemption entirely so a malicious user-supplied `.mrpack`
 /// manifest cannot trick the launcher into pulling from a local server
 /// (different threat model than `installer.rs::is_acceptable_mod_url`,
@@ -72,7 +72,7 @@ pub const MODPACK_ALLOWLIST: &[&str] = &[
 pub fn is_url_allowlisted(url: &str, path: &str) -> Result<(), ModpackError> {
     // Loopback exemption gated on debug_assertions so release builds drop it.
     // External integration tests compile this module without `cfg(test)` set,
-    // but they DO compile with debug_assertions on — so the gate works for both
+    // but they DO compile with debug_assertions on -- so the gate works for both
     // inline unit tests and external integration tests.
     #[cfg(debug_assertions)]
     if url.starts_with("http://127.0.0.1:") || url.starts_with("http://localhost:") {
@@ -106,7 +106,7 @@ pub fn is_url_allowlisted(url: &str, path: &str) -> Result<(), ModpackError> {
 /// - `env` absent → included (universal file per spec, Pitfall 3).
 /// - `env.client == Required | Optional` → included.
 ///
-/// Returns borrowed references into the input slice — no allocation of file data.
+/// Returns borrowed references into the input slice -- no allocation of file data.
 pub fn filter_files_for_client(files: &[MrpackFile]) -> Vec<&MrpackFile> {
     files
         .iter()
@@ -182,7 +182,7 @@ fn build_mod_row(file: &MrpackFile, file_name: &str, size: u64) -> InstalledModR
 /// # Atomicity note
 ///
 /// Downloaded files land at `<dest>.tmp`. The `.tmp → final` rename is NOT
-/// performed here — it happens in Plan 10-05 `service.rs` after override
+/// performed here -- it happens in Plan 10-05 `service.rs` after override
 /// extraction succeeds (atomicity invariant). The caller owns the rename.
 ///
 /// # Return value
@@ -243,7 +243,7 @@ pub async fn download_files(
                 ModpackError::Io(std::io::Error::other(format!("semaphore closed: {e}")))
             })?;
 
-            // 4b. Check cancellation AFTER acquiring permit (Pitfall — per plan must).
+            // 4b. Check cancellation AFTER acquiring permit (Pitfall -- per plan must).
             if token.is_cancelled() {
                 return Err(ModpackError::Cancelled);
             }
@@ -302,7 +302,7 @@ pub async fn download_files(
                         return Ok(row);
                     }
                     Err(ModrinthError::Sha512Mismatch { expected, got, .. }) => {
-                        // Hash mismatch is always a fatal error — don't try next URL.
+                        // Hash mismatch is always a fatal error -- don't try next URL.
                         return Err(ModpackError::HashMismatch {
                             path: file.path.clone(),
                             expected,
@@ -326,7 +326,7 @@ pub async fn download_files(
         });
     }
 
-    // Step 5: join loop — collect results, handle cancellation and errors.
+    // Step 5: join loop -- collect results, handle cancellation and errors.
     let mut rows: Vec<InstalledModRow> = Vec::with_capacity(total);
     let mut completed: usize = 0;
 
@@ -668,7 +668,7 @@ mod tests {
             when.method(GET).path("/optional.jar");
             then.status(200).body(body);
         });
-        // The server-only file's mock — must NEVER be hit.
+        // The server-only file's mock -- must NEVER be hit.
         let mock_server_only = server.mock(|when, then| {
             when.method(GET).path("/server-only.jar");
             then.status(200).body(body);
@@ -727,7 +727,7 @@ mod tests {
         use httpmock::prelude::*;
 
         // Strategy: the disallowed URL uses a non-allowlisted hostname (attacker.com).
-        // The allowlist check fires BEFORE any network call — so the mock server
+        // The allowlist check fires BEFORE any network call -- so the mock server
         // that would serve "attacker.com"-equivalent responses is NEVER contacted.
         //
         // We verify both that the error type is DisallowedSource AND that the
@@ -742,7 +742,7 @@ mod tests {
         let paths = make_paths(&tmp);
         let slug = "evil-pack";
 
-        // Use "http://attacker.com/backdoor.jar" — not reachable over the network
+        // Use "http://attacker.com/backdoor.jar" -- not reachable over the network
         // in test (no DNS resolution attempted; the allowlist short-circuits first).
         // This URL is NOT in MODPACK_ALLOWLIST and is NOT a loopback exemption.
         let disallowed_url = "http://attacker.com/backdoor.jar";
@@ -763,7 +763,7 @@ mod tests {
             }
             other => panic!("expected DisallowedSource, got {other:?}"),
         }
-        // The mock server must NEVER have been hit — allowlist ran before any GET.
+        // The mock server must NEVER have been hit -- allowlist ran before any GET.
         attacker_mock.assert_calls(0);
     }
 
@@ -773,7 +773,7 @@ mod tests {
 
         let server = MockServer::start();
         let actual_body = b"real content";
-        let wrong_sha = "a".repeat(128); // 128 'a' chars — definitely wrong
+        let wrong_sha = "a".repeat(128); // 128 'a' chars -- definitely wrong
 
         let _mock = server.mock(|when, then| {
             when.method(GET).path("/mod.jar");

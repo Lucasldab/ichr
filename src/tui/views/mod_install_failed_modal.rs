@@ -1,4 +1,4 @@
-//! Mod install failure modal — mirrors `loader_install_failed_modal.rs`.
+//! Mod install failure modal -- mirrors `loader_install_failed_modal.rs`.
 //!
 //! Source: 08-UI-SPEC.md §"Mod Install Failed Modal" lines 386-401.
 //! Esc dispatches `Action::DismissModInstallFailed`; the update() arm uses

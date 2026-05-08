@@ -1,4 +1,4 @@
-//! Windows @argfile writer — pure file-write used by the launch service on
+//! Windows @argfile writer -- pure file-write used by the launch service on
 //! Windows to bypass `CreateProcess` command-line length limits (MAX_PATH).
 //!
 //! See `.planning/research/PITFALLS.md` Pitfall 14 and

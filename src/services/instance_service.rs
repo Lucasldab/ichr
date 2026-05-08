@@ -19,7 +19,7 @@ const CLONE_INCLUDE_SUBDIRS: &[&str] = &["mods", "config"];
 /// `.minecraft` subtree, and writes `instance.json`.
 ///
 /// Rejects names that are empty after trimming or exceed `MAX_INSTANCE_NAME_LEN`.
-/// Does NOT perform the Mojang download — that is the install orchestrator's job.
+/// Does NOT perform the Mojang download -- that is the install orchestrator's job.
 pub async fn create_instance(
     paths: &AppPaths,
     display_name: &str,
@@ -54,7 +54,7 @@ pub async fn list_instances(paths: &AppPaths) -> Result<Vec<InstanceManifest>, A
 }
 
 /// Update the `display_name` of an existing instance. The slug and filesystem
-/// directory are NOT renamed — per locked decision ("rename is display-only").
+/// directory are NOT renamed -- per locked decision ("rename is display-only").
 pub async fn rename_instance(
     paths: &AppPaths,
     slug: &str,

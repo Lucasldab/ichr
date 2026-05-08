@@ -1,4 +1,4 @@
-//! Installed packs list — full-screen table of resource or shader packs for an instance.
+//! Installed packs list -- full-screen table of resource or shader packs for an instance.
 //!
 //! Cloned-and-parameterised from `installed_mods_list.rs` per Phase 11 plan 04.
 //!
@@ -57,7 +57,7 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
     };
 
     if packs.is_empty() {
-        let p = Paragraph::new("No packs installed — press Esc and R/S to browse")
+        let p = Paragraph::new("No packs installed -- press Esc and R/S to browse")
             .style(
                 Style::default()
                     .fg(Color::DarkGray)
@@ -66,7 +66,7 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(format!("{kind_label} — {slug}  (e/x/Tab/Esc)")),
+                    .title(format!("{kind_label} -- {slug}  (e/x/Tab/Esc)")),
             );
         f.render_widget(p, table_area);
     } else {
@@ -96,7 +96,7 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
                             .add_modifier(Modifier::DIM),
                     ),
                 };
-                // Shader packs cannot be toggled — state cell shows "n/a".
+                // Shader packs cannot be toggled -- state cell shows "n/a".
                 let (state_label, state_style) = match kind {
                     PackKind::Shader => (
                         "n/a",
@@ -145,7 +145,7 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(format!("{kind_label} — {slug}  (e/x/Tab/Esc)")),
+                .title(format!("{kind_label} -- {slug}  (e/x/Tab/Esc)")),
         );
         f.render_widget(table, table_area);
     }
@@ -187,7 +187,7 @@ pub fn map_installed_packs_list_event(ev: CtEvent, state: &AppState) -> Option<A
         CtEvent::Key(KeyEvent {
             code: KeyCode::Tab, ..
         }) => Some(Action::InstalledPacksCycleKind),
-        // `e` — toggle for Resource; notice for Shader.
+        // `e` -- toggle for Resource; notice for Shader.
         CtEvent::Key(KeyEvent {
             code: KeyCode::Char('e'),
             ..
@@ -195,7 +195,7 @@ pub fn map_installed_packs_list_event(ev: CtEvent, state: &AppState) -> Option<A
             PackKind::Resource => Some(Action::TogglePackEnabled),
             PackKind::Shader => Some(Action::ShaderToggleNotice),
         },
-        // `x` — open uninstall confirm regardless of kind.
+        // `x` -- open uninstall confirm regardless of kind.
         CtEvent::Key(KeyEvent {
             code: KeyCode::Char('x'),
             ..

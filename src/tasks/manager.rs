@@ -1,7 +1,7 @@
-//! `TaskManager` — bounded concurrent job pool with per-job cancellation.
+//! `TaskManager` -- bounded concurrent job pool with per-job cancellation.
 //!
 //! Invariants (see PITFALLS.md Pitfall 4, 17):
-//!   * All `tx.send(...)` calls use `let _ =` — never `.unwrap()`; the receiver
+//!   * All `tx.send(...)` calls use `let _ =` -- never `.unwrap()`; the receiver
 //!     being dropped is a legitimate shutdown signal.
 //!   * Job bodies must not hold a blocking I/O call across `.await`.
 //!     For blocking work use `tokio::task::spawn_blocking` inside the job body.

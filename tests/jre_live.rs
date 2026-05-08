@@ -1,4 +1,4 @@
-//! Live JRE download smoke test — gated by `#[ignore]`.
+//! Live JRE download smoke test -- gated by `#[ignore]`.
 //! Run with: `cargo test --test jre_live -- --ignored --nocapture`
 //!
 //! Downloads a real Mojang-blessed JRE (`java-runtime-delta` for Java 21) into a
@@ -15,7 +15,7 @@ use ichr::persistence::paths::AppPaths;
 use tempfile::TempDir;
 
 #[tokio::test]
-#[ignore = "requires internet access, ~150 MB download, and a Mojang-supported platform — see module docs"]
+#[ignore = "requires internet access, ~150 MB download, and a Mojang-supported platform -- see module docs"]
 async fn live_mojang_jre_download_java_runtime_delta() {
     let td = TempDir::new().unwrap();
     let paths = AppPaths::with_roots(
@@ -30,7 +30,7 @@ async fn live_mojang_jre_download_java_runtime_delta() {
 
     if plat.is_none() {
         println!(
-            "[jre_live] skipping — no Mojang platform key for this host \
+            "[jre_live] skipping -- no Mojang platform key for this host \
              (arch={arch:?}, os={os:?}); use Adoptium fallback test on this platform"
         );
         return;
@@ -63,5 +63,5 @@ async fn live_mojang_jre_download_java_runtime_delta() {
         );
     }
 
-    println!("[jre_live] SUCCESS — downloaded JRE to {}", exe.display());
+    println!("[jre_live] SUCCESS -- downloaded JRE to {}", exe.display());
 }

@@ -18,7 +18,7 @@ pub enum ModpackError {
     /// `modrinth.index.json` could not be parsed as valid JSON or did not
     /// match the expected schema.
     ///
-    /// NOT `#[from]` — `serde_json::Error` implements `Into<std::io::Error>`,
+    /// NOT `#[from]` -- `serde_json::Error` implements `Into<std::io::Error>`,
     /// which would create a conflicting `From` impl alongside
     /// `Io(#[from] std::io::Error)`. Callers wrap via
     /// `.map_err(ModpackError::ManifestParse)`.

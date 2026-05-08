@@ -21,6 +21,6 @@ pub type TaskResult = std::result::Result<(), String>;
 pub enum TaskEvent {
     /// Progress update from an active job.
     Progress { id: JobId, pct: u8, msg: String },
-    /// Terminal event — either Ok or Err (including cancellation).
+    /// Terminal event -- either Ok or Err (including cancellation).
     Completed { id: JobId, result: TaskResult },
 }

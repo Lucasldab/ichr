@@ -150,7 +150,7 @@ async fn test_classpath_emits_at_least_six_fabric_libraries_after_install() {
         .await
         .unwrap();
 
-    // Stub vanilla parent JSON (Mojang shape; minimal but valid) — needed
+    // Stub vanilla parent JSON (Mojang shape; minimal but valid) -- needed
     // for resolve_inherits to produce a ResolvedVersion.
     let vanilla_id = "1.20.4";
     let vanilla_json = br#"{

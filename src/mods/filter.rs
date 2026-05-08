@@ -1,15 +1,15 @@
 //! Pure mapping helpers for the Modrinth integration.
 //!
-//! No I/O, no async — every function is testable with `cargo nextest run -E 'test(mods::filter)'`
+//! No I/O, no async -- every function is testable with `cargo nextest run -E 'test(mods::filter)'`
 //! in milliseconds.
 //!
 //! Functions:
-//! - `modrinth_filter_for` — instance loader/MC → Modrinth `loaders` + `game_versions` query params (Pitfall 2: Quilt expands to `['fabric','quilt']`).
-//! - `search_facets`        — build the URL-encodable facets JSON for `/v2/search`.
-//! - `pick_primary_file`    — primary file selection per 08-RESEARCH.md §Endpoint #4 line 148.
-//! - `pick_latest_by_date`  — latest-by-`date_published` selection (ISO 8601 lex-sort).
-//! - `is_safe_modrinth_slug` / `is_safe_mod_filename` — V5 input validation gates BEFORE disk-path construction.
-//! - `disabled_filename` / `enabled_filename` — `.jar.disabled` toggle convention helpers.
+//! - `modrinth_filter_for` -- instance loader/MC → Modrinth `loaders` + `game_versions` query params (Pitfall 2: Quilt expands to `['fabric','quilt']`).
+//! - `search_facets`        -- build the URL-encodable facets JSON for `/v2/search`.
+//! - `pick_primary_file`    -- primary file selection per 08-RESEARCH.md §Endpoint #4 line 148.
+//! - `pick_latest_by_date`  -- latest-by-`date_published` selection (ISO 8601 lex-sort).
+//! - `is_safe_modrinth_slug` / `is_safe_mod_filename` -- V5 input validation gates BEFORE disk-path construction.
+//! - `disabled_filename` / `enabled_filename` -- `.jar.disabled` toggle convention helpers.
 
 use crate::domain::instance::ModloaderKind;
 use crate::loader::types::LoaderInfo;
@@ -22,7 +22,7 @@ use crate::mods::types::{ModrinthFile, ModrinthVersion};
 /// Returns `(loaders_to_query, game_versions_to_query)` for the Modrinth API.
 ///
 /// Quilt expands to `["fabric","quilt"]` because Quilt is binary-compatible with
-/// Fabric — Fabric-only mods load on Quilt instances. This is Pitfall 2 from
+/// Fabric -- Fabric-only mods load on Quilt instances. This is Pitfall 2 from
 /// 08-RESEARCH.md and is a load-bearing invariant.
 ///
 /// `game_versions` is just `[mc_version_id]` for v1; future enhancement noted
@@ -54,7 +54,7 @@ pub fn modrinth_filter_for(
 /// `[["categories:fabric"],["versions:1.20.4"],["project_type:mod"]]`
 pub fn search_facets(loaders: &[&str], mc_versions: &[String], project_type: &str) -> String {
     // GAP-FACETS-EMPTY-08 (Phase 8.2 gap closure): empty inner OR-arrays
-    // (e.g. `[]`) inside the outer AND make Modrinth match nothing — the
+    // (e.g. `[]`) inside the outer AND make Modrinth match nothing -- the
     // outer AND requires every inner OR to satisfy at least one term. So
     // when a category is "any" (empty input slice), we MUST omit that
     // entire AND group, not emit `[]`. Caller contract (client.rs:97)
@@ -75,7 +75,7 @@ pub fn search_facets(loaders: &[&str], mc_versions: &[String], project_type: &st
     if !mc_versions.is_empty() {
         parts.push(make("versions", mc_versions));
     }
-    // project_type is always non-empty — it's a required positional arg.
+    // project_type is always non-empty -- it's a required positional arg.
     parts.push(make("project_type", &pt_arr));
 
     format!("[{}]", parts.join(","))
@@ -101,7 +101,7 @@ pub fn pick_latest_by_date(versions: &[ModrinthVersion]) -> Option<&ModrinthVers
 }
 
 // ============================================================================
-// === Input validation (V5 — path-traversal mitigation)                   ===
+// === Input validation (V5 -- path-traversal mitigation)                   ===
 // ============================================================================
 
 /// True iff `s` is non-empty and every byte is `[A-Za-z0-9_-]`.
@@ -112,13 +112,13 @@ pub fn is_safe_modrinth_slug(s: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
-/// True iff `s` is a safe `.jar` filename — no path-traversal characters.
+/// True iff `s` is a safe `.jar` filename -- no path-traversal characters.
 ///
 /// Required BEFORE joining `s` to `instance_minecraft_dir(slug).join("mods")`
 /// (08-RESEARCH.md §Security Domain row "Path traversal via crafted filename").
 ///
 /// Rules:
-/// - Must end in `.jar` (case-sensitive — Modrinth always lower-cases).
+/// - Must end in `.jar` (case-sensitive -- Modrinth always lower-cases).
 /// - Must NOT start with `.` (no hidden files / no `..`).
 /// - Must NOT contain `/`, `\`, or any `..` substring.
 /// - Every byte must be `[A-Za-z0-9._+-]`.
@@ -141,9 +141,9 @@ pub fn is_safe_mod_filename(s: &str) -> bool {
 /// 200-400 MB legitimately. Per 11-CONTEXT.md D-LOCK pack-size cap.
 pub const MAX_PACK_FILE_BYTES: u64 = 500 * 1024 * 1024;
 
-/// True iff `s` is a safe `.zip` pack filename — no path-traversal.
+/// True iff `s` is a safe `.zip` pack filename -- no path-traversal.
 /// Mirrors `is_safe_mod_filename` rules with three deltas:
-///   1. Extension is `.zip` (case-insensitive — Windows NTFS).
+///   1. Extension is `.zip` (case-insensitive -- Windows NTFS).
 ///   2. SPACE byte is allowed (community packs: `Faithful 32x.zip`).
 ///   3. Otherwise identical: no leading dot, no slash/backslash/`..`,
 ///      ASCII alphanumeric + `._+- ` allowlist.
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn test_filter_quilt_expands_to_fabric_plus_quilt() {
-        // PITFALL 2 — load-bearing: Quilt is binary-compatible with Fabric.
+        // PITFALL 2 -- load-bearing: Quilt is binary-compatible with Fabric.
         // Modrinth's facet system does AND/OR not "compat-aware OR".
         let info = LoaderInfo {
             kind: ModloaderKind::Quilt,
@@ -441,7 +441,7 @@ mod tests {
 
     #[test]
     fn test_safe_filename_rejects_jar_disabled() {
-        // .jar.disabled is NOT a safe filename for download — the toggle layer adds .disabled
+        // .jar.disabled is NOT a safe filename for download -- the toggle layer adds .disabled
         // *after* placing the .jar; downloads always land as .jar.
         assert!(!is_safe_mod_filename("sodium.jar.disabled"));
     }
@@ -487,7 +487,7 @@ mod tests {
 
     #[test]
     fn test_is_safe_pack_filename_accepts_uppercase_extension() {
-        // Case-insensitive .zip check — Windows NTFS users may see .ZIP.
+        // Case-insensitive .zip check -- Windows NTFS users may see .ZIP.
         assert!(is_safe_pack_filename("Pack.ZIP"));
     }
 

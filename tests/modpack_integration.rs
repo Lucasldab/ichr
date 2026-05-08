@@ -94,7 +94,7 @@ async fn end_to_end_import_minimal_pack() {
         &mrpack,
         "Minimal Test Pack",
         "1.20.4",
-        None, // vanilla — no modloader
+        None, // vanilla -- no modloader
         &[ModEntry {
             path: "mods/minimal-mod.jar",
             payload: mod_body,
@@ -435,7 +435,7 @@ async fn import_with_path_traversal_in_overrides_skips_safely() {
     // must NOT have our test content (if the real /etc/passwd exists).
     if let Ok(canonical) = traversal_canonical {
         // The file exists (e.g. /etc/passwd on Linux) but must NOT contain our
-        // test content — proves we did not overwrite it.
+        // test content -- proves we did not overwrite it.
         if let Ok(content) = std::fs::read_to_string(&canonical) {
             assert!(
                 !content.contains("root:x:0:0:root:/root:/bin/bash"),
@@ -462,6 +462,6 @@ async fn import_with_path_traversal_in_overrides_skips_safely() {
     // temp dir root from the traversal).
     assert!(
         paths.instance_manifest(&manifest.slug).exists(),
-        "instance.json must exist — import succeeded despite traversal attempt"
+        "instance.json must exist -- import succeeded despite traversal attempt"
     );
 }

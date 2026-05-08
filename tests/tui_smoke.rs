@@ -1275,7 +1275,7 @@ fn test_cancel_loader_install_cancels_token_and_returns_to_list() {
 }
 
 // ========================================================================
-// Phase 8 (08-07): Modrinth state machine — 15 transition tests
+// Phase 8 (08-07): Modrinth state machine -- 15 transition tests
 // ========================================================================
 
 use ichr::mods::types::{
@@ -1374,7 +1374,7 @@ fn test_open_mod_browser_emits_search_effect_and_sets_active_view() {
 
 #[test]
 fn test_open_mod_browser_blocked_when_install_in_flight() {
-    // Pitfall 8 — T-08-07-01.
+    // Pitfall 8 -- T-08-07-01.
     let mut state = make_state_with_one_instance("foo", "1.20.4");
     state
         .running_mod_jobs
@@ -1439,7 +1439,7 @@ fn test_mod_browser_move_clamps_to_results_len() {
         fetch_state: ModBrowserFetchState::Ready,
         selected_detail: None,
     };
-    // Move down 5 — should saturate at 1 (len-1).
+    // Move down 5 -- should saturate at 1 (len-1).
     for _ in 0..5 {
         let _ = update(&mut state, Action::ModBrowserMove(1));
     }
@@ -1448,7 +1448,7 @@ fn test_mod_browser_move_clamps_to_results_len() {
     } else {
         panic!()
     }
-    // Move up 5 — should saturate at 0.
+    // Move up 5 -- should saturate at 0.
     for _ in 0..5 {
         let _ = update(&mut state, Action::ModBrowserMove(-1));
     }
@@ -1574,7 +1574,7 @@ fn test_dep_confirm_y_blocked_when_has_conflict() {
 
 #[test]
 fn test_mod_installed_stamps_already_installed_in_browser_results() {
-    // Pitfall 10 — T-08-07-02.
+    // Pitfall 10 -- T-08-07-02.
     let mut state = make_state_with_one_instance("foo", "1.20.4");
     state.active_view = ActiveView::ModBrowser {
         slug: "foo".into(),
@@ -1596,7 +1596,7 @@ fn test_mod_installed_stamps_already_installed_in_browser_results() {
     if let ActiveView::ModBrowser { results, .. } = &state.active_view {
         assert!(
             results[0].already_installed,
-            "Pitfall 10 — already_installed must be stamped"
+            "Pitfall 10 -- already_installed must be stamped"
         );
         assert!(
             !results[1].already_installed,
@@ -1695,7 +1695,7 @@ fn test_close_installed_mods_returns_to_instance_list() {
 
 #[test]
 fn test_toggle_mod_enabled_emits_correct_effect() {
-    // Per /gsd-check-plans Issue 5 — MOD-06 integration coverage.
+    // Per /gsd-check-plans Issue 5 -- MOD-06 integration coverage.
     let mut state = make_state_with_one_instance("foo", "1.20.4");
     state.active_view = ActiveView::InstalledModsList {
         slug: "foo".into(),
@@ -1722,7 +1722,7 @@ fn test_toggle_mod_enabled_emits_correct_effect() {
 
 #[test]
 fn test_toggle_mc_filter_cycles_state_and_re_emits_search() {
-    // Per /gsd-check-plans Issue 9 — MOD-01 filter coverage.
+    // Per /gsd-check-plans Issue 9 -- MOD-01 filter coverage.
     let mut state = make_state_with_one_instance("foo", "1.20.4");
     state.active_view = ActiveView::ModBrowser {
         slug: "foo".into(),
@@ -1909,7 +1909,7 @@ fn test_mod_browser_arrows_always_navigate_even_with_search() {
 }
 
 // ========================================================================
-// Phase 9 (09-06): CurseForge state machine — 12 tui_smoke tests
+// Phase 9 (09-06): CurseForge state machine -- 12 tui_smoke tests
 // ========================================================================
 
 use ichr::mods::curseforge::types::{
@@ -1953,7 +1953,7 @@ fn cf_project_detail(id: u64, slug: &str) -> CurseForgeProjectDetail {
 }
 
 /// Build a minimal `CurseForgeFileEntry` for tests. `dl` is the (nullable)
-/// downloadUrl — None mirrors the FileNotDownloadable wire shape (MOD-04).
+/// downloadUrl -- None mirrors the FileNotDownloadable wire shape (MOD-04).
 fn cf_file_entry(id: u64, fname: &str, dl: Option<String>) -> CurseForgeFileEntry {
     CurseForgeFileEntry {
         id,
@@ -1974,7 +1974,7 @@ fn cf_file_entry(id: u64, fname: &str, dl: Option<String>) -> CurseForgeFileEntr
 
 #[test]
 fn test_cf_open_no_op_when_api_key_absent() {
-    // Pitfall 1 — F is silently disabled when no API key is configured.
+    // Pitfall 1 -- F is silently disabled when no API key is configured.
     let mut s = cf_state(false);
     let effects = update(&mut s, Action::OpenCfBrowser { slug: "x".into() });
     assert!(
@@ -1991,7 +1991,7 @@ fn test_cf_open_no_op_when_api_key_absent() {
 
 #[test]
 fn test_cf_open_transitions_to_cf_browser_when_api_key_present() {
-    // Happy path — F opens CfBrowser + emits SearchCurseForge.
+    // Happy path -- F opens CfBrowser + emits SearchCurseForge.
     let mut s = cf_state(true);
     let effects = update(&mut s, Action::OpenCfBrowser { slug: "x".into() });
     assert!(matches!(s.active_view, ActiveView::CfBrowser { .. }));
@@ -2002,7 +2002,7 @@ fn test_cf_open_transitions_to_cf_browser_when_api_key_present() {
 
 #[test]
 fn test_cf_open_blocked_while_install_in_flight_on_same_instance() {
-    // Pitfall 8 inheritance from Phase 8 — running_mod_jobs is the
+    // Pitfall 8 inheritance from Phase 8 -- running_mod_jobs is the
     // source-agnostic per-instance install lock.
     let mut s = cf_state(true);
     s.running_mod_jobs
@@ -2010,7 +2010,7 @@ fn test_cf_open_blocked_while_install_in_flight_on_same_instance() {
     let effects = update(&mut s, Action::OpenCfBrowser { slug: "x".into() });
     assert!(
         !matches!(s.active_view, ActiveView::CfBrowser { .. }),
-        "Pitfall 8 — install in flight must block the F keybind"
+        "Pitfall 8 -- install in flight must block the F keybind"
     );
     assert!(effects.is_empty(), "Pitfall 8 guard must produce no effect");
 }
@@ -2061,7 +2061,7 @@ fn test_cf_browser_type_search_appends_char() {
 #[test]
 fn test_cf_browser_open_detail_emits_fetch_cf_mod_effect() {
     // Phase 8-mirror Action ping-pong: half 1.
-    // CfBrowserOpenDetail emits Effect::FetchCfMod — NOT a combined
+    // CfBrowserOpenDetail emits Effect::FetchCfMod -- NOT a combined
     // OpenCfFilePicker effect. The design locks separate FetchCfMod + ListCfFiles.
     let mut s = cf_state(true);
     let _ = update(&mut s, Action::OpenCfBrowser { slug: "x".into() });
@@ -2085,7 +2085,7 @@ fn test_cf_browser_open_detail_emits_fetch_cf_mod_effect() {
 #[test]
 fn test_cf_browser_detail_loaded_chains_to_list_cf_files_effect() {
     // Phase 8-mirror Action ping-pong: half 2.
-    // CfBrowserDetailLoaded MUST automatically chain to ListCfFiles —
+    // CfBrowserDetailLoaded MUST automatically chain to ListCfFiles --
     // mirrors Phase 8 ModDetailLoaded -> ModVersionsLoaded pattern.
     let mut s = cf_state(true);
     let _ = update(&mut s, Action::OpenCfBrowser { slug: "x".into() });
@@ -2127,7 +2127,7 @@ fn test_cf_file_picker_confirm_emits_install_cf_mod_effect_when_no_install_in_fl
 
 #[test]
 fn test_cf_file_picker_confirm_blocked_while_install_in_flight() {
-    // Pitfall 8 guard — even with an open file picker, install-in-flight on
+    // Pitfall 8 guard -- even with an open file picker, install-in-flight on
     // the same instance must silently no-op.
     let mut s = cf_state(true);
     s.running_mod_jobs
@@ -2143,13 +2143,13 @@ fn test_cf_file_picker_confirm_blocked_while_install_in_flight() {
         !effects
             .iter()
             .any(|e| matches!(e, Effect::InstallCfMod { .. })),
-        "Pitfall 8 — InstallCfMod must NOT be emitted while install in flight"
+        "Pitfall 8 -- InstallCfMod must NOT be emitted while install in flight"
     );
 }
 
 #[test]
 fn test_cf_mod_install_failed_transitions_to_modal_with_web_url() {
-    // MOD-04 success criterion 3 — FileNotDownloadable carries web_url,
+    // MOD-04 success criterion 3 -- FileNotDownloadable carries web_url,
     // and the modal renders the link.
     let mut s = cf_state(true);
     let url = "https://www.curseforge.com/minecraft/mc-mods/wonderful-world-mod/files/4567890"
@@ -2686,7 +2686,7 @@ fn test_modpack_import_failed_opens_failed_modal_then_dismiss() {
     );
 }
 
-// Test 13: HIGH-2 regression pin — ModpackImportCancelled clears running_modpack_imports
+// Test 13: HIGH-2 regression pin -- ModpackImportCancelled clears running_modpack_imports
 // and returns to InstanceList (NOT ModpackImportFailedModal). This pinned regression
 // ensures the dedicated ModpackImportCancelled arm calls clear() rather than the
 // ModpackImported arm calling remove("") (a no-op against a real-slug key).
@@ -2711,7 +2711,7 @@ fn test_modpack_import_cancelled_clears_running_imports_and_returns_to_instance_
 
     let effects = update(&mut s, Action::ModpackImportCancelled);
 
-    // Must return to InstanceList (not ModpackImportFailedModal — silent treatment)
+    // Must return to InstanceList (not ModpackImportFailedModal -- silent treatment)
     assert!(
         matches!(s.active_view, ActiveView::InstanceList { selected: 0 }),
         "ModpackImportCancelled must return to InstanceList; got {:?}",
@@ -2736,7 +2736,7 @@ fn test_modpack_import_cancelled_clears_running_imports_and_returns_to_instance_
         "ModpackImportCancelled must NOT open the failed modal"
     );
 
-    // Effects must be empty (no side-effects needed — everything is cleaned up by update())
+    // Effects must be empty (no side-effects needed -- everything is cleaned up by update())
     assert!(
         effects.is_empty(),
         "ModpackImportCancelled must emit no effects; got {effects:?}"
@@ -3193,7 +3193,7 @@ fn test_e_on_shader_row_dispatches_shader_toggle_notice() {
     {
         assert!(
             transient_status.as_deref()
-                == Some("Shaders cannot be toggled — use Iris/OptiFine in-game"),
+                == Some("Shaders cannot be toggled -- use Iris/OptiFine in-game"),
             "transient_status should be set to shader notice; got {transient_status:?}"
         );
     } else {

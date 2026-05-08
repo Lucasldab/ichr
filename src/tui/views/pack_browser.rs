@@ -1,14 +1,14 @@
-//! Pack browser — full-screen Modrinth browser parameterised by PackKind.
+//! Pack browser -- full-screen Modrinth browser parameterised by PackKind.
 //!
 //! Cloned-and-parameterised from `mod_browser.rs` per Phase 11 plan 04.
 //! D-LOCK: NO loader or MC filter chips (packs not loader-specific).
 //! D-LOCK: `D` (uppercase) opens drop-from-path modal with current slug+kind.
 //!
 //! Layout mirrors mod_browser.rs:
-//!  - Length(3) header — block title (kind-aware)
-//!  - Length(3) search bar — buffer rendered inline
-//!  - Min(1)   body — results list (40%) / detail pane (60%)
-//!  - Length(1) footer — DIM keybind hint
+//!  - Length(3) header -- block title (kind-aware)
+//!  - Length(3) search bar -- buffer rendered inline
+//!  - Min(1)   body -- results list (40%) / detail pane (60%)
+//!  - Length(1) footer -- DIM keybind hint
 
 use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
@@ -50,10 +50,10 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
         PackKind::Resource => "Resource Packs",
         PackKind::Shader => "Shader Packs",
     };
-    let header_para = Paragraph::new(format!("{kind_label} — {slug}")).block(
+    let header_para = Paragraph::new(format!("{kind_label} -- {slug}")).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(format!(" {kind_label} — {slug} ")),
+            .title(format!(" {kind_label} -- {slug} ")),
     );
     f.render_widget(header_para, chunks[0]);
 
@@ -110,7 +110,7 @@ fn render_results_pane(
 
     let placeholder = match fetch_state {
         ModBrowserFetchState::Loading => Some("Searching Modrinth..."),
-        ModBrowserFetchState::Error(_) => Some("Failed to reach Modrinth — check network"),
+        ModBrowserFetchState::Error(_) => Some("Failed to reach Modrinth -- check network"),
         ModBrowserFetchState::Ready if results.is_empty() => Some("No packs found"),
         ModBrowserFetchState::Ready => None,
     };
@@ -214,7 +214,7 @@ fn render_detail_pane(
     if let ModBrowserFetchState::Error(_) = fetch_state {
         lines.push(Line::raw(""));
         lines.push(Line::from(Span::styled(
-            "Could not load details — check network".to_string(),
+            "Could not load details -- check network".to_string(),
             Style::default()
                 .fg(Color::DarkGray)
                 .add_modifier(Modifier::DIM),
@@ -289,7 +289,7 @@ pub fn map_pack_browser_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             code: KeyCode::Enter,
             ..
         }) => Some(Action::InstallPackFromBrowser { slug, kind }),
-        // D (uppercase) opens the drop-from-path modal — kind inherited.
+        // D (uppercase) opens the drop-from-path modal -- kind inherited.
         CtEvent::Key(KeyEvent {
             code: KeyCode::Char('D'),
             modifiers,

@@ -7,7 +7,7 @@
 //! # Hash rotation
 //!
 //! `DEFAULT_MOJANG_JRE_ALL_URL` is content-addressed by Mojang. If Mojang
-//! rotates the hash (rare — stable since at least 2023), update the constant
+//! rotates the hash (rare -- stable since at least 2023), update the constant
 //! below and ship a patch. Set `ICHR_JRE_ALL_URL` env var at runtime
 //! to override without recompiling.
 
@@ -24,7 +24,7 @@ use crate::error::AppError;
 use crate::mojang::cache::atomic_write;
 use crate::persistence::paths::AppPaths;
 
-/// Mojang JRE all.json — stable content-addressed URL.
+/// Mojang JRE all.json -- stable content-addressed URL.
 ///
 /// To update: replace the 40-char SHA1 hex segment with the new hash
 /// from the Mojang launcher manifest. Override at runtime via
@@ -37,7 +37,7 @@ pub const DEFAULT_MOJANG_JRE_ALL_URL: &str =
 pub const MOJANG_JRE_URL_ENV: &str = "ICHR_JRE_ALL_URL";
 
 // ---------------------------------------------------------------------------
-// Serde types — Mojang JRE all.json
+// Serde types -- Mojang JRE all.json
 // ---------------------------------------------------------------------------
 
 /// Top-level all.json: `{ "linux": { "java-runtime-delta": [MojangJreVariant] } }`
@@ -67,7 +67,7 @@ pub struct MojangJreVersionInfo {
 }
 
 // ---------------------------------------------------------------------------
-// Serde types — per-variant manifest
+// Serde types -- per-variant manifest
 // ---------------------------------------------------------------------------
 
 /// Per-variant manifest: `{ "files": { "bin/java": MojangFileEntry } }`
@@ -114,7 +114,7 @@ pub struct MojangDownloadInfo {
 
 /// HTTP façade for Mojang JRE manifest and file downloads.
 ///
-/// Mirrors `MojangClient` from `src/mojang/client.rs` — same User-Agent,
+/// Mirrors `MojangClient` from `src/mojang/client.rs` -- same User-Agent,
 /// gzip, 30s timeout.
 #[derive(Debug, Clone)]
 pub struct MojangJreClient {
@@ -244,7 +244,7 @@ impl MojangJreClient {
             .await?;
 
         // Cache the manifest bytes for debugging / future incremental resume
-        // (parse from in-memory bytes above — do NOT re-read from disk)
+        // (parse from in-memory bytes above -- do NOT re-read from disk)
         let _ = atomic_write(&manifest_cache, &manifest_bytes).await;
 
         let tmp_dir = jre_dir.with_extension("tmp");
@@ -395,7 +395,7 @@ impl MojangJreClient {
                 tracing::warn!(
                     path = %rel_path,
                     target = %target,
-                    "skipping Mojang link entry on Windows — no manifests known to use links on Windows"
+                    "skipping Mojang link entry on Windows -- no manifests known to use links on Windows"
                 );
             }
         }
@@ -738,7 +738,7 @@ mod tests {
             when.method(GET).path("/manifest-delta.json");
             then.status(200).body(manifest_body);
         });
-        // Serve WRONG bytes — SHA1 mismatch
+        // Serve WRONG bytes -- SHA1 mismatch
         let _m_file = server.mock(|when, then| {
             when.method(GET).path("/bin/java");
             then.status(200).body(wrong_bytes.as_ref());

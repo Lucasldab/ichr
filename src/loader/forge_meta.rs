@@ -1,6 +1,6 @@
 //! Forge meta API HTTP client.
 //!
-//! Endpoints (verified 2026-05-06 — see 07-RESEARCH.md §Forge Endpoint Reference):
+//! Endpoints (verified 2026-05-06 -- see 07-RESEARCH.md §Forge Endpoint Reference):
 //!   GET https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml
 //!   GET https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json
 //!   GET https://maven.minecraftforge.net/net/minecraftforge/forge/{mc}-{forge}/forge-{mc}-{forge}-installer.jar
@@ -52,7 +52,7 @@ struct PromotionsSlim {
 impl PromotionsSlim {
     /// Returns true if `bare_forge_version` matches either the recommended
     /// OR latest pin for `mc_version`. `promos` values are bare versions
-    /// (e.g., `"47.4.20"`) — NOT prefixed with the MC version.
+    /// (e.g., `"47.4.20"`) -- NOT prefixed with the MC version.
     fn is_recommended_or_latest(&self, mc_version: &str, bare_forge_version: &str) -> bool {
         let recommended_key = format!("{mc_version}-recommended");
         let latest_key = format!("{mc_version}-latest");
@@ -114,7 +114,7 @@ impl ForgeMetaClient {
     ///
     /// Fetches `maven-metadata.xml`, filters entries by `"{mc_version}-"` prefix,
     /// strips the prefix to get bare Forge versions, and augments each with a
-    /// `stable` boolean from `promotions_slim.json` (best-effort — promotions
+    /// `stable` boolean from `promotions_slim.json` (best-effort -- promotions
     /// failure degrades gracefully to `stable: false` for all entries).
     #[tracing::instrument(skip_all, fields(mc_version = %mc_version))]
     pub async fn list_loader_versions(
@@ -144,10 +144,10 @@ impl ForgeMetaClient {
                 reason: format!("body {url}: {e}"),
             })?;
 
-        // 2. Extract all versions (returns empty Vec on malformed/empty XML — not an error)
+        // 2. Extract all versions (returns empty Vec on malformed/empty XML -- not an error)
         let all = maven_metadata::extract_versions(&xml);
 
-        // 3. Fetch promotions (best-effort — empty on failure, D-05 graceful degradation)
+        // 3. Fetch promotions (best-effort -- empty on failure, D-05 graceful degradation)
         let promotions = self.fetch_promotions().await.unwrap_or_default();
 
         // 4. Filter by MC prefix, strip prefix to get bare Forge version, apply stable
@@ -365,7 +365,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_installer_url_format() {
-        // Pure-function test — no HTTP mock needed
+        // Pure-function test -- no HTTP mock needed
         let client = ForgeMetaClient::new_with_base_urls(
             "https://maven.minecraftforge.net/net/minecraftforge/forge",
             "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json",
@@ -416,7 +416,7 @@ mod tests {
         let r = client
             .list_loader_versions("1.20.1")
             .await
-            .expect("ok — empty is not an error");
+            .expect("ok -- empty is not an error");
         assert!(
             r.is_empty(),
             "malformed XML => empty list (D-05 graceful state): {r:?}"
@@ -440,7 +440,7 @@ mod tests {
         let versions = client
             .list_loader_versions("1.20.1")
             .await
-            .expect("ok — promotions failure is graceful");
+            .expect("ok -- promotions failure is graceful");
         // Fixture has two 1.20.1 entries; both should be returned, all unstable
         assert_eq!(
             versions.len(),

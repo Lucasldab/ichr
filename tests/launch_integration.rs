@@ -196,7 +196,7 @@ async fn test_launch_fails_early_on_java_mismatch() {
 
     let java_service = JavaService::new().expect("JavaService::new");
 
-    // Ensure ICHR_JAVA is not set — we want the System override path taken.
+    // Ensure ICHR_JAVA is not set -- we want the System override path taken.
     let _prior = std::env::var("ICHR_JAVA").ok();
     std::env::remove_var("ICHR_JAVA");
 

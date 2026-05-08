@@ -1,4 +1,4 @@
-//! Dep-confirm modal — listing required/optional/incompatible deps before install.
+//! Dep-confirm modal -- listing required/optional/incompatible deps before install.
 //!
 //! Source: 08-UI-SPEC.md §"Dependency-Confirm Modal" lines 277-323.
 //! Mirrors `loader_switch_confirm.rs` (centered confirm with optional Red+BOLD
@@ -60,7 +60,7 @@ pub fn render_dep_confirm_modal(f: &mut Frame, area: Rect, state: &AppState) {
     //   Length(1) headline / Length(1) blank / Min(2) deps / Length(1) summary
     //   / Length(1) divider / Length(1) footer.
     // (Header is rendered by the outer block title; we drop the Length(3) header
-    //  chunk that's reserved for the title bar — no separate header content needed.)
+    //  chunk that's reserved for the title bar -- no separate header content needed.)
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -117,7 +117,7 @@ pub fn render_dep_confirm_modal(f: &mut Frame, area: Rect, state: &AppState) {
                 ),
                 DepKind::Embedded => unreachable!("filtered above"),
             };
-            // Body: "{title} {version}" — version may be None for Optional / Incompatible.
+            // Body: "{title} {version}" -- version may be None for Optional / Incompatible.
             let version_label = d
                 .version
                 .as_ref()
@@ -187,7 +187,7 @@ pub fn render_dep_confirm_modal(f: &mut Frame, area: Rect, state: &AppState) {
 
     // ---- Footer hint (UI-SPEC lines 661-662) ----
     let footer_text = if *has_conflict {
-        "Esc cancel — resolve conflict first"
+        "Esc cancel -- resolve conflict first"
     } else {
         "y to install  n/Esc to cancel"
     };

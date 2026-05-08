@@ -1,4 +1,4 @@
-//! Modpack import path-entry modal — single-line text entry for the `.mrpack` file path.
+//! Modpack import path-entry modal -- single-line text entry for the `.mrpack` file path.
 //!
 //! Mirrors `create_modal.rs` inline-buffer pattern (Phase 2 CreateStep::NameInput).
 //! Per CONTEXT.md Open Questions §3 (resolved): plain text-entry only; no

@@ -6,10 +6,10 @@
 //!   SHA-1 hash → upsert_pack
 //! - Copy via `tokio::fs::read` (full file into memory, up to 500 MB cap) with
 //!   cancel-aware `tokio::select!` wrapper.
-//! - SHA-1 ledger entry (no integrity verification — user-supplied file).
+//! - SHA-1 ledger entry (no integrity verification -- user-supplied file).
 //! - On cancel mid-copy: delete partial file + return `PackError::Cancelled`.
 //!
-//! Pitfall 4: `Path::file_name()` is called BEFORE any `.join()` — the raw
+//! Pitfall 4: `Path::file_name()` is called BEFORE any `.join()` -- the raw
 //! input string is never used in path construction.
 //!
 //! Pitfall 2: `is_safe_pack_filename` is used (not `is_safe_mod_filename`).
@@ -43,15 +43,15 @@ pub struct DropPackOutcome {
 ///
 /// # Validation order (D-LOCK)
 ///
-/// 1. `source_path.file_name()` extraction (path-traversal guard — Pitfall 4)
-/// 2. Lowercase-suffix `.zip` check (case-insensitive — Windows NTFS)
+/// 1. `source_path.file_name()` extraction (path-traversal guard -- Pitfall 4)
+/// 2. Lowercase-suffix `.zip` check (case-insensitive -- Windows NTFS)
 /// 3. `is_safe_pack_filename` allowlist → `PackError::UnsafeFilename`
 /// 4. `tokio::fs::metadata` → `PackError::NotFound` on absent or non-file;
 ///    `PackError::FileTooLarge` if `size > MAX_PACK_FILE_BYTES`
 /// 5. Collision check via `tokio::fs::try_exists` on `dest_path` →
 ///    `PackError::FilenameCollision` (D-LOCK refuse policy)
 /// 6. Cancel check
-/// 7. `tokio::fs::create_dir_all(dest_dir)` — defensive (Pitfall 3)
+/// 7. `tokio::fs::create_dir_all(dest_dir)` -- defensive (Pitfall 3)
 /// 8. Cancel-aware `tokio::select!` read + write
 /// 9. Build `InstalledModRow` with `source=ModSource::Local`
 /// 10. `upsert_pack` ledger row
@@ -71,7 +71,7 @@ pub async fn drop_pack_from_path(
     source_path: &Path,
     token: &CancellationToken,
 ) -> Result<DropPackOutcome, PackError> {
-    // ── (1) file_name extraction (path-traversal guard — Pitfall 4) ──────────
+    // ── (1) file_name extraction (path-traversal guard -- Pitfall 4) ──────────
     // Path::file_name() is called BEFORE any .join(); the raw source_path
     // string is NEVER concatenated into the dest path.
     let dest_filename_os = source_path.file_name().ok_or_else(|| PackError::NotFound {
@@ -79,7 +79,7 @@ pub async fn drop_pack_from_path(
     })?;
     let dest_filename = dest_filename_os.to_string_lossy().into_owned();
 
-    // ── (2) Extension check (case-insensitive — Windows NTFS) ────────────────
+    // ── (2) Extension check (case-insensitive -- Windows NTFS) ────────────────
     if !dest_filename.to_ascii_lowercase().ends_with(".zip") {
         return Err(PackError::NotAZip {
             path: dest_filename,
@@ -111,7 +111,7 @@ pub async fn drop_pack_from_path(
         });
     }
 
-    // ── (5) Collision check (D-LOCK refuse — 1:1 ledger/disk invariant) ──────
+    // ── (5) Collision check (D-LOCK refuse -- 1:1 ledger/disk invariant) ──────
     let dest_dir = paths.instance_packs_dir(slug, kind);
     let dest_path = dest_dir.join(&dest_filename);
     if tokio::fs::try_exists(&dest_path).await.unwrap_or(false) {
@@ -123,7 +123,7 @@ pub async fn drop_pack_from_path(
         return Err(PackError::Cancelled);
     }
 
-    // ── (7) Defensive create_dir_all (Pitfall 3 — old instances) ─────────────
+    // ── (7) Defensive create_dir_all (Pitfall 3 -- old instances) ─────────────
     tokio::fs::create_dir_all(&dest_dir).await.map_err(|e| {
         PackError::Io(std::io::Error::other(format!(
             "create_dir_all {}: {e}",
@@ -201,7 +201,7 @@ pub async fn drop_pack_from_path(
         kind: kind.into_installed_item_kind(),
     };
 
-    // ── (10) upsert_pack — ledger lock acquired internally ───────────────────
+    // ── (10) upsert_pack -- ledger lock acquired internally ───────────────────
     upsert_pack(paths, slug, row.clone())
         .await
         .map_err(PackError::Modrinth)?;
@@ -284,7 +284,7 @@ mod tests {
         p
     }
 
-    // ── Task 1 — Validation gate tests ───────────────────────────────────────
+    // ── Task 1 -- Validation gate tests ───────────────────────────────────────
 
     #[tokio::test]
     async fn test_drop_rejects_nonexistent_path() {
@@ -385,7 +385,7 @@ mod tests {
         let td = TempDir::new().unwrap();
         let paths = test_paths(&td);
         let src_td = TempDir::new().unwrap();
-        // .hidden.zip starts with '.' — is_safe_pack_filename rejects it.
+        // .hidden.zip starts with '.' -- is_safe_pack_filename rejects it.
         let src = write_file(src_td.path(), ".hidden.zip", b"data");
         let res = drop_pack_from_path(
             &paths,
@@ -454,7 +454,7 @@ mod tests {
         assert!(packs_dir.exists(), "packs dir should have been created");
     }
 
-    // ── Task 2 — Happy path / collision / cancel tests ─────────────────────
+    // ── Task 2 -- Happy path / collision / cancel tests ─────────────────────
 
     #[tokio::test]
     async fn test_drop_happy_path_resource_pack() {
@@ -607,7 +607,7 @@ mod tests {
 
         let res = handle.await.unwrap();
         // Either Cancelled (if the select caught it) or Ok (if copy completed
-        // before cancel fired) — both are valid. What matters is that if the
+        // before cancel fired) -- both are valid. What matters is that if the
         // result is Cancelled, the partial dest file must not exist.
         if matches!(res, Err(PackError::Cancelled)) {
             let dest_path =
@@ -617,7 +617,7 @@ mod tests {
                 "partial file should be cleaned up after cancel"
             );
         }
-        // If Ok — copy completed before cancel; that's fine too.
+        // If Ok -- copy completed before cancel; that's fine too.
     }
 
     #[tokio::test]

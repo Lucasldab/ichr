@@ -13,20 +13,20 @@ use std::path::{Component, Path, PathBuf};
 /// segments with no `..`, `.`, absolute prefix, or Windows drive letter).
 ///
 /// Returns `None` if any component would allow the resulting path to escape
-/// `base`. Callers MUST skip the entry (not error) when `None` is returned —
+/// `base`. Callers MUST skip the entry (not error) when `None` is returned --
 /// this matches the "skip-not-error" semantics established in
 /// `install::natives_extract`.
 ///
 /// # Important notes for callers
 ///
-/// - **Empty entry names** produce `Some(base.to_path_buf())` — zero Normal
+/// - **Empty entry names** produce `Some(base.to_path_buf())` -- zero Normal
 ///   components are pushed. Callers must not write to bare `base`.
 /// - **Leading `./`** (CurDir component) → `None`. Strip `./` before calling
 ///   if the archive may use this convention.
 /// - **Backslash paths on Linux** are treated as a single Normal component
 ///   and will return `Some`. This is correct: backslash is a valid filename
 ///   character on Linux and has no traversal semantics.
-/// - **This function never calls `canonicalize()`** — canonicalization
+/// - **This function never calls `canonicalize()`** -- canonicalization
 ///   requires the target path to already exist and performs filesystem I/O,
 ///   defeating the pre-creation safety check.
 pub fn safe_extract_path(entry_name: &str, base: &Path) -> Option<PathBuf> {
@@ -34,7 +34,7 @@ pub fn safe_extract_path(entry_name: &str, base: &Path) -> Option<PathBuf> {
     for component in Path::new(entry_name).components() {
         match component {
             Component::Normal(c) => result.push(c),
-            // Rejects RootDir, CurDir, ParentDir, Prefix — all traversal vectors.
+            // Rejects RootDir, CurDir, ParentDir, Prefix -- all traversal vectors.
             _ => return None,
         }
     }

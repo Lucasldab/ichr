@@ -145,7 +145,7 @@ impl MojangClient {
     /// Download `url` to `dest` WITHOUT SHA-1 verification.
     ///
     /// Use ONLY when the upstream API does not provide a sha1 (Quilt loader
-    /// libraries — see Phase 8.4 GAP-LIBRARY-SHAPE-08). All Mojang-protocol
+    /// libraries -- see Phase 8.4 GAP-LIBRARY-SHAPE-08). All Mojang-protocol
     /// callers MUST use `download_verified` instead. The caller is responsible
     /// for logging the trade-off (e.g. tracing::info!) at the call site.
     pub async fn download_unverified(&self, url: &str, dest: &Path) -> Result<(), AppError> {

@@ -33,7 +33,7 @@ pub const DEFAULT_ADOPTIUM_BASE: &str = "https://api.adoptium.net";
 pub const ADOPTIUM_BASE_URL_ENV: &str = "ICHR_ADOPTIUM_BASE_URL";
 
 // ---------------------------------------------------------------------------
-// Serde types — Adoptium API response
+// Serde types -- Adoptium API response
 // ---------------------------------------------------------------------------
 
 /// Top-level Adoptium asset entry (one element of the response array).
@@ -53,12 +53,12 @@ pub struct AdoptiumBinary {
     pub package: AdoptiumPackage,
 }
 
-/// Package metadata — download URL + SHA-256 checksum.
+/// Package metadata -- download URL + SHA-256 checksum.
 #[derive(Debug, Deserialize)]
 pub struct AdoptiumPackage {
     /// Direct download URL for the `.tar.gz` (Linux) or `.zip` (Windows).
     pub link: String,
-    /// SHA-256 hex digest of the archive (lowercase or uppercase — compared case-insensitively).
+    /// SHA-256 hex digest of the archive (lowercase or uppercase -- compared case-insensitively).
     pub checksum: String,
     pub size: u64,
 }
@@ -75,7 +75,7 @@ pub struct AdoptiumVersion {
 
 /// HTTP façade for Adoptium API requests.
 ///
-/// Mirrors `MojangJreClient` — same User-Agent, gzip, 30s timeout.
+/// Mirrors `MojangJreClient` -- same User-Agent, gzip, 30s timeout.
 /// The base URL can be overridden at construction time via the
 /// `ICHR_ADOPTIUM_BASE_URL` environment variable (for httpmock in tests).
 #[derive(Debug, Clone)]
@@ -97,7 +97,7 @@ impl AdoptiumClient {
 
     /// Construct with an explicit base URL.
     ///
-    /// Used in tests to avoid global env-var mutation — pass the httpmock
+    /// Used in tests to avoid global env-var mutation -- pass the httpmock
     /// server's base URL directly.
     pub fn new_with_base_url(base_url: impl Into<String>) -> Result<Self, AppError> {
         let http = reqwest::Client::builder()
@@ -183,7 +183,7 @@ impl AdoptiumClient {
             .map_err(|e| AppError::Http(format!("body {url}: {e}")))?
             .to_vec();
 
-        // SHA-256 verify — Adoptium uses SHA-256 (not SHA-1)
+        // SHA-256 verify -- Adoptium uses SHA-256 (not SHA-1)
         let got = sha256_hex(&bytes);
         if !got.eq_ignore_ascii_case(expected_sha256) {
             return Err(AppError::JavaDownloadFailed {
@@ -302,7 +302,7 @@ fn strip_top_prefix(p: &Path) -> Option<PathBuf> {
 /// prefix directory so that `jdk-21.0.10+7-jre/bin/java` extracts to
 /// `{dest_dir}/bin/java`.
 ///
-/// MUST be called from inside `tokio::task::spawn_blocking` — the `tar` and
+/// MUST be called from inside `tokio::task::spawn_blocking` -- the `tar` and
 /// `flate2` crates perform synchronous I/O.
 #[cfg(unix)]
 fn extract_tar_gz_blocking(bytes: Vec<u8>, dest_dir: &Path) -> Result<(), AppError> {
@@ -448,7 +448,7 @@ mod tests {
     // -----------------------------------------------------------------------
 
     /// Build a client pointed at the given mock server base URL.
-    /// Does NOT touch env vars — avoids races between parallel tests.
+    /// Does NOT touch env vars -- avoids races between parallel tests.
     fn make_client(server: &MockServer) -> AdoptiumClient {
         AdoptiumClient::new_with_base_url(server.base_url()).expect("client build")
     }
@@ -743,12 +743,12 @@ mod tests {
         }
 
         result.expect("env override fetch should succeed");
-        // The mock was hit — proves the env var was honoured
+        // The mock was hit -- proves the env var was honoured
         mock.assert_calls(1);
     }
 
     // -----------------------------------------------------------------------
-    // Task 2: install_adoptium — extraction + prefix strip + idempotency
+    // Task 2: install_adoptium -- extraction + prefix strip + idempotency
     // -----------------------------------------------------------------------
 
     /// Full happy-path install test (Linux tar.gz).
@@ -902,7 +902,7 @@ mod tests {
         // extract_tar_gz_blocking runs synchronously (normally in spawn_blocking)
         let result = extract_tar_gz_blocking(archive_bytes, &dest);
 
-        // Should succeed — the bad entry is silently skipped
+        // Should succeed -- the bad entry is silently skipped
         assert!(
             result.is_ok(),
             "traversal entry should be skipped, not errored: {result:?}"

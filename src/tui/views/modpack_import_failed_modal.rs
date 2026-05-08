@@ -1,4 +1,4 @@
-//! Modpack import failure modal — mirrors `loader_install_failed_modal.rs`.
+//! Modpack import failure modal -- mirrors `loader_install_failed_modal.rs`.
 //!
 //! Shown when ModpackImportFailed is dispatched. Esc dismisses.
 

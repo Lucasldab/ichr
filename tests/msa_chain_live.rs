@@ -1,4 +1,4 @@
-//! Live MSA auth smoke test — REAL Microsoft endpoints, REAL account.
+//! Live MSA auth smoke test -- REAL Microsoft endpoints, REAL account.
 //!
 //! Disabled by default (`#[ignore]`). Run before Phase 4 release with:
 //!
@@ -21,7 +21,7 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 #[tokio::test]
-#[ignore = "requires real MS account + browser + internet — see module docs"]
+#[ignore = "requires real MS account + browser + internet -- see module docs"]
 async fn live_msa_round_trip_prints_code_and_expects_sign_in() {
     let http = reqwest::Client::builder()
         .user_agent("ichr-live-test/0.1")
@@ -66,7 +66,7 @@ async fn live_msa_round_trip_prints_code_and_expects_sign_in() {
     let out = svc
         .start_device_code_auth(token, tx)
         .await
-        .expect("live auth should succeed — check console for device code prompt");
+        .expect("live auth should succeed -- check console for device code prompt");
     logger.abort();
 
     println!(

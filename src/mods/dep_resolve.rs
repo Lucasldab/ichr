@@ -52,7 +52,7 @@ pub struct ResolvedDepGraph {
 ///   Called once after BFS completes to hydrate `ResolvedDep.project_title` so the
 ///   dep-confirm modal and Installed Mods List surface human-readable mod names
 ///   instead of opaque project_ids (closes GAP-8-D). Missing keys fall back to
-///   the project_id itself — strictly better than the old `String::new()` outcome.
+///   the project_id itself -- strictly better than the old `String::new()` outcome.
 ///   For the production wiring, this is `client.get_projects_batch(ids)` mapped
 ///   into a `(id -> title)` HashMap.
 pub async fn resolve_required_deps<F1, Fut1, F2, Fut2, F3, Fut3>(
@@ -109,7 +109,7 @@ where
     }
 
     // Title hydration: collect unique project_ids, batch-fetch titles, write back.
-    // Closes GAP-8-D — without this, the construction sites in `process_dep` leave
+    // Closes GAP-8-D -- without this, the construction sites in `process_dep` leave
     // `project_title = String::new()`, and the dep-confirm modal + Installed Mods
     // List surface opaque project_ids instead of human-readable names. Fallback to
     // `project_id` for any id missing from the response keeps the resolver robust
@@ -349,7 +349,7 @@ mod tests {
     }
 
     // 2. Diamond: root(A) -> required(B), required(C); B->D required, C->D required.
-    // Result: B, C, D unique downloads — D appears twice in deps but is_new_download=true once.
+    // Result: B, C, D unique downloads -- D appears twice in deps but is_new_download=true once.
     #[tokio::test]
     async fn test_diamond_dedupe() {
         let d = mk_version("d1", "D", 50, vec![]);

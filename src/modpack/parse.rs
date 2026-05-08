@@ -1,7 +1,7 @@
 //! `.mrpack` v1 manifest parsing: serde types, validation, and loader detection.
 //!
 //! All functions are synchronous (no I/O, no network). Validation errors surface
-//! as typed `ModpackError` variants — no panics, no silent fallbacks.
+//! as typed `ModpackError` variants -- no panics, no silent fallbacks.
 //!
 //! # Trust boundary
 //! All public functions in this module accept untrusted data from the
@@ -26,7 +26,7 @@ use crate::modpack::error::ModpackError;
 /// `formatVersion` MUST equal `1`. `game` MUST equal `"minecraft"`.
 /// `dependencies` MUST contain the key `"minecraft"`.
 ///
-/// Unknown JSON fields are silently ignored (forward-compat — v1 minor
+/// Unknown JSON fields are silently ignored (forward-compat -- v1 minor
 /// extensions may add fields; `#[serde(deny_unknown_fields)]` is forbidden
 /// per the plan's `<forbids>` section).
 #[derive(Debug, Clone, Deserialize)]
@@ -41,7 +41,7 @@ pub struct MrpackIndex {
     pub files: Vec<MrpackFile>,
 }
 
-/// One entry in the `files[]` array — a mod (or other file) to download.
+/// One entry in the `files[]` array -- a mod (or other file) to download.
 ///
 /// `env` is `Option<MrpackEnv>` with `#[serde(default)]` because many packs
 /// in the wild omit the field entirely. Absent `env` means the file is
@@ -81,7 +81,7 @@ pub struct MrpackEnv {
 
 /// Whether a file is required, optional, or unsupported for a given side.
 ///
-/// `#[default]` is `Required` — when the `env` object is present but a field
+/// `#[default]` is `Required` -- when the `env` object is present but a field
 /// is somehow absent (malformed pack), defaulting to Required is safer than
 /// silently skipping the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
@@ -101,10 +101,10 @@ pub enum EnvRequirement {
 ///
 /// # Errors
 ///
-/// - [`ModpackError::ManifestParse`] — invalid JSON or schema mismatch
-/// - [`ModpackError::UnsupportedFormat`] — `formatVersion` != 1
-/// - [`ModpackError::UnsupportedGame`] — `game` != `"minecraft"`
-/// - [`ModpackError::MissingMinecraftDependency`] — no `"minecraft"` key in `dependencies`
+/// - [`ModpackError::ManifestParse`] -- invalid JSON or schema mismatch
+/// - [`ModpackError::UnsupportedFormat`] -- `formatVersion` != 1
+/// - [`ModpackError::UnsupportedGame`] -- `game` != `"minecraft"`
+/// - [`ModpackError::MissingMinecraftDependency`] -- no `"minecraft"` key in `dependencies`
 pub fn parse_index(json: &str) -> Result<MrpackIndex, ModpackError> {
     let idx: MrpackIndex = serde_json::from_str(json).map_err(ModpackError::ManifestParse)?;
 
@@ -162,7 +162,7 @@ pub fn detect_loader(deps: &HashMap<String, String>) -> Option<(LoaderType, Stri
             tracing::warn!(
                 keys = ?keys,
                 chosen = chosen_key,
-                "multiple loader keys in dependencies — using first-priority match"
+                "multiple loader keys in dependencies -- using first-priority match"
             );
             Some((chosen_loader, chosen_version.to_owned()))
         }
@@ -395,7 +395,7 @@ mod tests {
 
     #[test]
     fn test_detect_loader_priority_fabric_wins() {
-        // Pitfall 8: multiple loaders — Fabric must win over Forge
+        // Pitfall 8: multiple loaders -- Fabric must win over Forge
         let d = deps(&[
             ("minecraft", "1.20.4"),
             ("fabric-loader", "0.16.9"),
@@ -413,7 +413,7 @@ mod tests {
     fn test_detect_loader_vanilla_returns_none() {
         let d = deps(&[("minecraft", "1.20.4")]);
         let result = detect_loader(&d);
-        assert!(result.is_none(), "vanilla pack — no loader install step");
+        assert!(result.is_none(), "vanilla pack -- no loader install step");
     }
 
     // 5. strip_leading_dot_slash ──────────────────────────────────────────────
@@ -422,7 +422,7 @@ mod tests {
     fn test_strip_leading_dot_slash() {
         assert_eq!(strip_leading_dot_slash("./mods/foo.jar"), "mods/foo.jar");
         assert_eq!(strip_leading_dot_slash("mods/foo.jar"), "mods/foo.jar");
-        // Traversal attempt — strip only removes the leading "./"; the result
+        // Traversal attempt -- strip only removes the leading "./"; the result
         // still contains ".." which the path-guard will reject separately.
         assert_eq!(
             strip_leading_dot_slash("./../../etc/passwd"),

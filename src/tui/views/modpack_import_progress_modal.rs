@@ -1,4 +1,4 @@
-//! Modpack import progress modal — step status + LineGauge + log-tail + cancel hint.
+//! Modpack import progress modal -- step status + LineGauge + log-tail + cancel hint.
 //!
 //! Verbatim adaptation of `loader_install_progress_modal.rs` with field-name
 //! substitutions: `modpack_name` replaces `slug+loader+version`, same

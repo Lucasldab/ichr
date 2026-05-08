@@ -1,4 +1,4 @@
-//! Pack service façade — composes Modrinth client + ledger ops for resource
+//! Pack service façade -- composes Modrinth client + ledger ops for resource
 //! packs and shader packs. Mirrors `src/mods/service.rs::ModrinthService`
 //! field-for-field with PackKind parametrization.
 //!
@@ -6,7 +6,7 @@
 //! parameterized by PackKind on every method.
 //!
 //! Pitfall 1: DO NOT delegate toggle/uninstall to `src/mods/ledger::toggle_enabled`
-//! or `src/mods/ledger::uninstall` — those functions hardcode the `mods/`
+//! or `src/mods/ledger::uninstall` -- those functions hardcode the `mods/`
 //! subdirectory. We rebuild toggle + uninstall inline using `instance_packs_dir`.
 //!
 //! Pitfall 2: DO NOT call `is_safe_mod_filename` anywhere in this file.
@@ -52,7 +52,7 @@ fn is_acceptable_pack_url(url: &str) -> bool {
 
 /// Map PackKind discriminator → ledger InstalledItemKind discriminator.
 ///
-/// Internal helper — keeps the kind ↔ item_kind mapping in one place so the
+/// Internal helper -- keeps the kind ↔ item_kind mapping in one place so the
 /// ledger filter in `list_installed` and the row construction in
 /// `install_modrinth` agree.
 fn pack_kind_to_item_kind(kind: PackKind) -> InstalledItemKind {
@@ -108,7 +108,7 @@ impl PackService {
         paths: Option<&AppPaths>,
         slug: Option<&str>,
     ) -> Result<Vec<ModrinthSearchHit>, PackError> {
-        // D-LOCK: empty loaders slice — packs are not loader-specific.
+        // D-LOCK: empty loaders slice -- packs are not loader-specific.
         let mut hits = self
             .client
             .search_with_project_type(
@@ -120,7 +120,7 @@ impl PackService {
             )
             .await?;
 
-        // Stamp already_installed from the ledger (best-effort — if read fails, leave false).
+        // Stamp already_installed from the ledger (best-effort -- if read fails, leave false).
         // Filter by kind so a Mod row with the same project_id does not cause false positives.
         if let (Some(p), Some(s)) = (paths, slug) {
             if let Ok(led) = read_ledger(p, s).await {
@@ -253,12 +253,12 @@ impl PackService {
             p
         };
 
-        // Step 7 (Pitfall 3 — old instances): ensure dest dir exists.
+        // Step 7 (Pitfall 3 -- old instances): ensure dest dir exists.
         tokio::fs::create_dir_all(paths.instance_packs_dir(slug, kind))
             .await
             .map_err(PackError::Io)?;
 
-        // Step 8: streaming download + SHA-1 verify (inline — Pitfall 2).
+        // Step 8: streaming download + SHA-1 verify (inline -- Pitfall 2).
         let resp = self
             .client
             .http()
@@ -294,7 +294,7 @@ impl PackService {
             }
             buf.extend_from_slice(&chunk);
 
-            // Per-chunk progress emit (single-file install — completed=0, total=1).
+            // Per-chunk progress emit (single-file install -- completed=0, total=1).
             let intra_pct: u64 = if file.size == 0 {
                 100
             } else {
@@ -430,7 +430,7 @@ impl PackService {
             });
         }
 
-        // Use instance_packs_dir (NOT mods_dir) — Pitfall 1.
+        // Use instance_packs_dir (NOT mods_dir) -- Pitfall 1.
         let packs_dir = paths.instance_packs_dir(slug, kind);
         let (current_path, new_path) = if row.enabled {
             (
@@ -464,7 +464,7 @@ impl PackService {
     ///
     /// Defensive behavior: if the file is already missing (user manually
     /// deleted), drops the ledger row anyway (mirrors `src/mods/ledger::uninstall`
-    /// NotFound-tolerance, but uses `instance_packs_dir` — Pitfall 1).
+    /// NotFound-tolerance, but uses `instance_packs_dir` -- Pitfall 1).
     #[tracing::instrument(skip_all, fields(slug = %slug, kind = ?kind, mod_id = %mod_id))]
     pub async fn uninstall_pack(
         &self,
@@ -485,7 +485,7 @@ impl PackService {
             .ok_or_else(|| PackError::Modrinth(ModrinthError::ModNotFound(mod_id.to_string())))?
             .clone();
 
-        // Use instance_packs_dir (NOT mods_dir) — Pitfall 1.
+        // Use instance_packs_dir (NOT mods_dir) -- Pitfall 1.
         let packs_dir = paths.instance_packs_dir(slug, kind);
         let target = if row.enabled {
             packs_dir.join(&row.file_name)
@@ -669,7 +669,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_omits_loader_filter() {
-        // MockServer rejects requests whose facets contain "categories:" — would fire
+        // MockServer rejects requests whose facets contain "categories:" -- would fire
         // if a loader filter was added.
         let server = MockServer::start();
         let m = server.mock(|when, then| {
@@ -729,7 +729,7 @@ mod tests {
         )
         .await
         .unwrap();
-        // Shader row for a DIFFERENT project — confirms kind filter works.
+        // Shader row for a DIFFERENT project -- confirms kind filter works.
         upsert_pack(
             &paths,
             "inst",
@@ -740,7 +740,7 @@ mod tests {
 
         let svc = PackService::with_client(make_client(&server));
 
-        // Search for Resource packs — RPID1 should be already_installed.
+        // Search for Resource packs -- RPID1 should be already_installed.
         let hits = svc
             .search(
                 "faithful",
@@ -757,7 +757,7 @@ mod tests {
             "ResourcePack row should mark RPID1 as installed"
         );
 
-        // Search for Shader packs — RPID1 is a ResourcePack row, NOT a Shader row.
+        // Search for Shader packs -- RPID1 is a ResourcePack row, NOT a Shader row.
         // Even though the search returns the same hit (mock always returns RPID1),
         // the kind filter must prevent the ResourcePack row from marking it as installed.
         let hits2 = svc
@@ -836,7 +836,7 @@ mod tests {
                 .body(json!({"hits":[],"offset":0,"limit":20,"total_hits":0}).to_string());
         });
         let svc = PackService::with_client(make_client(&server));
-        // mc = None, kind = Resource — project_type facet MUST still be sent.
+        // mc = None, kind = Resource -- project_type facet MUST still be sent.
         let _ = svc
             .search("x", PackKind::Resource, None, None, None)
             .await
@@ -1043,7 +1043,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_install_modrinth_rejects_zip_filename_via_pack_validator() {
-        // MockServer should receive 0 requests — unsafe filename rejected before HTTP.
+        // MockServer should receive 0 requests -- unsafe filename rejected before HTTP.
         let server = MockServer::start();
         let m = server.mock(|when, then| {
             when.method(GET);
@@ -1083,7 +1083,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_install_modrinth_creates_dest_dir_defensively() {
-        // Instance dir tree is missing resourcepacks/ — install should still succeed.
+        // Instance dir tree is missing resourcepacks/ -- install should still succeed.
         let server = MockServer::start();
         let body = b"pack-content";
         let sha1 = sha1_of(body);
@@ -1126,7 +1126,7 @@ mod tests {
     async fn test_install_modrinth_atomicity_upsert_before_rename() {
         // Simulate rename failure by pre-creating a directory at the final path.
         // After the failed install, the ledger row MUST still be present (upsert
-        // happened before rename — Pitfall 8).
+        // happened before rename -- Pitfall 8).
         let server = MockServer::start();
         let body = b"pack-data";
         let sha1 = sha1_of(body);
@@ -1167,7 +1167,7 @@ mod tests {
         assert!(result.is_err(), "expected error due to rename conflict");
 
         // But ledger row MUST be present (upsert happened before rename).
-        // project_id passed is "CONFLICT-PID" — that becomes row.mod_id.
+        // project_id passed is "CONFLICT-PID" -- that becomes row.mod_id.
         let ledger = crate::mods::ledger::read_ledger(&paths, "inst")
             .await
             .unwrap();

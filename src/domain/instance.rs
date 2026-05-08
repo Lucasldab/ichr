@@ -54,7 +54,7 @@ pub struct InstanceManifest {
     /// Human-readable name as entered by the user (UI surface).
     pub display_name: String,
 
-    /// Filesystem-safe identifier. Stable after creation — rename does NOT mutate slug.
+    /// Filesystem-safe identifier. Stable after creation -- rename does NOT mutate slug.
     pub slug: String,
 
     /// Minecraft version id, e.g. "1.21.4".
@@ -112,7 +112,7 @@ impl InstanceManifest {
     }
 }
 
-/// RFC3339/ISO-8601 UTC "2026-04-20T09:00:00Z" — seconds precision is enough.
+/// RFC3339/ISO-8601 UTC "2026-04-20T09:00:00Z" -- seconds precision is enough.
 pub(crate) fn now_iso8601_utc() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let secs = SystemTime::now()

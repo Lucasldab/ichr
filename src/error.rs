@@ -32,7 +32,7 @@ pub enum AppError {
     /// supplying these fields; if the vanilla parent is itself missing the field
     /// (truncated install, hand-rolled JSON, future Mojang format change) we
     /// surface a typed error instead of panicking on `.unwrap()`.
-    #[error("version `{version_id}` and its inheritsFrom chain do not declare required field `{field}` (Fabric/Quilt loaders inherit this from vanilla — install the parent vanilla version first)")]
+    #[error("version `{version_id}` and its inheritsFrom chain do not declare required field `{field}` (Fabric/Quilt loaders inherit this from vanilla -- install the parent vanilla version first)")]
     InheritsFromMissingRequired { field: String, version_id: String },
 
     #[error("HTTP error: {0}")]
@@ -57,18 +57,18 @@ pub enum AppError {
     #[error("Launch failed (exit code {code}): {message}")]
     LaunchFailed { code: i32, message: String },
 
-    #[error("Version not installed for instance {slug} — run install first")]
+    #[error("Version not installed for instance {slug} -- run install first")]
     VersionNotInstalled { slug: String },
 
     #[error("Java binary not found: checked ICHR_JAVA env var and PATH")]
     JavaNotFound,
 
     #[error(
-        "Java override path does not exist: {path:?} — fix or clear instance.json `java_override`"
+        "Java override path does not exist: {path:?} -- fix or clear instance.json `java_override`"
     )]
     JavaOverrideNotFound { path: std::path::PathBuf },
 
-    #[error("Java major version mismatch: Minecraft requires Java {required}, found Java {found} at {path:?} — {hint}")]
+    #[error("Java major version mismatch: Minecraft requires Java {required}, found Java {found} at {path:?} -- {hint}")]
     JavaMismatch {
         required: u32,
         found: u32,
@@ -100,7 +100,7 @@ pub enum AppError {
     #[error("Modpack error: {0}")]
     Modpack(#[from] crate::modpack::error::ModpackError),
 
-    #[error("No active account — add a Microsoft account or launch in offline mode")]
+    #[error("No active account -- add a Microsoft account or launch in offline mode")]
     NoActiveAccount,
 }
 

@@ -211,7 +211,7 @@ fn merge(parent: VersionJson, child: VersionJson) -> VersionJson {
         time: child.time,
         arguments,
         minecraft_arguments: child.minecraft_arguments.or(parent.minecraft_arguments),
-        inherits_from: None, // resolved chain — no further parent
+        inherits_from: None, // resolved chain -- no further parent
     }
 }
 
@@ -224,7 +224,7 @@ mod tests {
     use crate::error::AppError;
     use std::collections::HashMap;
 
-    /// Build a VersionJson for tests via JSON parsing — mirrors the pattern
+    /// Build a VersionJson for tests via JSON parsing -- mirrors the pattern
     /// in `tests/mojang_protocol.rs::vjson_stub` but local to this file (no
     /// cross-crate test-helper coupling). Includes the demoted fields by
     /// default; helpers below override them to None as needed for loader
@@ -254,7 +254,7 @@ mod tests {
 
     /// Real Fabric/Quilt loader on-disk JSON shape: NO assetIndex, NO assets,
     /// NO downloads, NO javaVersion, NO logging. Has inheritsFrom set.
-    /// This is the production-shape fixture — DO NOT add the demoted fields
+    /// This is the production-shape fixture -- DO NOT add the demoted fields
     /// to it. If a test fails because parse rejects this shape, the fix is
     /// the type system (Option-demote those fields), NOT fattening the
     /// fixture. See plan 08.3-01 explicit forbid for the rationale.
@@ -275,22 +275,22 @@ mod tests {
     }
 
     /// GAP-LAUNCH-PARSE-08 regression (Phase 8.3 round-3 BLOCKER):
-    /// production-shaped loader JSON (NO assetIndex/assets/downloads — those
+    /// production-shaped loader JSON (NO assetIndex/assets/downloads -- those
     /// are inherited from vanilla via `inheritsFrom`) MUST resolve cleanly
     /// when the vanilla parent is in the parents map.
     #[test]
     fn test_resolve_inherits_loader_shape_hydrates_from_vanilla_parent() {
-        // Loader child — production shape: no assetIndex/assets/downloads.
+        // Loader child -- production shape: no assetIndex/assets/downloads.
         let loader = loader_vjson("fabric-loader-0.19.2-1.20.4", "1.20.4");
         assert!(
             loader.asset_index.is_none(),
-            "loader_vjson fixture must lack asset_index — this proves the test fixture matches \
+            "loader_vjson fixture must lack asset_index -- this proves the test fixture matches \
              production loader JSONs on disk (NOT the 8.2-01 fattened shape)"
         );
         assert!(loader.assets.is_none());
         assert!(loader.downloads.is_none());
 
-        // Vanilla parent — has the demoted fields.
+        // Vanilla parent -- has the demoted fields.
         let vanilla = vjson("1.20.4");
         assert!(
             vanilla.asset_index.is_some(),
@@ -303,16 +303,16 @@ mod tests {
         let resolved = resolve_inherits(&loader, &parents)
             .expect("loader+vanilla merge must produce ResolvedVersion");
 
-        // ResolvedVersion fields are non-Option — they're hydrated from the parent.
+        // ResolvedVersion fields are non-Option -- they're hydrated from the parent.
         assert_eq!(
             resolved.asset_index.id, "x",
             "asset_index hydrated from vanilla parent"
         );
         assert_eq!(resolved.assets, "x", "assets hydrated from vanilla parent");
 
-        // id remains the loader id (MultiMC convention — used in ${version_name})
+        // id remains the loader id (MultiMC convention -- used in ${version_name})
         assert_eq!(resolved.id, "fabric-loader-0.19.2-1.20.4");
-        // root_id is the vanilla MC id (where the JAR lives on disk —
+        // root_id is the vanilla MC id (where the JAR lives on disk --
         // SECONDARY-BUG-FIX surface area)
         assert_eq!(resolved.root_id, "1.20.4");
         // mainClass: child wins
@@ -367,7 +367,7 @@ mod tests {
     #[test]
     fn test_resolve_inherits_errors_when_required_field_missing_from_chain() {
         // A vanilla-id parent with `inherits_from: None` but ALSO missing
-        // asset_index/assets/downloads — the degenerate case (truncated
+        // asset_index/assets/downloads -- the degenerate case (truncated
         // install / hand-rolled JSON) the typed error variant exists for.
         let mut bare_parent = vjson("bare-parent");
         bare_parent.asset_index = None;

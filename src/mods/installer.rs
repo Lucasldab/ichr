@@ -346,7 +346,7 @@ pub async fn download_one_with_hash_algo(
     // Important: `sha1` 0.10 uses `digest` 0.10 while `sha2` 0.11 uses `digest`
     // 0.11. The two `Digest` traits coexist but cannot be unified across crates,
     // so we call them independently. The module-level
-    // `use sha2::{Digest, Sha512}` puts `sha2::Digest` (digest 0.11) in scope —
+    // `use sha2::{Digest, Sha512}` puts `sha2::Digest` (digest 0.11) in scope --
     // sha2 hashers (Sha512, Sha256) work directly. For Sha1 we scope-import
     // `sha1::Digest` inside the arm so its method resolution wins locally.
     let got = match hash_algo {

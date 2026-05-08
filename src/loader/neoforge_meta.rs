@@ -1,14 +1,14 @@
 //! NeoForge meta API HTTP client.
 //!
-//! Endpoints (verified 2026-05-07 — see 07-RESEARCH.md §Errata, GAP-7-B):
+//! Endpoints (verified 2026-05-07 -- see 07-RESEARCH.md §Errata, GAP-7-B):
 //!   GET https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge
 //!     → JSON: {"isSnapshot": bool, "versions": [String, ...]}
 //!   GET https://maven.neoforged.net/releases/net/neoforged/neoforge/{v}/neoforge-{v}-installer.jar
-//!     → Installer JAR (different base — the maven-files repo, not the JSON-API)
+//!     → Installer JAR (different base -- the maven-files repo, not the JSON-API)
 //!
 //! Override base URLs for tests via:
-//!   - `ICHR_NEOFORGE_MAVEN_BASE_URL`        (JSON-API base — list_loader_versions)
-//!   - `ICHR_NEOFORGE_MAVEN_FILES_BASE_URL`  (maven-files base — installer_url)
+//!   - `ICHR_NEOFORGE_MAVEN_BASE_URL`        (JSON-API base -- list_loader_versions)
+//!   - `ICHR_NEOFORGE_MAVEN_FILES_BASE_URL`  (maven-files base -- installer_url)
 //!
 //! Why dual bases: the version listing endpoint and the installer JAR live at
 //! different roots on `maven.neoforged.net`. Phase 7 originally assumed they
@@ -29,12 +29,12 @@ use std::time::Duration;
 use crate::loader::error::LoaderError;
 use crate::loader::types::LoaderVersionEntry;
 
-/// JSON-API base URL — used by `list_loader_versions`.
+/// JSON-API base URL -- used by `list_loader_versions`.
 pub const DEFAULT_NEOFORGE_MAVEN_BASE: &str =
     "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge";
 pub const NEOFORGE_MAVEN_BASE_URL_ENV: &str = "ICHR_NEOFORGE_MAVEN_BASE_URL";
 
-/// Maven-FILES base URL — used by `installer_url` only. Distinct from the
+/// Maven-FILES base URL -- used by `installer_url` only. Distinct from the
 /// JSON-API base above because the version listing endpoint and the installer
 /// JAR live in different parts of the `maven.neoforged.net` layout.
 pub const DEFAULT_NEOFORGE_MAVEN_FILES_BASE: &str =
@@ -53,7 +53,7 @@ pub const NEOFORGE_MAVEN_FILES_BASE_URL_ENV: &str = "ICHR_NEOFORGE_MAVEN_FILES_B
 /// - `"1.20.1"` → `Some("20.1.")`
 /// - `"2.0"`    → `None`          NeoForge only exists for the `1.x` line
 ///
-/// Pitfall 8: never split by `"."` beyond the first strip — NeoForge betas
+/// Pitfall 8: never split by `"."` beyond the first strip -- NeoForge betas
 /// have 4 segments (e.g., `"21.4.114-beta"` or `"26.1.2.41-beta"`); a plain
 /// prefix match handles them correctly.
 pub fn mc_to_neoforge_prefix(mc_version: &str) -> Option<String> {
@@ -61,7 +61,7 @@ pub fn mc_to_neoforge_prefix(mc_version: &str) -> Option<String> {
     Some(format!("{stripped}.")) // "21.4."
 }
 
-/// Stability heuristic — string-only check (Pitfall 8: never split by `.`).
+/// Stability heuristic -- string-only check (Pitfall 8: never split by `.`).
 ///
 /// A NeoForge version is considered stable when its version string contains
 /// none of the pre-release markers: `beta`, `rc`, `pre`, `alpha`
@@ -82,9 +82,9 @@ pub fn is_neoforge_stable(version: &str) -> bool {
 #[derive(Debug, Clone)]
 pub struct NeoForgeMetaClient {
     http: reqwest::Client,
-    /// JSON-API base — GET `{json_api_base}` returns the version list.
+    /// JSON-API base -- GET `{json_api_base}` returns the version list.
     json_api_base: String,
-    /// Maven-files base — used to construct installer JAR URLs.
+    /// Maven-files base -- used to construct installer JAR URLs.
     maven_files_base: String,
 }
 
@@ -149,16 +149,16 @@ impl NeoForgeMetaClient {
             None => return Ok(Vec::new()),
         };
 
-        // The JSON-API base IS the endpoint URL — no path suffix. Trim a
+        // The JSON-API base IS the endpoint URL -- no path suffix. Trim a
         // trailing `/` so a base configured as `.../neoforge/` (with slash)
         // and `.../neoforge` (without) both work.
         let url = self.json_api_base.trim_end_matches('/').to_string();
 
-        // Private DTO for transport — not part of the module's public API.
+        // Private DTO for transport -- not part of the module's public API.
         // `isSnapshot` is camelCase in the upstream payload; map explicitly via
-        // `#[serde(rename)]` (no `rename_all` magic — see Phase 7.1-01 plan
+        // `#[serde(rename)]` (no `rename_all` magic -- see Phase 7.1-01 plan
         // "Explicit Forbids" §2). Without `#[serde(default)]` a missing field
-        // surfaces as a parse error — that's the contract: `isSnapshot` is
+        // surfaces as a parse error -- that's the contract: `isSnapshot` is
         // REQUIRED by upstream and a future schema drift MUST fail loudly.
         #[derive(serde::Deserialize)]
         struct VersionsResponse {
@@ -219,7 +219,7 @@ mod tests {
     //! Tests for `NeoForgeMetaClient`.
     //!
     //! The JSON fixture `tests/fixtures/neoforge_meta_versions.json` is a
-    //! BYTE-EQUIVALENT capture of the production response — DO NOT hand-edit.
+    //! BYTE-EQUIVALENT capture of the production response -- DO NOT hand-edit.
     //! If the upstream JSON shape changes, RECAPTURE via:
     //!
     //! ```bash
@@ -237,7 +237,7 @@ mod tests {
     /// Byte-equivalent capture of the production NeoForge JSON-API response.
     /// Captured 2026-05-07. Trimmed to 18 entries covering every prefix Phase 7
     /// uses (20.2.x, 21.0.x, 21.1.x, 21.4.x) plus the 4-segment beta family
-    /// (26.1.x.x including `26.1.2.41-beta` — Pitfall 8 anchor).
+    /// (26.1.x.x including `26.1.2.41-beta` -- Pitfall 8 anchor).
     const NEOFORGE_META_JSON: &str =
         include_str!("../../tests/fixtures/neoforge_meta_versions.json");
 
@@ -312,7 +312,7 @@ mod tests {
     async fn test_list_loader_versions_filters_by_mc_prefix() {
         let server = MockServer::start();
         // The JSON-API base IS the endpoint URL (no path suffix). httpmock
-        // serves the body for any GET request — production uses one URL, so
+        // serves the body for any GET request -- production uses one URL, so
         // a path-agnostic mock matches the production request.
         server.mock(|when, then| {
             when.method(GET);
@@ -376,7 +376,7 @@ mod tests {
         });
 
         let client = make_client(&server);
-        // "1.99.0" is unknown — prefix "99.0." — no fixture entries match
+        // "1.99.0" is unknown -- prefix "99.0." -- no fixture entries match
         let versions = client.list_loader_versions("1.99.0").await.expect("ok");
         assert!(
             versions.is_empty(),
@@ -399,7 +399,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_installer_url_format() {
-        // Pure-function test — no HTTP mock needed. installer_url builds from
+        // Pure-function test -- no HTTP mock needed. installer_url builds from
         // the maven-files base, which `new_with_base_url` sets to the same
         // value as the JSON-API base for back-compat.
         let client = NeoForgeMetaClient::new_with_base_url(
@@ -498,7 +498,7 @@ mod tests {
     #[allow(non_snake_case)]
     async fn test_list_loader_versions_rejects_missing_isSnapshot_field() {
         // Inverse canary: a server returning a body that OMITS `isSnapshot`
-        // MUST surface as a parse error — we want to know if upstream stops
+        // MUST surface as a parse error -- we want to know if upstream stops
         // sending the field, not silently pretend it's `false`. The transport
         // DTO has NO `#[serde(default)]` on `is_snapshot` for exactly this
         // reason: missing field = loud failure.

@@ -9,14 +9,14 @@ use crate::domain::platform::{Arch, OsName};
 use crate::error::AppError;
 
 // ---------------------------------------------------------------------------
-// Platform key mapping — Mojang JRE all.json
+// Platform key mapping -- Mojang JRE all.json
 // ---------------------------------------------------------------------------
 
 /// Map `(OsName, Arch)` → Mojang `all.json` top-level platform key, or `None`
 /// if Mojang has no entry for the platform (caller falls through to Adoptium).
 ///
 /// Verified against <https://piston-meta.mojang.com/v1/products/java-runtime/…/all.json>
-/// (2026-04-20). Mojang has NO `linux-arm64` / `linux-aarch64` key — Aarch64 Linux
+/// (2026-04-20). Mojang has NO `linux-arm64` / `linux-aarch64` key -- Aarch64 Linux
 /// must fall back to Adoptium.
 pub fn mojang_platform_key(os: OsName, arch: Arch) -> Option<&'static str> {
     match (os, arch) {
@@ -98,7 +98,7 @@ pub fn parse_java_major(stderr: &str) -> Option<u32> {
 ///
 /// Note on forward-compatibility (Assumption A4 from research): newer Java is
 /// accepted for all vanilla MC versions. Modded 1.12.x on Java 21 may need
-/// additional `--add-opens` JVM flags — that is handled in a future modloader
+/// additional `--add-opens` JVM flags -- that is handled in a future modloader
 /// phase, not here.
 pub fn validate_java_major(found: u32, required: u32, java_path: &Path) -> Result<(), AppError> {
     if found < required {

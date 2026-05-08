@@ -6,15 +6,15 @@ use embed_manifest::new_manifest;
 /// Builder-contract test: `new_manifest()` defaults must keep
 /// `long_path_aware` enabled. If embed-manifest 2.x changes this default,
 /// our `build.rs` becomes a silent no-op for the Windows manifest's most
-/// important capability — this test catches that drift.
+/// important capability -- this test catches that drift.
 ///
 /// embed-manifest 1.5's `ManifestBuilder` and its inner `WindowsSettings`
 /// both derive `Debug`. The nested `WindowsSettings` field stores
-/// `long_path_aware` as a `bool` (NOT a `Setting` enum — the public
+/// `long_path_aware` as a `bool` (NOT a `Setting` enum -- the public
 /// `long_path_aware(Setting)` setter converts via `.enabled()`). The
 /// Debug representation of a default-constructed builder therefore
 /// contains the literal substring `long_path_aware: true`. We pin
-/// EXACTLY that — if the field name changes OR if the default flips
+/// EXACTLY that -- if the field name changes OR if the default flips
 /// to `false`, this test fails loudly.
 #[test]
 fn embed_manifest_defaults_enable_long_path_aware() {
@@ -41,7 +41,7 @@ fn embed_manifest_defaults_enable_long_path_aware() {
 fn build_rs_is_no_op_on_linux() {
     // CARGO_CFG_WINDOWS is set ONLY during build script compilation
     // for Windows targets. Tests do not see it. Asserting `is_none()`
-    // here is therefore a tautology under `cargo test` on Linux — the
+    // here is therefore a tautology under `cargo test` on Linux -- the
     // POINT of the test is that this file COMPILES at all on Linux,
     // which proves embed-manifest's dev-dep is reachable on non-Windows
     // hosts (it has no platform-specific build deps that fail to
@@ -54,14 +54,14 @@ fn build_rs_is_no_op_on_linux() {
 
 /// Windows-host smoke: after `cargo build --release` on Windows, the
 /// expected binary path exists. PE manifest section verification is
-/// part of HUMAN-UAT (12-HUMAN-UAT.md step 1) — too heavy for an
+/// part of HUMAN-UAT (12-HUMAN-UAT.md step 1) -- too heavy for an
 /// integration test. This test only confirms the build pipeline
 /// produces a binary at the conventional location.
 #[cfg(target_os = "windows")]
 #[test]
 fn built_exe_path_exists_after_release_build() {
     // Locate the workspace target/ directory via cargo's standard
-    // layout. We accept either debug or release path — the goal is to
+    // layout. We accept either debug or release path -- the goal is to
     // prove the .exe exists, not which profile produced it.
     let target_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target");
     let candidates = [

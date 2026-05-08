@@ -9,9 +9,9 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum JavaRuntimeId {
-    /// Mojang-managed JRE — `variant` is the `component` string from
+    /// Mojang-managed JRE -- `variant` is the `component` string from
     /// `VersionJson.java_version.component` (e.g. "java-runtime-delta").
-    /// The variant list grows over time — never hardcode it.
+    /// The variant list grows over time -- never hardcode it.
     Mojang { variant: String },
     /// Adoptium JRE keyed on Java major version (8, 17, 21, 25, ...).
     Adoptium { major: u32 },

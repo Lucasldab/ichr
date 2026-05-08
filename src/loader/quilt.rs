@@ -1,14 +1,14 @@
 //! Quilt meta API HTTP client.
 //!
-//! Endpoints (verified 2026-04-26 — see 06-RESEARCH.md §API Reference):
+//! Endpoints (verified 2026-04-26 -- see 06-RESEARCH.md §API Reference):
 //!   GET /v3/versions/loader
 //!   GET /v3/versions/loader/{game_version}/{loader_version}/profile/json
 //!
 //! Differences from Fabric:
 //! - Path prefix is `/v3/` not `/v2/`.
-//! - Loader list has NO `stable` boolean — derive from version string
+//! - Loader list has NO `stable` boolean -- derive from version string
 //!   (presence of `"beta"`, `"rc"`, or `"pre"` => pre-release).
-//! - Profile JSON libraries are `{name, url}` only — no hash fields.
+//! - Profile JSON libraries are `{name, url}` only -- no hash fields.
 //!
 //! Override the base URL for tests via `ICHR_QUILT_META_BASE_URL`.
 
@@ -35,7 +35,7 @@ struct QuiltLoaderItem {
 
 // LoaderLibrary is the canonical shared type defined in src/loader/types.rs
 // by 06-01. Quilt parses every hash field (sha1/sha256/sha512/md5) as None
-// — asserted by test_fetch_profile_no_hashes_on_libraries (06-04-01).
+// -- asserted by test_fetch_profile_no_hashes_on_libraries (06-04-01).
 
 /// Parsed Quilt loader profile. `raw_bytes` is the verbatim API response,
 /// written verbatim to disk by 06-05 to preserve any future fields.
@@ -189,10 +189,10 @@ impl QuiltMetaClient {
 }
 
 // -----------------------------------------------------------------------
-// to_mojang_shape — translate quilt-meta wire shape to Mojang on-disk shape.
+// to_mojang_shape -- translate quilt-meta wire shape to Mojang on-disk shape.
 //
 // Phase 8.4 (round-4 BLOCKER closure GAP-LIBRARY-SHAPE-08). Quilt-meta
-// library entries are uniformly {name, url} (no upstream hashes — verified
+// library entries are uniformly {name, url} (no upstream hashes -- verified
 // by test_fetch_profile_no_hashes_on_libraries / Pattern 6). The translated
 // entries emit downloads.artifact.sha1 = None and .size = None; the
 // launcher's LibraryArtifact has those fields as Option<_> per 8.4.
@@ -252,7 +252,7 @@ pub fn to_mojang_shape(raw_bytes: &[u8]) -> Result<Vec<u8>, LoaderError> {
             .unwrap_or_else(|| quilt_default_repo(&name).to_string());
         let url = crate::loader::maven::maven_download_url(&repo, &name)?;
 
-        // Quilt-meta does not carry sha1/size — but tolerate them anyway
+        // Quilt-meta does not carry sha1/size -- but tolerate them anyway
         // (forward-compat if Quilt ever adds them).
         let sha1 = entry_obj
             .get("sha1")
@@ -326,7 +326,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_loader_versions_derives_stable_from_version_string() {
         let server = MockServer::start();
-        // Quilt API has NO stable field — only version + build.
+        // Quilt API has NO stable field -- only version + build.
         let body = r#"[
             {"version":"0.30.0-beta.7","maven":"org.quiltmc:quilt-loader:0.30.0-beta.7","build":120,"separator":"-"},
             {"version":"0.27.2","maven":"org.quiltmc:quilt-loader:0.27.2","build":50,"separator":"."}
@@ -520,7 +520,7 @@ mod tests {
                 .artifact
                 .as_ref()
                 .unwrap_or_else(|| panic!("library {} must have artifact", lib.name));
-            // Quilt has NO upstream hashes — sha1 + size MUST be None.
+            // Quilt has NO upstream hashes -- sha1 + size MUST be None.
             assert!(art.sha1.is_none(), "quilt {} sha1 must be None", lib.name);
             assert!(art.size.is_none(), "quilt {} size must be None", lib.name);
             // path + url are still populated.

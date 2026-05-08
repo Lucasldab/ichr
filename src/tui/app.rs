@@ -68,13 +68,13 @@ pub enum ActiveView {
         current: String,
         original: String,
     },
-    /// Inline group editor (INST-06 — mirrors RenameInline).
+    /// Inline group editor (INST-06 -- mirrors RenameInline).
     GroupInline {
         slug: String,
         buffer: String,
         original: Option<String>,
     },
-    /// Launch-failed modal — shown when Action::LaunchFailed is dispatched.
+    /// Launch-failed modal -- shown when Action::LaunchFailed is dispatched.
     /// Esc dismisses and returns to InstanceList.
     LaunchFailedModal {
         slug: String,
@@ -93,7 +93,7 @@ pub enum ActiveView {
         expires_at: Instant,
         stage: String,
     },
-    /// AUTH-02 error modal (e.g., "No Xbox profile — visit xbox.com/profile").
+    /// AUTH-02 error modal (e.g., "No Xbox profile -- visit xbox.com/profile").
     AccountAuthFailed {
         reason: String,
     },
@@ -218,11 +218,11 @@ pub enum ActiveView {
         version_label: String,
         error: String,
         log_tail: String,
-        /// Where to return after dismissal — depends on which view triggered the install.
+        /// Where to return after dismissal -- depends on which view triggered the install.
         return_to: ModInstallFailedReturnTo,
     },
 
-    // ── Phase 9 (CurseForge Integration) — see 09-RESEARCH.md §TUI Integration Plumbing ──
+    // ── Phase 9 (CurseForge Integration) -- see 09-RESEARCH.md §TUI Integration Plumbing ──
     /// Phase 9 (MOD-03): full-screen split-pane CurseForge mod browser.
     /// Mirrors Phase 8's `ModBrowser` shape but binds CurseForge wire types.
     /// Rendered by `src/tui/views/cf_browser.rs` (added in 09-07).
@@ -231,7 +231,7 @@ pub enum ActiveView {
         search_input: String,
         results: Vec<crate::mods::curseforge::types::CurseForgeSearchHit>,
         selected: usize,
-        /// Reused from Phase 8 — Loading / Ready / Error(String).
+        /// Reused from Phase 8 -- Loading / Ready / Error(String).
         fetch_state: crate::mods::types::ModBrowserFetchState,
         /// None = use instance MC; Some("any") = no MC filter; Some(version) = explicit.
         mc_filter: Option<String>,
@@ -250,7 +250,7 @@ pub enum ActiveView {
         files: Vec<crate::mods::curseforge::types::CurseForgeFileEntry>,
         selected: usize,
     },
-    /// Phase 9 (MOD-04): error modal shown when an install fails — most importantly
+    /// Phase 9 (MOD-04): error modal shown when an install fails -- most importantly
     /// the FileNotDownloadable case where `web_url` is `Some(url)` so the modal
     /// can render an "Open in browser:" line. Per 09-RESEARCH.md §"downloadUrl
     /// null UX" lines 252-289.
@@ -259,11 +259,11 @@ pub enum ActiveView {
         mod_title: String,
         file_label: String,
         error_message: String,
-        /// Some(url) iff the failure is FileNotDownloadable — render the link.
+        /// Some(url) iff the failure is FileNotDownloadable -- render the link.
         web_url: Option<String>,
     },
 
-    // ── Phase 10 (Modpack Import) — see 10-PATTERNS.md ──
+    // ── Phase 10 (Modpack Import) -- see 10-PATTERNS.md ──
     /// Phase 10 (PACK-01): centered text-entry modal for path to .mrpack.
     /// Rendered by `src/tui/views/modpack_import_path_modal.rs`.
     ModpackImportPathInput {
@@ -351,7 +351,7 @@ pub enum JavaPickerRow {
 /// A row in the loader picker modal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LoaderPickerRow {
-    /// No loader (vanilla — clears installed loader if any).
+    /// No loader (vanilla -- clears installed loader if any).
     None,
     /// Open the Fabric version picker.
     Fabric,
@@ -400,7 +400,7 @@ pub struct AppState {
     /// Phase 9 (MOD-03): true iff a CurseForge API key was resolved at startup.
     /// Set by 09-07 in `run.rs` from `cf_service.api_key_present()`. Read by
     /// the `OpenCfBrowser` arm to silently no-op the F keybind when no key is
-    /// configured (Pitfall 1 surface — 09-RESEARCH.md §"Keybind guard").
+    /// configured (Pitfall 1 surface -- 09-RESEARCH.md §"Keybind guard").
     pub cf_api_key_present: bool,
     /// Phase 10: tracks slug → CancellationToken for an in-progress modpack import.
     /// Single-entry in v1 (only one modpack import runs at a time); HashMap shape
@@ -436,7 +436,7 @@ pub enum Action {
 
     // Create flow
     TypeName(char),
-    /// Pasted text into the CreateModal name-input field — applies on
+    /// Pasted text into the CreateModal name-input field -- applies on
     /// terminals that emit `Event::Paste(String)` (bracketed-paste mode,
     /// enabled at terminal init in 08.1-04). Buffer-mutation only; no
     /// downstream effect (mirrors `TypeName` behaviour).
@@ -457,7 +457,7 @@ pub enum Action {
     ConfirmDelete,
     CancelDelete,
 
-    // Group editor (INST-06 — mirrors rename pattern)
+    // Group editor (INST-06 -- mirrors rename pattern)
     OpenGroupInput {
         slug: String,
         current: String,
@@ -493,7 +493,7 @@ pub enum Action {
         id: String,
     },
     CancelAddAccount,
-    /// Internal — stores the CancellationToken created by execute_effects for
+    /// Internal -- stores the CancellationToken created by execute_effects for
     /// the device-code auth task into state.add_account_cancel.
     AddAccountTokenCreated(CancellationToken),
 
@@ -552,13 +552,13 @@ pub enum Action {
     LoaderVersionSelect,
     /// Dismiss the loader version picker and return to loader picker.
     LoaderVersionPickerCancel,
-    /// Internal — emitted by execute_effects inside the spawned task body BEFORE
+    /// Internal -- emitted by execute_effects inside the spawned task body BEFORE
     /// calling install_loader. Inserts the CancellationToken into running_loader_installs.
     LoaderInstallStarted {
         slug: String,
         token: CancellationToken,
     },
-    /// Progress update from the install task — updates the progress modal fields.
+    /// Progress update from the install task -- updates the progress modal fields.
     LoaderInstallProgress {
         slug: String,
         pct: u8,
@@ -566,17 +566,17 @@ pub enum Action {
         bytes_done: u64,
         bytes_total: u64,
     },
-    /// Phase 7 (D-02): live log-tail line from the installer subprocess — updates
+    /// Phase 7 (D-02): live log-tail line from the installer subprocess -- updates
     /// `LoaderInstallProgressModal.log_tail` without touching the gauge percentage.
     LoaderInstallLogTail {
         slug: String,
         tail: String,
     },
-    /// Install completed successfully — clears running token, refreshes instances.
+    /// Install completed successfully -- clears running token, refreshes instances.
     LoaderInstalled {
         slug: String,
     },
-    /// Install failed — clears running token, transitions to failed modal.
+    /// Install failed -- clears running token, transitions to failed modal.
     LoaderInstallFailed {
         slug: String,
         loader: LoaderType,
@@ -600,7 +600,7 @@ pub enum Action {
     LaunchInstance {
         slug: String,
     },
-    /// Internal — emitted by execute_effects inside the spawned task body BEFORE
+    /// Internal -- emitted by execute_effects inside the spawned task body BEFORE
     /// calling launch_instance. Inserts the CancellationToken into running_instances.
     LaunchJobStarted {
         slug: String,
@@ -647,9 +647,9 @@ pub enum Action {
     },
     ServiceErrored(String),
 
-    // ── Phase 8 (Modrinth Integration) — see UI-SPEC §Keybind Contract ──
+    // ── Phase 8 (Modrinth Integration) -- see UI-SPEC §Keybind Contract ──
     // Mod browser
-    /// `M` keybind on InstanceList — opens the Modrinth mod browser for the
+    /// `M` keybind on InstanceList -- opens the Modrinth mod browser for the
     /// given instance. Pitfall 8 guard: silent no-op if a previous mod install
     /// for this slug is still in flight (`state.running_mod_jobs.contains_key`).
     OpenModBrowser {
@@ -670,20 +670,20 @@ pub enum Action {
     },
     /// Move the highlighted row in the ModBrowser results list (saturating).
     ModBrowserMove(isize),
-    /// Enter on a ModBrowser row — opens the version picker for the selected mod.
+    /// Enter on a ModBrowser row -- opens the version picker for the selected mod.
     ModBrowserOpenVersions,
-    /// `v` in ModBrowser — cycles MC filter (None ↔ Some("any")) and re-emits search.
+    /// `v` in ModBrowser -- cycles MC filter (None ↔ Some("any")) and re-emits search.
     ToggleModMcFilter,
-    /// `l` in ModBrowser — cycles loader filter (None ↔ Some("any")) and re-emits search.
+    /// `l` in ModBrowser -- cycles loader filter (None ↔ Some("any")) and re-emits search.
     ToggleModLoaderFilter,
-    /// Backspace in ModBrowser search input — pops last char, re-emits search if empty.
+    /// Backspace in ModBrowser search input -- pops last char, re-emits search if empty.
     ModBrowserBackspaceSearch,
-    /// Esc in ModBrowser — returns to InstanceList.
+    /// Esc in ModBrowser -- returns to InstanceList.
     ModBrowserCancel,
     /// Printable char into ModBrowser search input. j/k disambiguation lives in the
     /// keymap (08-08): when search is empty, j/k navigate; otherwise they type.
     ModBrowserTypeSearch(char),
-    /// Pasted text into ModBrowser search input — applies on terminals that
+    /// Pasted text into ModBrowser search input -- applies on terminals that
     /// emit `Event::Paste(String)` (bracketed-paste mode, enabled at terminal
     /// init in 08.1-04). Mirror of `ModBrowserTypeSearch(char)` but appends
     /// the full pasted string and re-emits the search effect once.
@@ -702,13 +702,13 @@ pub enum Action {
     },
     /// Move the highlighted version row (saturating).
     ModVersionPickerMove(isize),
-    /// Enter on a version row — fires `Effect::ResolveModDependencies`.
+    /// Enter on a version row -- fires `Effect::ResolveModDependencies`.
     ModVersionPickerSelect,
-    /// Esc on the version picker — returns to ModBrowser (preserves user's place).
+    /// Esc on the version picker -- returns to ModBrowser (preserves user's place).
     ModVersionPickerCancel,
 
     // Dep-confirm modal
-    /// Async result: BFS dep resolution finished — opens DepConfirmModal.
+    /// Async result: BFS dep resolution finished -- opens DepConfirmModal.
     ModDepsResolved {
         slug: String,
         project_id: String,
@@ -717,15 +717,15 @@ pub enum Action {
         version_label: String,
         graph: Box<ResolvedDepGraph>,
     },
-    /// `y`/`Y` on DepConfirmModal — fires `Effect::InstallModWithDeps` IFF
+    /// `y`/`Y` on DepConfirmModal -- fires `Effect::InstallModWithDeps` IFF
     /// `has_conflict == false`.
     ConfirmModInstall,
-    /// `n`/`Esc` on DepConfirmModal — returns to ModVersionPickerModal per
+    /// `n`/`Esc` on DepConfirmModal -- returns to ModVersionPickerModal per
     /// UI-SPEC line 597 (preserves user's place).
     CancelModInstall,
 
     // Install lifecycle
-    /// Internal — emitted by execute_effects inside the spawned task body BEFORE
+    /// Internal -- emitted by execute_effects inside the spawned task body BEFORE
     /// the install begins. Inserts the CancellationToken into running_mod_jobs.
     /// Mirrors `LoaderInstallStarted`.
     ModInstallStarted {
@@ -733,14 +733,14 @@ pub enum Action {
         project_id: String,
         token: CancellationToken,
     },
-    /// Install completed successfully — clears running_mod_jobs row AND walks the
+    /// Install completed successfully -- clears running_mod_jobs row AND walks the
     /// open ModBrowser results (if any) to stamp `already_installed = true` for
     /// the matching `project_id` (Pitfall 10 fix).
     ModInstalled {
         slug: String,
         project_id: String,
     },
-    /// Install failed — clears running_mod_jobs row, transitions to the failed modal.
+    /// Install failed -- clears running_mod_jobs row, transitions to the failed modal.
     ModInstallFailed {
         slug: String,
         mod_title: String,
@@ -748,12 +748,12 @@ pub enum Action {
         error: String,
         log_tail: String,
     },
-    /// Esc on ModInstallFailedModal — returns to whichever view triggered the install
+    /// Esc on ModInstallFailedModal -- returns to whichever view triggered the install
     /// (ModBrowser → ModBrowser, anything else → InstalledModsList).
     DismissModInstallFailed,
 
     // Installed mods list
-    /// `m` keybind on InstanceList — opens the per-instance Installed Mods List.
+    /// `m` keybind on InstanceList -- opens the per-instance Installed Mods List.
     /// Also emits `Effect::FetchInstalledMods` to populate the rows.
     OpenInstalledMods {
         slug: String,
@@ -765,32 +765,32 @@ pub enum Action {
     },
     /// Move the highlighted row in the InstalledModsList (saturating).
     InstalledModsMove(isize),
-    /// `e` keybind on InstalledModsList — fires `Effect::ToggleModEnabledEff`
+    /// `e` keybind on InstalledModsList -- fires `Effect::ToggleModEnabledEff`
     /// for the highlighted row (renames `.jar` ↔ `.jar.disabled`).
     ToggleModEnabled,
-    /// Async result: toggle finished — flip the `enabled` field on the matching row.
+    /// Async result: toggle finished -- flip the `enabled` field on the matching row.
     ModToggled {
         slug: String,
         mod_id: String,
         enabled: bool,
     },
-    /// `x` keybind on InstalledModsList — opens the uninstall confirm overlay.
+    /// `x` keybind on InstalledModsList -- opens the uninstall confirm overlay.
     OpenUninstallModConfirm,
-    /// `y`/`Y` on UninstallModConfirm — fires `Effect::UninstallMod` and returns
+    /// `y`/`Y` on UninstallModConfirm -- fires `Effect::UninstallMod` and returns
     /// to InstalledModsList immediately (responsive UX; row removed by ModUninstalled).
     ConfirmUninstallMod,
-    /// `n`/`Esc` on UninstallModConfirm — returns to InstalledModsList.
+    /// `n`/`Esc` on UninstallModConfirm -- returns to InstalledModsList.
     CancelUninstallMod,
-    /// Async result: uninstall finished — remove the matching row from the list.
+    /// Async result: uninstall finished -- remove the matching row from the list.
     ModUninstalled {
         slug: String,
         mod_id: String,
     },
-    /// Esc on InstalledModsList — returns to InstanceList.
+    /// Esc on InstalledModsList -- returns to InstanceList.
     CloseInstalledMods,
 
-    // ── Phase 9 (CurseForge Integration) — see 09-RESEARCH.md §TUI Integration Plumbing ──
-    /// `F` keybind on InstanceList — opens the CurseForge mod browser for the
+    // ── Phase 9 (CurseForge Integration) -- see 09-RESEARCH.md §TUI Integration Plumbing ──
+    /// `F` keybind on InstanceList -- opens the CurseForge mod browser for the
     /// given instance. Pitfall 1 guard: silent no-op when `cf_api_key_present == false`.
     /// Pitfall 8 guard: silent no-op when `running_mod_jobs.contains_key(&slug)`.
     OpenCfBrowser {
@@ -808,23 +808,23 @@ pub enum Action {
         slug: String,
         hits: Vec<crate::mods::curseforge::types::CurseForgeSearchHit>,
     },
-    /// Async result: search failed — drives `fetch_state = Error(_)`.
+    /// Async result: search failed -- drives `fetch_state = Error(_)`.
     CfBrowserSearchFailed {
         slug: String,
         error: String,
     },
     /// Move the highlighted row in the CfBrowser results list (saturating).
     CfBrowserMoveSelection(i32),
-    /// `v` in CfBrowser — cycles MC filter (None ↔ Some("any")) and re-emits search.
+    /// `v` in CfBrowser -- cycles MC filter (None ↔ Some("any")) and re-emits search.
     CfBrowserToggleMcFilter,
-    /// `l` in CfBrowser — cycles loader filter (None ↔ Some(<instance loader>)) and re-emits search.
+    /// `l` in CfBrowser -- cycles loader filter (None ↔ Some(<instance loader>)) and re-emits search.
     CfBrowserToggleLoaderFilter,
-    /// Enter on a CfBrowser row — Action ping-pong half 1: emits `Effect::FetchCfMod`.
+    /// Enter on a CfBrowser row -- Action ping-pong half 1: emits `Effect::FetchCfMod`.
     CfBrowserOpenDetail {
         slug: String,
         mod_id: u64,
     },
-    /// Async result: project detail loaded — Action ping-pong half 2: emits `Effect::ListCfFiles`.
+    /// Async result: project detail loaded -- Action ping-pong half 2: emits `Effect::ListCfFiles`.
     /// Mirrors Phase 8's `ModDetailLoaded → ModVersionsLoaded` chain.
     CfBrowserDetailLoaded {
         slug: String,
@@ -832,14 +832,14 @@ pub enum Action {
     },
     /// Printable char into CfBrowser search input.
     CfBrowserTypeSearch(char),
-    /// Pasted text into CfBrowser search input — applies on terminals that
+    /// Pasted text into CfBrowser search input -- applies on terminals that
     /// emit `Event::Paste(String)` (bracketed-paste mode, enabled at terminal
     /// init in 08.1-04). Mirror of `CfBrowserTypeSearch(char)` but appends
     /// the full pasted string and re-emits the search effect once.
     CfBrowserPasteSearch(String),
-    /// Backspace in CfBrowser search input — pops last char, re-emits search.
+    /// Backspace in CfBrowser search input -- pops last char, re-emits search.
     CfBrowserBackspaceSearch,
-    /// Async result: file list loaded — transitions to `CfFilePickerModal`.
+    /// Async result: file list loaded -- transitions to `CfFilePickerModal`.
     CfFilePickerLoaded {
         slug: String,
         mod_detail: crate::mods::curseforge::types::CurseForgeProjectDetail,
@@ -847,10 +847,10 @@ pub enum Action {
     },
     /// Move the highlighted file in the CfFilePickerModal (saturating).
     CfFilePickerMove(i32),
-    /// Enter on a CfFilePickerModal row — emits `Effect::InstallCfMod`.
+    /// Enter on a CfFilePickerModal row -- emits `Effect::InstallCfMod`.
     /// Pitfall 8 guard: silent no-op when `running_mod_jobs.contains_key(&slug)`.
     CfFilePickerConfirm,
-    /// Internal — emitted by execute_effects (09-07) inside the spawned task body
+    /// Internal -- emitted by execute_effects (09-07) inside the spawned task body
     /// BEFORE install_mod_into_instance begins. Inserts the CancellationToken
     /// into `running_mod_jobs` (single-mutation point shared with Phase 8).
     CfModInstallStarted {
@@ -859,12 +859,12 @@ pub enum Action {
         file_id: u64,
         token: CancellationToken,
     },
-    /// Install completed successfully — clears `running_mod_jobs[&slug]`.
+    /// Install completed successfully -- clears `running_mod_jobs[&slug]`.
     CfModInstalled {
         slug: String,
         mod_id: u64,
     },
-    /// Install failed — clears `running_mod_jobs[&slug]`, transitions to
+    /// Install failed -- clears `running_mod_jobs[&slug]`, transitions to
     /// `CfInstallFailedModal`. `web_url` is `Some(url)` for FileNotDownloadable
     /// (the load-bearing UX path per MOD-04).
     CfModInstallFailed {
@@ -874,11 +874,11 @@ pub enum Action {
         error: String,
         web_url: Option<String>,
     },
-    /// Esc on CfInstallFailedModal — returns to InstanceList.
+    /// Esc on CfInstallFailedModal -- returns to InstanceList.
     CfDismissInstallFailed,
 
-    // ── Phase 10 (Modpack Import) — see 10-PATTERNS.md ──
-    /// `i` (lowercase) keybind on InstanceList — opens the path-entry modal
+    // ── Phase 10 (Modpack Import) -- see 10-PATTERNS.md ──
+    /// `i` (lowercase) keybind on InstanceList -- opens the path-entry modal
     /// for importing a `.mrpack` file from disk.
     OpenModpackImport,
     /// User typed a character in the path-input modal.
@@ -887,11 +887,11 @@ pub enum Action {
     ImportPathPasteSearch(String),
     /// User pressed Backspace in the path-input modal.
     ImportPathBackspaceSearch,
-    /// User pressed Enter in the path-input modal — submits the path.
+    /// User pressed Enter in the path-input modal -- submits the path.
     ImportPathSubmit,
-    /// User pressed Esc in the path-input modal — cancels without importing.
+    /// User pressed Esc in the path-input modal -- cancels without importing.
     ImportPathCancel,
-    /// Internal — emitted by the spawned task BEFORE calling import_mrpack.
+    /// Internal -- emitted by the spawned task BEFORE calling import_mrpack.
     /// Inserts the CancellationToken into running_modpack_imports and transitions
     /// ActiveView to ModpackImportProgressModal.
     ModpackImportStarted {
@@ -899,7 +899,7 @@ pub enum Action {
         modpack_name: String,
         token: CancellationToken,
     },
-    /// Progress update from the import task — updates the progress modal fields.
+    /// Progress update from the import task -- updates the progress modal fields.
     ModpackImportProgress {
         slug: String,
         pct: u8,
@@ -907,7 +907,7 @@ pub enum Action {
         bytes_done: u64,
         bytes_total: u64,
     },
-    /// Import completed successfully — clears running_modpack_imports[slug],
+    /// Import completed successfully -- clears running_modpack_imports[slug],
     /// transitions to InstanceList, emits Effect::FetchInstances.
     ModpackImported {
         slug: String,
@@ -917,16 +917,16 @@ pub enum Action {
     /// running_modpack_imports map without needing to know the resolved slug (which
     /// the spawned task may not have if cancel preceded create_instance).
     ModpackImportCancelled,
-    /// Import failed — clears running_modpack_imports, transitions to ModpackImportFailedModal.
+    /// Import failed -- clears running_modpack_imports, transitions to ModpackImportFailedModal.
     ModpackImportFailed {
         modpack_name: String,
         error: String,
         log_tail: String,
     },
     /// User-keystroke action: Esc on progress modal.
-    /// No slug arg — uses the unique current modpack import (HashMap is single-entry in v1).
+    /// No slug arg -- uses the unique current modpack import (HashMap is single-entry in v1).
     CancelModpackImport,
-    /// Esc on ModpackImportFailedModal — returns to InstanceList.
+    /// Esc on ModpackImportFailedModal -- returns to InstanceList.
     DismissModpackImportFailed,
 
     // ── Phase 11 (11-04): Pack browser + installed list + drop-path ──────────
@@ -943,7 +943,7 @@ pub enum Action {
     PackBrowserBackspaceSearch,
     /// Paste a string into the pack browser search buffer.
     PackBrowserPasteSearch(String),
-    /// Pack browser search results arrived — slug+kind match guard applied in update().
+    /// Pack browser search results arrived -- slug+kind match guard applied in update().
     PackBrowserSearchLoaded {
         slug: String,
         kind: PackKind,
@@ -955,9 +955,9 @@ pub enum Action {
         kind: PackKind,
         message: String,
     },
-    /// Esc on pack browser — return to InstanceList.
+    /// Esc on pack browser -- return to InstanceList.
     PackBrowserClose,
-    /// `D` inside a pack browser — open the drop-from-path modal.
+    /// `D` inside a pack browser -- open the drop-from-path modal.
     PackDropPathOpen {
         slug: String,
         kind: PackKind,
@@ -968,9 +968,9 @@ pub enum Action {
     PackDropPathBackspace,
     /// Paste into the pack drop path buffer.
     PackDropPathPaste(String),
-    /// Enter — submit the drop path.
+    /// Enter -- submit the drop path.
     PackDropPathSubmit,
-    /// Esc — cancel the drop path modal, return to pack browser.
+    /// Esc -- cancel the drop path modal, return to pack browser.
     PackDropPathCancel,
     /// Installed packs list loaded (async).
     InstalledPacksLoaded {
@@ -980,13 +980,13 @@ pub enum Action {
     },
     /// Navigate in the installed packs list.
     InstalledPacksMove(i32),
-    /// Tab key on InstalledModsList or InstalledPacksList — cycle Mod→Resource→Shader→Mod.
+    /// Tab key on InstalledModsList or InstalledPacksList -- cycle Mod→Resource→Shader→Mod.
     InstalledPacksCycleKind,
-    /// `e` on an installed pack row (Resource kind) — toggle enabled.
+    /// `e` on an installed pack row (Resource kind) -- toggle enabled.
     TogglePackEnabled,
-    /// `e` on an installed pack row (Shader kind) — show transient notice.
+    /// `e` on an installed pack row (Shader kind) -- show transient notice.
     ShaderToggleNotice,
-    /// `x` on an installed pack row — open uninstall confirm.
+    /// `x` on an installed pack row -- open uninstall confirm.
     OpenUninstallPackConfirm,
     /// `y` on UninstallPackConfirm.
     ConfirmUninstallPack,
@@ -1057,7 +1057,7 @@ pub enum Action {
 }
 
 /// Effects requested by `update()`. NOTE: there is deliberately NO
-/// `SpawnVersionInstall` variant — creating an instance and installing its
+/// `SpawnVersionInstall` variant -- creating an instance and installing its
 /// version are performed by a single `CreateInstance` effect, handled
 /// atomically by the runtime (02-07-03 `execute_effects`). See 02-07 plan
 /// header for the rationale (checker blocker B2).
@@ -1137,7 +1137,7 @@ pub enum Effect {
         slug: String,
     },
 
-    // ── Phase 8 (Modrinth Integration) — wired by 08-08 run.rs effect arms ──
+    // ── Phase 8 (Modrinth Integration) -- wired by 08-08 run.rs effect arms ──
     /// MOD-01: search Modrinth for mods matching the query, filtered by the
     /// instance's MC version + loader (with optional UI override).
     SearchModrinth {
@@ -1194,10 +1194,10 @@ pub enum Effect {
         slug: String,
     },
 
-    // ── Phase 9 (CurseForge Integration) — wired by 09-07 run.rs effect arms ──
+    // ── Phase 9 (CurseForge Integration) -- wired by 09-07 run.rs effect arms ──
     // LOCKED set: `FetchCfMod` + `ListCfFiles` are kept SEPARATE (mirrors
     // Phase 8's ListModVersions / FetchModDetail split). Do NOT add a combined
-    // `OpenCfFilePicker` effect — the design relies on the Action ping-pong
+    // `OpenCfFilePicker` effect -- the design relies on the Action ping-pong
     // pattern: CfBrowserOpenDetail → FetchCfMod → CfBrowserDetailLoaded →
     // ListCfFiles → CfFilePickerLoaded.
     /// MOD-03: search CurseForge mods matching the query, filtered by MC + loader.
@@ -1235,7 +1235,7 @@ pub enum Effect {
         mrpack_path: std::path::PathBuf,
     },
     /// PACK-01: cancel the running modpack import (no-op hook for symmetry with
-    /// CancelLoaderInstall — the actual token.cancel() happened in update()).
+    /// CancelLoaderInstall -- the actual token.cancel() happened in update()).
     CancelModpackImport,
 
     // ── Phase 11 (11-04): Pack browser + install effects ─────────────────────
@@ -1335,7 +1335,7 @@ pub fn loader_versions_visible_indices(
 /// Apply an `Action`, mutate `state`, and return the side-effects to execute.
 ///
 /// This is the single mutation point for all UI state. Views receive `&AppState`
-/// (immutable) — no other code path mutates `AppState`.
+/// (immutable) -- no other code path mutates `AppState`.
 pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
     match action {
         Action::Quit => {
@@ -1726,7 +1726,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
         Action::InstanceLaunched { slug: _ } => {
-            // Tracing signal only — token already inserted via LaunchJobStarted.
+            // Tracing signal only -- token already inserted via LaunchJobStarted.
             vec![]
         }
         Action::InstanceExited {
@@ -1851,7 +1851,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             match selected {
                 0 => {
                     // None row: if instance has a loader → open switch confirm to "none".
-                    // Otherwise it's already vanilla — no-op.
+                    // Otherwise it's already vanilla -- no-op.
                     let has_loader = state
                         .instances
                         .iter()
@@ -1898,7 +1898,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     }]
                 }
                 2 => {
-                    // Quilt row — show all by default (Open Question 3 lock)
+                    // Quilt row -- show all by default (Open Question 3 lock)
                     let current_version = state
                         .instances
                         .iter()
@@ -2082,7 +2082,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             );
             let real_idx = match visible.get(selected) {
                 Some(&i) => i,
-                None => return vec![], // empty list — no-op
+                None => return vec![], // empty list -- no-op
             };
             let chosen = &versions[real_idx];
             let chosen_version = chosen.version.clone();
@@ -2093,7 +2093,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             // "← currently installed" hint), so it is None for cross-kind switches
             // and cannot be used to detect that the user is switching loader TYPE.
             // Compute installed_loader fresh here so cross-kind switches still trip
-            // the WARNING confirm modal (UAT Check 5 regression — major).
+            // the WARNING confirm modal (UAT Check 5 regression -- major).
             let installed_loader: Option<(crate::domain::instance::ModloaderKind, String)> = state
                 .instances
                 .iter()
@@ -2108,7 +2108,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 LoaderType::NeoForge => crate::domain::instance::ModloaderKind::NeoForge,
             };
 
-            // Same exact loader+version already installed — no-op (also covers the
+            // Same exact loader+version already installed -- no-op (also covers the
             // historical `current_version.as_deref() == Some(&chosen_version)` case).
             if let Some((installed_kind, ref installed_ver)) = installed_loader {
                 if installed_kind == target_kind && installed_ver == &chosen_version {
@@ -2125,7 +2125,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
 
             match installed_loader {
                 Some((installed_kind, installed_ver)) => {
-                    // Switching — same kind (different version) OR cross-kind (TYPE switch).
+                    // Switching -- same kind (different version) OR cross-kind (TYPE switch).
                     // type_switch flips on cross-kind to render the red WARNING line in
                     // LoaderSwitchConfirm (loader_switch_confirm.rs:25 conditional).
                     let type_switch = installed_kind != target_kind;
@@ -2141,7 +2141,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     vec![]
                 }
                 None => {
-                    // Vanilla instance, no installed loader — emit install effect directly.
+                    // Vanilla instance, no installed loader -- emit install effect directly.
                     state.active_view = ActiveView::LoaderInstallProgressModal {
                         slug: slug.clone(),
                         loader: loader_type,
@@ -2223,7 +2223,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
         Action::LoaderInstallLogTail { slug, tail } => {
             // Phase 7 (D-02): update the live log tail in the progress modal without
-            // touching the gauge percentage — these events come from [log-tail]-prefixed
+            // touching the gauge percentage -- these events come from [log-tail]-prefixed
             // TaskEvent::Progress messages filtered in the run.rs forwarder.
             if let ActiveView::LoaderInstallProgressModal {
                 slug: modal_slug,
@@ -2324,13 +2324,13 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
 
-        // ── Phase 8 (Modrinth Integration) — pure update() arms ──
+        // ── Phase 8 (Modrinth Integration) -- pure update() arms ──
         // All arms below mutate AppState and (optionally) emit Effects. NO arm
-        // performs HTTP, file I/O, or task spawning — those live in 08-08 run.rs.
+        // performs HTTP, file I/O, or task spawning -- those live in 08-08 run.rs.
         Action::OpenModBrowser { slug } => {
             // Pitfall 8 (08-RESEARCH.md §Pitfall 8): silent no-op if a previous
             // mod install for this instance is still in flight. The user is not
-            // shown an error — just nothing happens. Tested by
+            // shown an error -- just nothing happens. Tested by
             // `test_open_mod_browser_blocked_when_install_in_flight`.
             if state.running_mod_jobs.contains_key(&slug) {
                 return vec![];
@@ -2872,7 +2872,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::CancelModInstall => {
-            // Per UI-SPEC line 597 — return to ModVersionPickerModal preserving
+            // Per UI-SPEC line 597 -- return to ModVersionPickerModal preserving
             // slug/project context. We do not have the original versions list cached
             // here; transition to the picker with empty versions and selected=0.
             // (08-08 may choose to re-fetch via ListModVersions; the spec only
@@ -3210,9 +3210,9 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![Effect::KillProcess { slug }]
         }
 
-        // ── Phase 9 (CurseForge Integration) — pure update() arms ──
+        // ── Phase 9 (CurseForge Integration) -- pure update() arms ──
         // All arms below mutate AppState and (optionally) emit Effects. NO arm
-        // performs HTTP, file I/O, or task spawning — those live in 09-07 run.rs.
+        // performs HTTP, file I/O, or task spawning -- those live in 09-07 run.rs.
         // Mirrors Phase 8's modrinth arms 1:1 (CfBrowser ≡ ModBrowser, etc.).
         Action::OpenCfBrowser { slug } => {
             // Pitfall 1 (09-RESEARCH.md §"Keybind guard"): F is silently disabled
@@ -4107,7 +4107,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 };
                 vec![Effect::DropInstallPack { slug, kind, path }]
             } else {
-                // Empty buffer — set error message.
+                // Empty buffer -- set error message.
                 if let ActiveView::PackDropPathInput { error, .. } = &mut state.active_view {
                     *error = Some("Path cannot be empty".to_string());
                 }
@@ -4258,7 +4258,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             } = &mut state.active_view
             {
                 *transient_status =
-                    Some("Shaders cannot be toggled — use Iris/OptiFine in-game".to_string());
+                    Some("Shaders cannot be toggled -- use Iris/OptiFine in-game".to_string());
             }
             vec![]
         }
@@ -4451,7 +4451,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             version,
         } => {
             // Hand off to the existing install effect (run.rs:1891). This arm
-            // is the second hop of the GAP-11-A wiring chain — the auto-pick
+            // is the second hop of the GAP-11-A wiring chain -- the auto-pick
             // happens in the `Effect::FetchPackVersions` handler in run.rs.
             vec![Effect::InstallPackFromModrinth {
                 slug,
@@ -4691,7 +4691,7 @@ mod tests {
         s.running_instances
             .insert("ti".into(), CancellationToken::new());
         let _ = update(&mut s, Action::OpenLoaderPicker { slug: "ti".into() });
-        // No transition — instance is running
+        // No transition -- instance is running
         assert!(matches!(s.active_view, ActiveView::InstanceList { .. }));
     }
 
@@ -4840,7 +4840,7 @@ mod tests {
     /// `type_switch: true` so the red WARNING line renders. Prior bug: the
     /// version-picker plumbed `current_version` was filtered by target kind, so
     /// a cross-kind switch saw `current_version: None` and dropped to the direct
-    /// install branch — bypassing the safety warning entirely.
+    /// install branch -- bypassing the safety warning entirely.
     #[test]
     fn test_loader_version_select_cross_kind_emits_warning_confirm() {
         let mut s = vanilla_state_with("ti", "1.21.4");
@@ -4850,7 +4850,7 @@ mod tests {
             version: "0.16.9".into(),
             version_id: "fabric-loader-0.16.9-1.21.4".into(),
         });
-        // Open Quilt version picker — current_version is None because the picker
+        // Open Quilt version picker -- current_version is None because the picker
         // filters by target kind (Quilt) and the installed kind is Fabric.
         s.active_view = ActiveView::LoaderVersionPickerModal {
             slug: "ti".into(),

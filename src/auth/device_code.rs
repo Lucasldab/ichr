@@ -5,7 +5,7 @@
 //! the httpmock test pattern used here).
 //!
 //! State machine (`poll_for_token`):
-//!   1. sleep(interval) — or cancel immediately if token fired
+//!   1. sleep(interval) -- or cancel immediately if token fired
 //!   2. POST /consumers/oauth2/v2.0/token grant_type=device_code
 //!   3. if 200 → `Complete { access_token, refresh_token, expires_in }`
 //!   4. if 400:
@@ -34,7 +34,7 @@ use crate::auth::AuthError;
 // Constants
 // ---------------------------------------------------------------------------
 
-/// Default MSA client ID — the legacy Mojang public launcher app ID.
+/// Default MSA client ID -- the legacy Mojang public launcher app ID.
 /// Conventional for third-party launchers (Prism, ATLauncher, GDLauncher).
 /// Override via `ICHR_MSA_CLIENT_ID` to use your own Azure AD registration.
 pub const DEFAULT_MSA_CLIENT_ID: &str = "00000000402b5328";
@@ -69,7 +69,7 @@ pub fn client_id() -> String {
     std::env::var(MSA_CLIENT_ID_ENV).unwrap_or_else(|_| DEFAULT_MSA_CLIENT_ID.to_string())
 }
 
-/// Device-code flow start state — fields sent to the TUI for display.
+/// Device-code flow start state -- fields sent to the TUI for display.
 #[derive(Debug, Clone)]
 pub struct DeviceCodeStart {
     /// Short code to show the user (e.g., "ABCD-1234").
@@ -94,7 +94,7 @@ pub enum DeviceCodeProgress {
     AuthorizationPending { interval: u64 },
     /// Server asked the poller to slow down (RFC 8628 §3.5: +5s to interval).
     SlowDown { new_interval: u64 },
-    /// Authorization granted — tokens ready.
+    /// Authorization granted -- tokens ready.
     Complete {
         access_token: String,
         refresh_token: String,
@@ -218,7 +218,7 @@ pub async fn poll_for_token(
     let cid = client_id();
 
     loop {
-        // Wait `interval_secs` OR cancellation — whichever arrives first.
+        // Wait `interval_secs` OR cancellation -- whichever arrives first.
         tokio::select! {
             biased;
             _ = cancel_token.cancelled() => {
@@ -258,7 +258,7 @@ pub async fn poll_for_token(
             return Ok(body);
         }
 
-        // 4xx — parse as OAuth error response.
+        // 4xx -- parse as OAuth error response.
         let err_body: OauthErrorResponse = match resp.json().await {
             Ok(b) => b,
             Err(e) => {
@@ -450,7 +450,7 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // poll_for_token — happy path
+    // poll_for_token -- happy path
     // ------------------------------------------------------------------
 
     #[tokio::test]
@@ -490,7 +490,7 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // poll_for_token — authorization_pending → cancel
+    // poll_for_token -- authorization_pending → cancel
     // ------------------------------------------------------------------
 
     #[tokio::test]
@@ -533,7 +533,7 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // poll_for_token — slow_down (RFC 8628 §3.5: +5s to interval)
+    // poll_for_token -- slow_down (RFC 8628 §3.5: +5s to interval)
     // ------------------------------------------------------------------
 
     #[tokio::test]
@@ -570,7 +570,7 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // poll_for_token — expired_token
+    // poll_for_token -- expired_token
     // ------------------------------------------------------------------
 
     #[tokio::test]
@@ -600,7 +600,7 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // poll_for_token — access_denied
+    // poll_for_token -- access_denied
     // ------------------------------------------------------------------
 
     #[tokio::test]
@@ -638,7 +638,7 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // poll_for_token — immediate cancellation
+    // poll_for_token -- immediate cancellation
     // ------------------------------------------------------------------
 
     #[tokio::test]
@@ -667,7 +667,7 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // refresh_access_token — success
+    // refresh_access_token -- success
     // ------------------------------------------------------------------
 
     #[tokio::test]
@@ -694,7 +694,7 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // refresh_access_token — invalid_grant → RefreshFailed
+    // refresh_access_token -- invalid_grant → RefreshFailed
     // ------------------------------------------------------------------
 
     #[tokio::test]

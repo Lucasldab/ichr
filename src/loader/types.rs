@@ -1,4 +1,4 @@
-//! Loader domain types — pure data, no I/O.
+//! Loader domain types -- pure data, no I/O.
 
 use serde::{Deserialize, Serialize};
 
@@ -30,7 +30,7 @@ pub struct LoaderVersionEntry {
 }
 
 /// One library entry from a loader profile JSON.
-/// Canonical shared shape used by BOTH Fabric and Quilt clients —
+/// Canonical shared shape used by BOTH Fabric and Quilt clients --
 /// fabric.rs and quilt.rs import this type directly (no per-loader
 /// duplication). Fabric profiles populate `sha1`/`sha256`/`size`;
 /// Quilt profiles always parse with all hash fields as `None`.
@@ -68,7 +68,7 @@ pub struct LoaderInfo {
 ///
 /// Modern Forge installer architecture is post-1.13; pre-1.13 Forge uses
 /// a fundamentally different installer flow that is out of scope for v1.
-/// Uses string-prefix matching — Mojang version IDs are not strict semver.
+/// Uses string-prefix matching -- Mojang version IDs are not strict semver.
 pub fn forge_supported_for_mc(mc: &str) -> bool {
     const SUPPORTED_PREFIXES: &[&str] = &[
         "1.13", "1.14", "1.15", "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22", "1.23",
@@ -80,7 +80,7 @@ pub fn forge_supported_for_mc(mc: &str) -> bool {
 /// MC version compatibility for NeoForge (07-CONTEXT.md D-05: 1.20.1+ only).
 ///
 /// NeoForge forked Forge at MC 1.20.1; pre-1.20.1 is Forge-only.
-/// Uses string-prefix matching — Mojang version IDs are not strict semver.
+/// Uses string-prefix matching -- Mojang version IDs are not strict semver.
 pub fn neoforge_supported_for_mc(mc: &str) -> bool {
     // Explicit prefix list from 1.20.1 onward. Uses prefix matches to handle
     // patches and pre-releases (e.g., "1.21-pre3" matches "1.21").

@@ -1,18 +1,18 @@
 //! CurseForge installer helpers.
 //!
-//! Phase 9 plan 09-04: implements `resolve_download_url` — the load-bearing
+//! Phase 9 plan 09-04: implements `resolve_download_url` -- the load-bearing
 //! function for MOD-04 success criterion 3. Plan 09-05 (CurseForgeService)
 //! calls this at the top of `install_mod_into_instance` and either obtains
 //! the URL or surfaces `CurseForgeError::FileNotDownloadable` before
 //! attempting any download.
 //!
-//! Per 09-RESEARCH.md §"downloadUrl null UX" lines 247-289 — the three
+//! Per 09-RESEARCH.md §"downloadUrl null UX" lines 247-289 -- the three
 //! resolution cases:
 //!
 //!   1. Inline URL present (most common, one-fewer round-trip)
 //!   2. Inline null + dedicated /download-url endpoint returns Some(url)
-//!      (transient null — file is downloadable, the file response is just stale)
-//!   3. Inline null + dedicated endpoint returns None (403/404 — the author
+//!      (transient null -- file is downloadable, the file response is just stale)
+//!   3. Inline null + dedicated endpoint returns None (403/404 -- the author
 //!      has disabled third-party distribution; user must open in browser)
 
 use crate::mods::curseforge::client::CurseForgeClient;
@@ -31,7 +31,7 @@ pub enum DownloadResolution {
 /// fallback chain. Returns `Err(FileNotDownloadable)` carrying the user-facing
 /// web URL when the file is restricted at the API level.
 ///
-/// Per 09-RESEARCH.md §"downloadUrl null UX" lines 247-289 — the three cases:
+/// Per 09-RESEARCH.md §"downloadUrl null UX" lines 247-289 -- the three cases:
 ///
 ///   1. `file.download_url == Some(non-empty)` → `Ok(Resolved(url))`,
 ///      ZERO additional HTTP calls.
@@ -42,7 +42,7 @@ pub enum DownloadResolution {
 ///      with `web_url` built via `web_url_for_file`.
 ///
 /// Any HTTP error from `get_file_download_url` (e.g. RateLimited, 5xx) bubbles
-/// up via `?` — the FileNotDownloadable variant is reserved for the explicit
+/// up via `?` -- the FileNotDownloadable variant is reserved for the explicit
 /// 403/404 restricted-distribution signal.
 pub async fn resolve_download_url(
     client: &CurseForgeClient,
@@ -117,7 +117,7 @@ mod tests {
         }
     }
 
-    // Case 1: inline URL present — ZERO calls to /download-url endpoint.
+    // Case 1: inline URL present -- ZERO calls to /download-url endpoint.
     #[tokio::test]
     async fn test_inline_url_present_resolves_without_fallback_call() {
         let server = MockServer::start();

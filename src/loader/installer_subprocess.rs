@@ -1,4 +1,4 @@
-//! Async installer subprocess runner — drains stdio into a per-install
+//! Async installer subprocess runner -- drains stdio into a per-install
 //! log file, maintains a ring buffer of the last LOG_TAIL_LINES lines,
 //! and honours CancellationToken with a 5-second SIGTERM grace before
 //! hard kill (per 07-CONTEXT.md "Cancel Mid-Subprocess" entry).
@@ -7,7 +7,7 @@
 //! be `tokio::spawn`'d BEFORE `child.wait()` is polled.
 //!
 //! **07-RESEARCH.md Pitfall 6 (cleanup on cancel):** This module does
-//! NOT clean staging — the caller (LoaderService) does, after this fn
+//! NOT clean staging -- the caller (LoaderService) does, after this fn
 //! returns Cancelled.
 //!
 //! **D-02 live tail:** Every ~500ms while the subprocess runs, we emit
@@ -41,7 +41,7 @@ const LOG_TAIL_PERIOD: Duration = Duration::from_millis(500);
 /// on exit code 0; SubprocessExit on non-zero; Cancelled on token fire.
 ///
 /// Both stdout AND stderr drain tasks are `tokio::spawn`'d BEFORE
-/// `child.wait()` is polled — Pitfall 4 (stdio deadlock) prevention.
+/// `child.wait()` is polled -- Pitfall 4 (stdio deadlock) prevention.
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(skip_all, fields(?job_id, cwd = %cwd.display()))]
 pub async fn run_installer(
@@ -193,7 +193,7 @@ async fn write_session_header(
         .map(|d| d.as_secs())
         .unwrap_or(0);
     let header = format!(
-        "=== Loader install: {} {} {} — unix_ts={secs} ===\n",
+        "=== Loader install: {} {} {} -- unix_ts={secs} ===\n",
         java_bin.display(),
         jvm_args.join(" "),
         args.join(" ")
@@ -249,7 +249,7 @@ where
             let _ = f.write_all(stamped.as_bytes()).await;
             let _ = f.write_all(b"\n").await;
         }
-        // Push into ring (briefly held lock — no .await)
+        // Push into ring (briefly held lock -- no .await)
         {
             let mut g = ring.lock().expect("ring lock");
             if g.len() >= LOG_TAIL_LINES {
@@ -322,7 +322,7 @@ mod tests {
         }
     }
 
-    // See src/launcher/spawn.rs for the full rationale — same flake on
+    // See src/launcher/spawn.rs for the full rationale -- same flake on
     // GH Actions ubuntu-latest. Run locally with --include-ignored.
     #[ignore = "flaky on GH Actions ubuntu-latest; run with --include-ignored locally"]
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
