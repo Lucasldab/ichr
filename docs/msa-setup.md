@@ -7,13 +7,13 @@ You need to register your own Azure AD app and point ichr at its client ID via t
 ## One-time Azure AD registration
 
 1. Sign in to the [Azure Portal](https://portal.azure.com/) with any Microsoft account. A free personal account works; you don't need a paid Azure subscription.
-2. Search for **App registrations** → **New registration**.
+2. Search for **App registrations** -> **New registration**.
 3. Fill in:
    - **Name:** anything (e.g., `ichr-<yourhandle>`).
    - **Supported account types:** choose **Personal Microsoft accounts only**.
    - **Redirect URI:** leave blank -- device-code flow doesn't use one.
 4. Click **Register**. The overview page now shows an **Application (client) ID** -- a GUID like `11111111-2222-3333-4444-555555555555`.
-5. In the left nav: **Authentication** → scroll to **Advanced settings** → set **Allow public client flows** to **Yes** → **Save**.
+5. In the left nav: **Authentication** -> scroll to **Advanced settings** -> set **Allow public client flows** to **Yes** -> **Save**.
 
 ## Point ichr at your app
 
@@ -44,7 +44,7 @@ Persist the shell export in your rc file (`~/.bashrc`, `~/.zshrc`, etc.) or Wind
 
 ## Verify
 
-In ichr: press `A` → `a` → the device-code modal should now show a `user_code` and `https://microsoft.com/link` URL. Visit the URL in a browser, enter the code, sign in with your Minecraft-licensed Microsoft account. The account should appear in the list when the chain completes.
+In ichr: press `A` -> `a` -> the device-code modal should now show a `user_code` and `https://microsoft.com/link` URL. Visit the URL in a browser, enter the code, sign in with your Minecraft-licensed Microsoft account. The account should appear in the list when the chain completes.
 
 ## Security notes
 
@@ -57,7 +57,7 @@ In ichr: press `A` → `a` → the device-code modal should now show a `user_cod
 | Symptom | Fix |
 |---------|-----|
 | `Microsoft rejected the default client ID` | You haven't set `ICHR_MSA_CLIENT_ID` yet, or the variable isn't visible to the launcher. Verify with `echo $ICHR_MSA_CLIENT_ID` (Linux) / `$env:ICHR_MSA_CLIENT_ID` (PowerShell). |
-| `AADSTS7000218: The request body must contain the following parameter: 'client_assertion' or 'client_secret'` | In Azure Portal → **Authentication** → set **Allow public client flows** to **Yes**. |
-| `AADSTS50020: User account ... from identity provider 'live.com' does not exist in tenant` | In the registration step, you picked "Single tenant" or "Multi-tenant" instead of "Personal Microsoft accounts only". Create a new registration or edit **Manifest → signInAudience → "PersonalMicrosoftAccount"**. |
+| `AADSTS7000218: The request body must contain the following parameter: 'client_assertion' or 'client_secret'` | In Azure Portal -> **Authentication** -> set **Allow public client flows** to **Yes**. |
+| `AADSTS50020: User account ... from identity provider 'live.com' does not exist in tenant` | In the registration step, you picked "Single tenant" or "Multi-tenant" instead of "Personal Microsoft accounts only". Create a new registration or edit **Manifest -> signInAudience -> "PersonalMicrosoftAccount"**. |
 | XSTS rejects with `XErr 2148916233` | The signed-in MS account has no Xbox profile. Create one at <https://www.xbox.com/profile> and retry. |
 | `AccountAuthFailed` with any other XErr code | Known codes (child account, country restriction, etc.) are translated into readable messages by `src/auth/xsts_errors.rs`. If you hit an unknown code, please open an issue with the raw `XErr` value. |

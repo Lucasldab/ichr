@@ -138,7 +138,7 @@ cargo test
 
 ## Roadmap
 
-- AppID approval (pending Microsoft review) → embedded client ID, zero setup
+- AppID approval (pending Microsoft review) -> embedded client ID, zero setup
 - Configurable keybinds and color theme via `~/.config/ichr/config.toml`
 - CurseForge integration enabled (post-API-key bureaucracy)
 - macOS support
