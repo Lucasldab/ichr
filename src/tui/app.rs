@@ -814,6 +814,26 @@ pub enum Action {
     PackToggled { slug: String, kind: PackKind, mod_id: String, new_enabled: bool },
     /// Install a pack from a Modrinth version (Enter in pack browser).
     InstallPackFromBrowser { slug: String, kind: PackKind },
+    /// Browser auto-pick stage: full `ModrinthVersion` resolved by the
+    /// `Effect::FetchPackVersions` task; `update()` arm dispatches the
+    /// existing `Effect::InstallPackFromModrinth` (GAP-11-A wiring).
+    AutoStartPackInstall {
+        slug: String,
+        kind: PackKind,
+        project_id: String,
+        project_slug: String,
+        project_title: String,
+        version: ModrinthVersion,
+    },
+    /// Browser auto-pick stage: list-versions or get-version request failed.
+    /// Tail-routed to `Action::PackInstallFailed` so the existing failure UI
+    /// surfaces uniformly (GAP-11-A wiring).
+    PackVersionsFailed {
+        slug: String,
+        kind: PackKind,
+        project_id: String,
+        message: String,
+    },
 }
 
 /// Effects requested by `update()`. NOTE: there is deliberately NO
@@ -970,6 +990,19 @@ pub enum Effect {
         project_slug: String,
         project_title: String,
         version: ModrinthVersion,
+    },
+    /// Browser Enter-key install (GAP-11-A): list versions for a Modrinth pack
+    /// project, auto-pick the first `is_latest_stable=true` (fallback
+    /// `versions.first()`), fetch the full version body, then dispatch
+    /// `Action::AutoStartPackInstall` which fans out to
+    /// `Effect::InstallPackFromModrinth`.
+    FetchPackVersions {
+        slug: String,
+        kind: PackKind,
+        project_id: String,
+        project_slug: String,
+        project_title: String,
+        mc: Option<String>,
     },
     /// Toggle a pack's enabled/disabled state (rename .zip ↔ .zip.disabled).
     TogglePackEnabledEff { slug: String, kind: PackKind, mod_id: String },
@@ -3661,14 +3694,64 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::InstallPackFromBrowser { slug, kind } => {
-            // Placeholder: full install flow (version picker → install) deferred to
-            // gap-closure. For now just emit SearchPacks to reload results.
+            // GAP-11-A wiring: read the selected hit from the active PackBrowser
+            // view, then dispatch the auto-pick install chain via
+            // `Effect::FetchPackVersions`. The chain unfolds in run.rs:
+            //   list_versions → pick first is_latest_stable → get_version →
+            //   `Action::AutoStartPackInstall` → `Effect::InstallPackFromModrinth`.
+            let picked = if let ActiveView::PackBrowser { results, selected, .. } =
+                &state.active_view
+            {
+                results.get(*selected).cloned()
+            } else {
+                None
+            };
             let mc = state
                 .instances
                 .iter()
                 .find(|m| m.slug == slug)
                 .map(|m| m.mc_version_id.clone());
-            vec![Effect::SearchPacks { slug, kind, query: String::new(), mc }]
+            if let Some(hit) = picked {
+                vec![Effect::FetchPackVersions {
+                    slug,
+                    kind,
+                    project_id: hit.project_id,
+                    project_slug: hit.slug,
+                    project_title: hit.title,
+                    mc,
+                }]
+            } else {
+                vec![]
+            }
+        }
+
+        Action::AutoStartPackInstall {
+            slug,
+            kind,
+            project_id,
+            project_slug,
+            project_title,
+            version,
+        } => {
+            // Hand off to the existing install effect (run.rs:1891). This arm
+            // is the second hop of the GAP-11-A wiring chain — the auto-pick
+            // happens in the `Effect::FetchPackVersions` handler in run.rs.
+            vec![Effect::InstallPackFromModrinth {
+                slug,
+                kind,
+                project_id,
+                project_slug,
+                project_title,
+                version,
+            }]
+        }
+
+        Action::PackVersionsFailed { slug, kind, project_id: _, message } => {
+            // Tail-route to the existing PackInstallFailed arm so the failure
+            // UI surfaces uniformly. project_id is dropped; PackInstallFailed
+            // does not carry it (the active PackBrowser view supplies context
+            // via slug + kind alone).
+            update(state, Action::PackInstallFailed { slug, kind, error: message })
         }
     }
 }
@@ -4245,5 +4328,215 @@ mod tests {
             }
             other => panic!("expected ModBrowser view, got {other:?}"),
         }
+    }
+
+    // ------------------------------------------------------------------------
+    // GAP-11-A (11-06): Pack browser Enter-key install wiring.
+    //
+    // The install dispatch chain has 3 hops:
+    //   1. Action::InstallPackFromBrowser   → Effect::FetchPackVersions
+    //   2. (run.rs task: list_versions → pick latest stable → get_version)
+    //      then Action::AutoStartPackInstall → Effect::InstallPackFromModrinth
+    //   3. on failure, Action::PackVersionsFailed → tail-routes through
+    //      Action::PackInstallFailed (existing arm)
+    //
+    // Tests below pin hops 1 + 2 + 3 in src/tui/app.rs (run.rs hop is
+    // covered by tests/packs_integration.rs).
+    // ------------------------------------------------------------------------
+
+    fn pack_browser_state_with_one_hit(
+        slug: &str,
+        mc: &str,
+        kind: PackKind,
+    ) -> AppState {
+        use crate::mods::types::{ModBrowserFetchState, ModrinthSearchHit};
+        let manifest = crate::domain::instance::InstanceManifest::new(
+            slug.to_string(),
+            slug.to_string(),
+            mc.to_string(),
+        );
+        AppState {
+            instances: vec![manifest],
+            active_view: ActiveView::PackBrowser {
+                slug: slug.into(),
+                kind,
+                search: "faithful".into(),
+                fetch_state: ModBrowserFetchState::Ready,
+                results: vec![ModrinthSearchHit {
+                    project_id: "w0TnApzs".into(),
+                    slug: "faithful-32x".into(),
+                    title: "Faithful 32x".into(),
+                    description: "fixture".into(),
+                    downloads: 0,
+                    already_installed: false,
+                }],
+                selected: 0,
+            },
+            ..AppState::default()
+        }
+    }
+
+    #[test]
+    fn test_install_pack_from_browser_resource_dispatches_fetch_versions() {
+        let mut state = pack_browser_state_with_one_hit("test-inst", "1.20.4", PackKind::Resource);
+        let effects = update(
+            &mut state,
+            Action::InstallPackFromBrowser {
+                slug: "test-inst".into(),
+                kind: PackKind::Resource,
+            },
+        );
+        assert_eq!(effects.len(), 1);
+        match &effects[0] {
+            Effect::FetchPackVersions {
+                slug,
+                kind,
+                project_id,
+                project_slug,
+                project_title,
+                mc,
+            } => {
+                assert_eq!(slug, "test-inst");
+                assert_eq!(*kind, PackKind::Resource);
+                assert_eq!(project_id, "w0TnApzs");
+                assert_eq!(project_slug, "faithful-32x");
+                assert_eq!(project_title, "Faithful 32x");
+                assert_eq!(mc.as_deref(), Some("1.20.4"));
+            }
+            other => panic!("expected FetchPackVersions, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_install_pack_from_browser_shader_dispatches_fetch_versions() {
+        // Symmetric path for SPAK-02.
+        let mut state = pack_browser_state_with_one_hit("test-inst", "1.20.4", PackKind::Shader);
+        let effects = update(
+            &mut state,
+            Action::InstallPackFromBrowser {
+                slug: "test-inst".into(),
+                kind: PackKind::Shader,
+            },
+        );
+        assert_eq!(effects.len(), 1);
+        assert!(matches!(
+            effects[0],
+            Effect::FetchPackVersions { kind: PackKind::Shader, .. }
+        ));
+    }
+
+    #[test]
+    fn test_install_pack_from_browser_with_no_results_emits_no_effect() {
+        use crate::mods::types::{ModBrowserFetchState, ModrinthSearchHit};
+        let mut state = AppState {
+            active_view: ActiveView::PackBrowser {
+                slug: "test-inst".into(),
+                kind: PackKind::Resource,
+                search: String::new(),
+                fetch_state: ModBrowserFetchState::Ready,
+                results: Vec::<ModrinthSearchHit>::new(),
+                selected: 0,
+            },
+            ..AppState::default()
+        };
+        let effects = update(
+            &mut state,
+            Action::InstallPackFromBrowser {
+                slug: "test-inst".into(),
+                kind: PackKind::Resource,
+            },
+        );
+        assert!(effects.is_empty(), "no selected hit -> no effect");
+    }
+
+    #[test]
+    fn test_auto_start_pack_install_dispatches_install_from_modrinth() {
+        use crate::mods::types::{ModrinthFile, ModrinthHashes};
+        let version = ModrinthVersion {
+            id: "kIpbQNcv".into(),
+            project_id: "w0TnApzs".into(),
+            name: "Faithful 32x for MC 1.20.4".into(),
+            version_number: "1.20.4".into(),
+            version_type: "release".into(),
+            game_versions: vec!["1.20.4".into()],
+            loaders: vec!["vanilla".into()],
+            downloads: 0,
+            date_published: "2026-01-01T00:00:00Z".into(),
+            dependencies: vec![],
+            files: vec![ModrinthFile {
+                url: "https://example/faithful.zip".into(),
+                filename: "faithful.zip".into(),
+                primary: true,
+                size: 100,
+                hashes: ModrinthHashes {
+                    sha1: "deadbeef".into(),
+                    sha512: "deadbeef".into(),
+                },
+            }],
+        };
+        let mut state = AppState::default();
+        let effects = update(
+            &mut state,
+            Action::AutoStartPackInstall {
+                slug: "test-inst".into(),
+                kind: PackKind::Resource,
+                project_id: "w0TnApzs".into(),
+                project_slug: "faithful-32x".into(),
+                project_title: "Faithful 32x".into(),
+                version: version.clone(),
+            },
+        );
+        assert_eq!(effects.len(), 1);
+        match &effects[0] {
+            Effect::InstallPackFromModrinth {
+                slug,
+                kind,
+                project_id,
+                project_slug,
+                project_title,
+                version: v,
+            } => {
+                assert_eq!(slug, "test-inst");
+                assert_eq!(*kind, PackKind::Resource);
+                assert_eq!(project_id, "w0TnApzs");
+                assert_eq!(project_slug, "faithful-32x");
+                assert_eq!(project_title, "Faithful 32x");
+                assert_eq!(v.id, "kIpbQNcv");
+            }
+            other => panic!("expected InstallPackFromModrinth, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_pack_versions_failed_routes_to_install_failed() {
+        // PackVersionsFailed must tail into PackInstallFailed (clears running
+        // job book-keeping + logs warning); both arms emit no effects.
+        let mut state = AppState {
+            running_pack_jobs: {
+                let mut m = std::collections::HashMap::new();
+                m.insert(
+                    ("test-inst".to_string(), PackKind::Resource),
+                    tokio_util::sync::CancellationToken::new(),
+                );
+                m
+            },
+            ..AppState::default()
+        };
+        let effects = update(
+            &mut state,
+            Action::PackVersionsFailed {
+                slug: "test-inst".into(),
+                kind: PackKind::Resource,
+                project_id: "w0TnApzs".into(),
+                message: "boom".into(),
+            },
+        );
+        assert!(effects.is_empty());
+        assert!(
+            !state
+                .running_pack_jobs
+                .contains_key(&("test-inst".to_string(), PackKind::Resource)),
+            "PackInstallFailed tail-call must drop the running-job entry"
+        );
     }
 }

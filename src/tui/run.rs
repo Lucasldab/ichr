@@ -1942,6 +1942,65 @@ async fn execute_effects(
                 });
             }
 
+            Effect::FetchPackVersions { slug, kind, project_id, project_slug, project_title, mc } => {
+                // GAP-11-A: browser Enter-key auto-pick install chain.
+                // 1. list_versions for the picked project (kind-aware, MC-filtered).
+                // 2. pick first `is_latest_stable=true`; fallback `versions.first()`.
+                // 3. get_version to materialise the full ModrinthVersion body.
+                // 4. dispatch Action::AutoStartPackInstall, which fans out to
+                //    Effect::InstallPackFromModrinth (handler above).
+                let svc = Arc::clone(&pack_service);
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    match svc.list_versions(&project_id, mc.as_deref(), kind).await {
+                        Ok(entries) => {
+                            let entry_opt = entries
+                                .iter()
+                                .find(|v| v.is_latest_stable)
+                                .cloned()
+                                .or_else(|| entries.first().cloned());
+                            let Some(entry) = entry_opt else {
+                                let _ = tx.send(Action::PackVersionsFailed {
+                                    slug,
+                                    kind,
+                                    project_id,
+                                    message: "no compatible versions found".to_string(),
+                                }).await;
+                                return;
+                            };
+                            match svc.get_version(&entry.version_id).await {
+                                Ok(version) => {
+                                    let _ = tx.send(Action::AutoStartPackInstall {
+                                        slug,
+                                        kind,
+                                        project_id,
+                                        project_slug,
+                                        project_title,
+                                        version,
+                                    }).await;
+                                }
+                                Err(e) => {
+                                    let _ = tx.send(Action::PackVersionsFailed {
+                                        slug,
+                                        kind,
+                                        project_id,
+                                        message: e.to_string(),
+                                    }).await;
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            let _ = tx.send(Action::PackVersionsFailed {
+                                slug,
+                                kind,
+                                project_id,
+                                message: e.to_string(),
+                            }).await;
+                        }
+                    }
+                });
+            }
+
             Effect::TogglePackEnabledEff { slug, kind, mod_id } => {
                 let svc = Arc::clone(&pack_service);
                 let paths2 = paths.clone();
