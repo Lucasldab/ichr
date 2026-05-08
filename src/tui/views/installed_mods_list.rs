@@ -107,6 +107,10 @@ pub fn map_installed_mods_list_event(ev: CtEvent) -> Option<Action> {
         | CtEvent::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
             Some(Action::InstalledModsMove(1))
         }
+        // Phase 11 D-LOCK Tab switcher: Tab from InstalledMods cycles to Resource.
+        CtEvent::Key(KeyEvent { code: KeyCode::Tab, .. }) => {
+            Some(Action::InstalledPacksCycleKind)
+        }
         CtEvent::Key(KeyEvent { code: KeyCode::Char('e'), .. }) => Some(Action::ToggleModEnabled),
         CtEvent::Key(KeyEvent { code: KeyCode::Char('x'), .. }) => {
             Some(Action::OpenUninstallModConfirm)
