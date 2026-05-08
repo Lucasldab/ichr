@@ -5,6 +5,12 @@ edition = "2021"
 rust-version = "1.88"
 description = "Terminal-UI Minecraft Java Edition launcher"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/Lucasldab/mineltui"
+homepage = "https://github.com/Lucasldab/mineltui"
+readme = "README.md"
+authors = ["Lucas L. de Barros <lucasldabarros@gmail.com>"]
+keywords = ["minecraft", "launcher", "tui", "ratatui"]
+categories = ["command-line-utilities", "games"]
 
 [dependencies]
 # TUI
