@@ -70,6 +70,14 @@ impl KeySpec {
         Self { code, modifiers }
     }
 
+    /// User-facing label (matches the wire format) for embedding in
+    /// hint strings: `"L"`, `"Ctrl+L"`, `"Enter"`, etc. Used by
+    /// renderers so on-screen prompts track user overrides instead of
+    /// quoting hardcoded defaults.
+    pub fn display(&self) -> String {
+        keyspec_to_wire(self)
+    }
+
     /// True iff the incoming `KeyEvent` matches this binding. Modifier
     /// match is exact (`Ctrl+L` does NOT match plain `L`); code match
     /// is exact for `Char(_)` (case-sensitive, deliberately).
@@ -119,6 +127,17 @@ impl Keybinds {
     /// so the displayed shortcut tracks the user's overrides.
     pub fn get(&self, action: ActionKey) -> Option<&KeySpec> {
         self.bindings.get(&action)
+    }
+
+    /// Convenience: resolve a slot to its user-facing label, or fall
+    /// back to `"?"` if somehow unbound. `Default` populates every
+    /// slot, so this should not happen at runtime; the fallback keeps
+    /// hint text rendering total against malformed configs.
+    pub fn label(&self, action: ActionKey) -> String {
+        self.bindings
+            .get(&action)
+            .map(|k| k.display())
+            .unwrap_or_else(|| "?".to_string())
     }
 }
 

@@ -71,17 +71,26 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
     .block(Block::default().borders(Borders::ALL).title(title));
     f.render_widget(table, table_area);
 
-    // Active-account footer row.
+    // Active-account footer row. Hint reads the live keybind label so a
+    // user-rebound `open_accounts_list` propagates into the footer text
+    // (no more lying "press A" when they've remapped to Ctrl+A or
+    // similar).
+    let accounts_label = state
+        .config
+        .keybinds
+        .label(crate::config::ActionKey::OpenAccountsList);
     let footer_text = match state
         .active_account_id
         .as_ref()
         .and_then(|id| state.accounts.iter().find(|a| &a.id == id))
     {
         Some(a) => format!(
-            "Launching as: {}  (press A to manage accounts)",
+            "Launching as: {}  (press {accounts_label} to manage accounts)",
             a.mc_username
         ),
-        None => "Offline mode -- press A to add a Microsoft account".to_string(),
+        None => format!(
+            "Offline mode -- press {accounts_label} to add a Microsoft account"
+        ),
     };
     let footer = Paragraph::new(footer_text).style(Style::default().add_modifier(Modifier::DIM));
     f.render_widget(footer, footer_area);

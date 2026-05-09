@@ -59,13 +59,18 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
     f.render_widget(header_para, chunks[0]);
 
     // ---- Search bar (vim-style focus indicator; mirrors mod_browser.rs) ----
-    // Color slots come from `state.config.colors` so users can re-skin
-    // the launcher via `~/.config/ichr/config.toml`.
+    // Color slots and hint text both consult the user config, so a
+    // rebound `browser_begin_search` shows up in the placeholder and
+    // title automatically.
     let palette = &state.config.colors;
+    let search_label = state
+        .config
+        .keybinds
+        .label(crate::config::ActionKey::BrowserBeginSearch);
     let search_display = if *is_searching {
         format!("search: {search}_")
     } else if search.is_empty() {
-        format!("press / to search Modrinth {kind_label}")
+        format!("press {search_label} to search Modrinth {kind_label}")
     } else {
         format!("search: {search}")
     };
@@ -83,10 +88,15 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
     } else {
         palette.dim.to_color()
     };
+    let title_str = if *is_searching {
+        "Search [Esc]".to_string()
+    } else {
+        format!("Search [{search_label}]")
+    };
     let search_para = Paragraph::new(search_display).style(search_style).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(if *is_searching { "Search [Esc]" } else { "Search [/]" })
+            .title(title_str)
             .border_style(Style::default().fg(border_color)),
     );
     f.render_widget(search_para, chunks[1]);

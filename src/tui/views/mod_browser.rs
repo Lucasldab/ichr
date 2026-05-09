@@ -119,10 +119,18 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
     // switches to `accent`. Both colors are user-configurable via
     // `~/.config/ichr/config.toml -> [colors] accent / dim / text`.
     let palette = &state.config.colors;
+    // Hint text uses the live keybind label so on-screen prompts track
+    // user overrides (`browser_begin_search = "?"` -> "press ? to
+    // search"). `Esc` is hardcoded because exit-search is not
+    // configurable yet; calling out the literal key is honest.
+    let search_label = state
+        .config
+        .keybinds
+        .label(crate::config::ActionKey::BrowserBeginSearch);
     let search_display = if *is_searching {
         format!("search: {search}_")
     } else if search.is_empty() {
-        "press / to search Modrinth".to_string()
+        format!("press {search_label} to search Modrinth")
     } else {
         format!("search: {search}")
     };
@@ -140,10 +148,15 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
     } else {
         palette.dim.to_color()
     };
+    let title_str = if *is_searching {
+        "Search [Esc]".to_string()
+    } else {
+        format!("Search [{search_label}]")
+    };
     let search_para = Paragraph::new(search_display).style(search_style).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(if *is_searching { "Search [Esc]" } else { "Search [/]" })
+            .title(title_str)
             .border_style(Style::default().fg(border_color)),
     );
     f.render_widget(search_para, chunks[1]);
