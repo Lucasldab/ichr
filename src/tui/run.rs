@@ -20,6 +20,7 @@ use tokio::time::interval;
 use super::app::{
     update, Action, ActiveView, AppState, CreateStep, Effect, JavaPickerRow, VersionFilter,
 };
+use crate::config::ActionKey;
 use super::terminal::Tui;
 use super::view::view;
 use crate::auth::service::{AccountAuthEvent, AccountService};
@@ -339,39 +340,112 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
 }
 
 fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
+    // Configurable-keybind dispatch (`~/.config/ichr/config.toml ->
+    // [keybinds]`). Runs before the hardcoded match arms so user
+    // overrides win. Actions whose slot is not yet rebindable
+    // (s/r/x/d/Esc/arrow-nav/k) keep their hardcoded handlers below.
+    if let CtEvent::Key(kev) = ev {
+        let kb = &state.config.keybinds;
+        if kb.matches(ActionKey::Quit, &kev) {
+            return Some(Action::Quit);
+        }
+        if kb.matches(ActionKey::OpenCreateInstance, &kev) {
+            return Some(Action::OpenCreateModal);
+        }
+        if kb.matches(ActionKey::OpenModpackImport, &kev) {
+            return Some(Action::OpenModpackImport);
+        }
+        if kb.matches(ActionKey::OpenAccountsList, &kev) {
+            return Some(Action::OpenAccounts);
+        }
+        // Per-instance actions: need a selected, non-running target.
+        if let ActiveView::InstanceList { selected } = &state.active_view {
+            if let Some(m) = state.instances.get(*selected) {
+                let slug = m.slug.clone();
+                let running = state.running_instances.contains_key(&slug);
+                if kb.matches(ActionKey::LaunchInstance, &kev) {
+                    return if running {
+                        // T-03-05-01 belt-and-suspenders: ignore launch
+                        // attempts on a running instance.
+                        None
+                    } else {
+                        Some(Action::LaunchInstance { slug })
+                    };
+                }
+                if kb.matches(ActionKey::OpenJavaPicker, &kev) {
+                    // Cannot change Java mid-run.
+                    return if running {
+                        None
+                    } else {
+                        Some(Action::OpenJavaPicker { slug })
+                    };
+                }
+                if kb.matches(ActionKey::OpenLoaderPicker, &kev) {
+                    let installing = state.running_loader_installs.contains_key(&slug);
+                    return if running || installing {
+                        None
+                    } else {
+                        Some(Action::OpenLoaderPicker { slug })
+                    };
+                }
+                if kb.matches(ActionKey::OpenModBrowser, &kev) {
+                    // Pitfall 8 (08-RESEARCH.md): silent no-op while a mod
+                    // install is in flight.
+                    return if state.running_mod_jobs.contains_key(&slug) {
+                        None
+                    } else {
+                        Some(Action::OpenModBrowser { slug })
+                    };
+                }
+                if kb.matches(ActionKey::OpenInstalledMods, &kev) {
+                    return Some(Action::OpenInstalledMods { slug });
+                }
+                if kb.matches(ActionKey::OpenCfBrowser, &kev) {
+                    // Pitfall 1 + 8 inheritance.
+                    return if state.cf_api_key_present
+                        && !state.running_mod_jobs.contains_key(&slug)
+                    {
+                        Some(Action::OpenCfBrowser { slug })
+                    } else {
+                        None
+                    };
+                }
+                if kb.matches(ActionKey::OpenPackResourceBrowser, &kev) {
+                    let in_flight = state
+                        .running_pack_jobs
+                        .contains_key(&(slug.clone(), PackKind::Resource));
+                    return if in_flight {
+                        None
+                    } else {
+                        Some(Action::OpenPackBrowser {
+                            slug,
+                            kind: PackKind::Resource,
+                        })
+                    };
+                }
+                if kb.matches(ActionKey::OpenPackShaderBrowser, &kev) {
+                    let in_flight = state
+                        .running_pack_jobs
+                        .contains_key(&(slug.clone(), PackKind::Shader));
+                    return if in_flight {
+                        None
+                    } else {
+                        Some(Action::OpenPackBrowser {
+                            slug,
+                            kind: PackKind::Shader,
+                        })
+                    };
+                }
+            }
+        }
+    }
+    // Hardcoded fallback for keys that don't (yet) have a configurable
+    // slot: Esc-as-quit, lifecycle keys (s/r/x/d), and arrow / hjk-style
+    // navigation. Migrating these to `[keybinds]` is a follow-up.
     match ev {
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Char('q'),
-            ..
-        }) => Some(Action::Quit),
         CtEvent::Key(KeyEvent {
             code: KeyCode::Esc, ..
         }) => Some(Action::Quit),
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Char('c'),
-            ..
-        }) => Some(Action::OpenCreateModal),
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Char('i'),
-            ..
-        }) => Some(Action::OpenModpackImport),
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Enter,
-            ..
-        }) => {
-            if let ActiveView::InstanceList { selected } = &state.active_view {
-                if let Some(m) = state.instances.get(*selected) {
-                    if state.running_instances.contains_key(&m.slug) {
-                        // Already running -- no-op (T-03-05-01 belt-and-suspenders).
-                        return None;
-                    }
-                    return Some(Action::LaunchInstance {
-                        slug: m.slug.clone(),
-                    });
-                }
-            }
-            None
-        }
         CtEvent::Key(KeyEvent {
             code: KeyCode::Char('s'),
             ..
@@ -437,149 +511,14 @@ fn map_instance_list_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             }
             None
         }
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Char('A'),
-            modifiers,
-            ..
-        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::OpenAccounts),
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Char('j'),
-            ..
-        }) => {
-            // `j` on a non-running instance opens the Java picker.
-            // On a running instance it is a no-op (can't change java mid-game).
-            if let ActiveView::InstanceList { selected } = &state.active_view {
-                if let Some(m) = state.instances.get(*selected) {
-                    if !state.running_instances.contains_key(&m.slug) {
-                        return Some(Action::OpenJavaPicker {
-                            slug: m.slug.clone(),
-                        });
-                    }
-                }
-            }
-            None
-        }
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Char('L'),
-            modifiers,
-            ..
-        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
-            // `L` (uppercase) opens the loader picker for a non-running instance
-            // with no install already in flight (T-06-20).
-            if let ActiveView::InstanceList { selected } = &state.active_view {
-                if let Some(m) = state.instances.get(*selected) {
-                    if !state.running_instances.contains_key(&m.slug)
-                        && !state.running_loader_installs.contains_key(&m.slug)
-                    {
-                        return Some(Action::OpenLoaderPicker {
-                            slug: m.slug.clone(),
-                        });
-                    }
-                }
-            }
-            None
-        }
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Char('M'),
-            modifiers,
-            ..
-        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
-            // `M` (uppercase) opens the Modrinth mod browser. Pitfall 8 guard:
-            // silent no-op while a previous mod install is in flight for the same
-            // instance. The update() arm in app.rs enforces this too (defense in
-            // depth) -- see test_open_mod_browser_blocked_when_install_in_flight.
-            if let ActiveView::InstanceList { selected } = &state.active_view {
-                if let Some(m) = state.instances.get(*selected) {
-                    if !state.running_mod_jobs.contains_key(&m.slug) {
-                        return Some(Action::OpenModBrowser {
-                            slug: m.slug.clone(),
-                        });
-                    }
-                }
-            }
-            None
-        }
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Char('m'),
-            modifiers,
-            ..
-        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
-            // `m` (lowercase) opens the per-instance Installed Mods List.
-            if let ActiveView::InstanceList { selected } = &state.active_view {
-                if let Some(m) = state.instances.get(*selected) {
-                    return Some(Action::OpenInstalledMods {
-                        slug: m.slug.clone(),
-                    });
-                }
-            }
-            None
-        }
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Char('F'),
-            modifiers,
-            ..
-        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
-            // `F` (uppercase) opens the CurseForge mod browser. Pitfall 1
-            // guard: silent no-op when no CurseForge API key was resolved at
-            // startup. Pitfall 8 guard (inherited from Phase 8): silent no-op
-            // while a previous mod install is in flight for the same instance.
-            // The update() arm in app.rs enforces both guards too (defense in
-            // depth) -- see test_cf_open_no_op_when_api_key_absent.
-            if let ActiveView::InstanceList { selected } = &state.active_view {
-                if let Some(m) = state.instances.get(*selected) {
-                    if state.cf_api_key_present && !state.running_mod_jobs.contains_key(&m.slug) {
-                        return Some(Action::OpenCfBrowser {
-                            slug: m.slug.clone(),
-                        });
-                    }
-                }
-            }
-            None
-        }
-        // Phase 11 D-LOCK: uppercase R → Resource Pack browser.
-        // lowercase 'r' (OpenRenameInline) is NOT modified.
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Char('R'),
-            modifiers,
-            ..
-        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
-            if let ActiveView::InstanceList { selected } = &state.active_view {
-                if let Some(m) = state.instances.get(*selected) {
-                    if !state
-                        .running_pack_jobs
-                        .contains_key(&(m.slug.clone(), PackKind::Resource))
-                    {
-                        return Some(Action::OpenPackBrowser {
-                            slug: m.slug.clone(),
-                            kind: PackKind::Resource,
-                        });
-                    }
-                }
-            }
-            None
-        }
-        // Phase 11 D-LOCK: uppercase S → Shader Pack browser.
-        // lowercase 's' (StopInstance) is NOT modified.
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Char('S'),
-            modifiers,
-            ..
-        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
-            if let ActiveView::InstanceList { selected } = &state.active_view {
-                if let Some(m) = state.instances.get(*selected) {
-                    if !state
-                        .running_pack_jobs
-                        .contains_key(&(m.slug.clone(), PackKind::Shader))
-                    {
-                        return Some(Action::OpenPackBrowser {
-                            slug: m.slug.clone(),
-                            kind: PackKind::Shader,
-                        });
-                    }
-                }
-            }
-            None
-        }
+        // ── Configurable bindings (A / j / L / M / m / F / R / S) live in
+        //   `[keybinds]` and are dispatched at the top of this fn. The
+        //   arms that previously matched these letters were removed when
+        //   the dispatcher landed -- editing config.toml is the way to
+        //   change them now. The hardcoded arms below cover keys that do
+        //   not yet have a slot in the keybind enum (Down/Up/k for nav,
+        //   c/i are bound but their lowercase forms still flow through
+        //   the same code).
         CtEvent::Key(KeyEvent {
             code: KeyCode::Down,
             ..
