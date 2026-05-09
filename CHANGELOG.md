@@ -7,13 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Pending
+### Added
 
-- Microsoft AppID approval -- once granted, the launcher's client ID will be
-  embedded so first-run no longer requires the `ICHR_MSA_CLIENT_ID` env var
-- Configurable keybinds and color theme via TOML config file
-- Search-bar focus mode in mod / pack browsers (`/` to enter search,
-  unblocking searches that start with shadowed letters like `j`, `k`, `v`, `l`)
+- **Embedded Microsoft AppID** (Mojang-approved 2026-05-08) -- end users
+  no longer need to register their own Azure AD app or set
+  `ICHR_MSA_CLIENT_ID`. Forks still override via the env var; see
+  `docs/msa-setup.md`.
+- **User configuration** at `~/.config/ichr/config.toml` (`docs/config.md`):
+  - `[colors]` palette with seven semantic slots (accent / dim / error /
+    success / info / text / selected_bg). Accepts named ANSI colors or
+    `#RRGGBB` hex literals.
+  - `[keybinds]` table for fifteen action slots covering global and
+    instance-list actions plus the browser search-mode trigger. Wire
+    format supports modifier chains (`"Ctrl+Shift+L"`) and treats
+    uppercase letters as `Shift+letter` automatically.
+  - On-screen hint text (search-bar placeholder, account-management
+    footer, browser titles) reads the live keybind label so prompts
+    track user overrides.
+- **Vim-style search mode** in mod / resource pack / shader pack browsers:
+  `/` enters search mode (every printable char types into the buffer),
+  Esc exits search mode without closing the browser. Closes the bug
+  where queries could not start with `v`, `l`, `j`, or `k` because
+  those letters were consumed as filter / nav shortcuts.
+- **Pack-install failure modal** mirroring the mod-install failure modal,
+  so failures (e.g. a Modrinth filename containing Minecraft formatting
+  codes) surface in the UI instead of only in `ichr.log`.
+
+### Fixed
+
+- Modrinth pack filenames containing Minecraft formatting codes (`§6`,
+  `§r`) and bracket characters are now sanitized at install time
+  instead of rejected. Path-traversal protection is preserved -- inputs
+  containing `/`, `\`, or `..` are still refused outright.
+- "Installed" tag in mod / pack browser results now appears immediately
+  after install completes, rather than only after the user types another
+  search character. Backed by an in-memory installed-set on AppState
+  that decouples the stamp from the install/search round-trip race.
+- Microsoft Account refresh tokens persist correctly. Previously
+  `keyring` 3.x was compiled without a platform backend feature, so
+  `set_password` returned `Ok` against a stub while later
+  `get_password` calls failed with `AccountNotFound` at launch.
+  Cargo features now opt into the real OS secret service / kernel
+  keyutils backends with the encrypted-file fallback for headless
+  hosts.
 
 ## [0.1.0] -- 2026-05-08
 

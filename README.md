@@ -9,12 +9,12 @@ Minecraft -- without leaving the terminal.
 ```
 ┌─ ichr ────────────────────────────────────────────────┐
 │ Instances                                             │
-│   ► fabric-1.20.4         vanilla → Fabric 0.16       │
+│   ► fabric-1.20.4         vanilla -> Fabric 0.16      │
 │     forge-1.20.1          Forge 47.4.10               │
 │     vanilla-1.21.4        latest release              │
 │                                                       │
-│ N new   Enter open   L launch   E edit   D delete     │
-│ Q quit                                                │
+│ c new   Enter launch   L loader   M mods   d delete   │
+│ A accounts   J java   R packs   q quit                │
 └───────────────────────────────────────────────────────┘
 ```
 
@@ -35,6 +35,8 @@ Minecraft -- without leaving the terminal.
   DPAPI on Windows) or AES-256-GCM encrypted file fallback.
 - **Single binary**: no installer, no runtime dependencies. `cargo install` or
   download a release archive.
+- **Customizable**: rebind keys and re-skin the color palette via
+  `~/.config/ichr/config.toml`. See [`docs/config.md`](docs/config.md).
 
 ## Status
 
@@ -100,6 +102,35 @@ writes its data to platform-standard directories:
 | Linux | `~/.local/share/ichr` | `~/.config/ichr` | `~/.cache/ichr` |
 | Windows | `%APPDATA%\ichr\data` | `%APPDATA%\ichr\config` | `%LOCALAPPDATA%\ichr\cache` |
 
+## Customization
+
+Drop a `config.toml` into the platform's config directory above to
+rebind keys or re-skin the color palette. The file is optional;
+missing or malformed files fall back to defaults with a warning in
+`ichr.log`.
+
+```toml
+[colors]
+accent      = "lightcyan"      # focused borders, active filter chips
+dim         = "#444444"        # placeholders, inactive borders
+selected_bg = "#003366"
+
+[keybinds]
+quit                 = "Q"     # uppercase letter implies Shift
+open_loader_picker   = "Ctrl+L"
+browser_begin_search = "?"
+```
+
+Schema, accepted color names + hex literals, the keybind wire format
+(modifier syntax, named keys, the "uppercase implies Shift" rule),
+and an example dark-theme config live in
+[`docs/config.md`](docs/config.md). Coverage is incremental: the
+most-visible surfaces (browser search bars, instance-list keys, key
+hint strings) read from the config today; modal chrome and per-view
+keybinds still use defaults and are migrated as the project evolves.
+
+There is no live reload -- restart `ichr` to pick up edits.
+
 ## Windows long-path support
 
 ichr's binary declares `longPathAware` in its Windows manifest. For the
@@ -138,7 +169,8 @@ cargo test
 
 ## Roadmap
 
-- Configurable keybinds and color theme via `~/.config/ichr/config.toml`
+- Full keybind + color customization coverage (currently the most-visible
+  surfaces; deeper modal chrome still uses defaults)
 - CurseForge integration enabled (post-API-key bureaucracy)
 - macOS support
 - ARM64 binaries
