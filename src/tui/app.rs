@@ -13,11 +13,13 @@
 //! JavaPickerOptionsLoaded, etc.) for per-instance java_override management.
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use std::time::Instant;
 
 use tokio_util::sync::CancellationToken;
 
 use crate::auth::{Account, AuthContext};
+use crate::config::Config;
 use crate::domain::platform::{Arch, OsName};
 use crate::domain::InstanceManifest;
 use crate::java::detect::SystemJava;
@@ -453,6 +455,13 @@ pub struct AppState {
     /// Per-(instance, kind) set of installed Modrinth project_ids (packs).
     /// Mirrors `installed_mod_project_ids` for the pack browsers.
     pub installed_pack_project_ids: HashMap<(String, PackKind), HashSet<String>>,
+    /// User-facing configuration: rebindable keys + color palette.
+    /// Loaded once at startup from `~/.config/ichr/config.toml` (or
+    /// platform equivalent); shared via `Arc` so per-frame render fns
+    /// can clone the handle cheaply. Defaults match the historical
+    /// hardcoded UX so introducing this field is a no-op until
+    /// renderers / handlers migrate to read from it.
+    pub config: Arc<Config>,
 }
 
 #[derive(Debug, Clone)]

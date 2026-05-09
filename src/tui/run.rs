@@ -133,8 +133,15 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
     // F keybind can no-op silently and instance_list can render the title hint.
     // Use struct-update syntax to satisfy clippy::field_reassign_with_default
     // (Phase 1 precedent -- same pattern as arch/os).
+    //
+    // User config: load `<config_dir>/config.toml` once at startup. Missing
+    // file or parse errors fall back to defaults (see `config::Config::load`).
+    let config = std::sync::Arc::new(crate::config::Config::load(
+        &paths.config_dir.join("config.toml"),
+    ));
     let mut state = AppState {
         cf_api_key_present: cf_service.api_key_present(),
+        config,
         ..AppState::default()
     };
 

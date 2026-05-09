@@ -222,7 +222,12 @@ mod tests {
         assert_eq!(a.xuid, "uhs-1");
         assert_eq!(a.xbox_user_hash, "uhs-1");
         assert_eq!(a.user_type, "msa");
-        // Default when ICHR_MSA_CLIENT_ID env var is unset.
-        assert_eq!(a.clientid, "00000000402b5328");
+        // Default when ICHR_MSA_CLIENT_ID env var is unset -- pulled
+        // from `auth::device_code::DEFAULT_MSA_CLIENT_ID` so the test
+        // tracks the constant rather than restating its value.
+        assert_eq!(
+            a.clientid,
+            crate::auth::device_code::DEFAULT_MSA_CLIENT_ID
+        );
     }
 }
