@@ -21,7 +21,7 @@
 //!   - pitfall 5 (PITFALLS.md): scope MUST include `offline_access` or no
 //!     refresh_token is issued
 //!   - pitfall 16: no raw token values in tracing macro field args
-//!   - client_id default: legacy Mojang launcher ID; env override documented (A1)
+//!   - client_id default: production ichr AppID baked in; env override documented (A1)
 
 use serde::Deserialize;
 use std::time::Duration;
@@ -34,10 +34,23 @@ use crate::auth::AuthError;
 // Constants
 // ---------------------------------------------------------------------------
 
-/// Default MSA client ID -- the legacy Mojang public launcher app ID.
-/// Conventional for third-party launchers (Prism, ATLauncher, GDLauncher).
-/// Override via `ICHR_MSA_CLIENT_ID` to use your own Azure AD registration.
-pub const DEFAULT_MSA_CLIENT_ID: &str = "00000000402b5328";
+/// Default MSA client ID -- the production ichr Azure AD app registration,
+/// approved by Mojang Enforcement on 2026-05-08 and added to the Minecraft
+/// Services API allow list.
+///
+/// This is a public-client AppID: it has no `client_secret` and is *not*
+/// sensitive. Embedding it in source matches the convention used by every
+/// major OSS launcher (PrismLauncher, HMCL, ATLauncher, Modrinth App).
+/// Authentication still requires explicit user consent through the device
+/// code flow at `microsoft.com/link`, where Microsoft displays the
+/// registered app name + publisher locked to this AppID.
+///
+/// Forks and downstream redistributions MUST register their own Azure AD
+/// app and override via `ICHR_MSA_CLIENT_ID` -- per the Minecraft Usage
+/// Guidelines each launcher needs its own approved AppID. Reusing this
+/// one for a fork would attribute that fork's traffic to ichr and risks
+/// the AppID being revoked project-wide.
+pub const DEFAULT_MSA_CLIENT_ID: &str = "1729c1ea-1682-4223-91de-7538cb1c16f2";
 
 /// Environment variable name for client ID override.
 pub const MSA_CLIENT_ID_ENV: &str = "ICHR_MSA_CLIENT_ID";
@@ -63,8 +76,10 @@ pub const DEVICE_CODE_GRANT: &str = "urn:ietf:params:oauth:grant-type:device_cod
 // ---------------------------------------------------------------------------
 
 /// Returns the MSA client ID, honoring the `ICHR_MSA_CLIENT_ID` env
-/// override.  Default: `"00000000402b5328"` (legacy Mojang public ID;
-/// conventional for third-party launchers).
+/// override. Default: the production ichr AppID baked in via
+/// `DEFAULT_MSA_CLIENT_ID` so end users never have to register their own
+/// Azure AD app. Forks/downstream builds set the env var (or replace the
+/// constant) with their own approved AppID.
 pub fn client_id() -> String {
     std::env::var(MSA_CLIENT_ID_ENV).unwrap_or_else(|_| DEFAULT_MSA_CLIENT_ID.to_string())
 }
@@ -163,15 +178,17 @@ pub async fn request_device_code(
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
         // AADSTS700016 ("unauthorized_client" / "Application with identifier ...
-        // was not found in the directory 'Microsoft Accounts'") means the
-        // legacy Mojang launcher client_id is no longer accepted. User must
-        // register their own Azure AD app and set ICHR_MSA_CLIENT_ID.
-        // See docs/msa-setup.md for the registration walkthrough.
+        // was not found in the directory 'Microsoft Accounts'") means
+        // the AppID is unknown to Microsoft. With a production AppID
+        // baked in (`DEFAULT_MSA_CLIENT_ID`) this should only happen for
+        // forks that overrode `ICHR_MSA_CLIENT_ID` with an unregistered
+        // value, or if Microsoft revoked the default AppID.
         if body.contains("AADSTS700016") || body.contains("unauthorized_client") {
             return Err(AuthError::DeviceCodeRequest(
-                "Microsoft rejected the default client ID. You need to register \
-                 your own Azure AD app and set ICHR_MSA_CLIENT_ID. \
-                 See docs/msa-setup.md for a 5-step walkthrough."
+                "Microsoft rejected the configured client ID. If you set \
+                 ICHR_MSA_CLIENT_ID, verify the GUID matches an Azure AD app \
+                 that is approved by Mojang. See docs/msa-setup.md for the \
+                 registration walkthrough."
                     .to_string(),
             ));
         }

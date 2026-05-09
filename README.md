@@ -41,14 +41,22 @@ Minecraft -- without leaving the terminal.
 **v0.1.0** -- first public release. The core path (create instance, install
 modloader, install mods from Modrinth, launch) works end-to-end on Linux.
 
-**Microsoft Account sign-in currently requires a one-time setup** to register
-your own Azure AD app and supply its client ID via environment variable.
-This is a transitional requirement: Microsoft retired the legacy shared
-client ID that older third-party launchers used, and ichr's own client ID
-is pending review on Microsoft's AppID approval list. Once approved, the
-client ID will be embedded in the binary and no setup will be required.
+**Microsoft Account sign-in works out of the box.** ichr's Azure AD app
+was approved by Mojang Enforcement and the production AppID is embedded
+in the binary, matching the convention used by every major OSS launcher
+(PrismLauncher, HMCL, ATLauncher). Press `A` to add an account and
+follow the device-code prompt -- no environment variables, no Azure
+portal trips. The AppID is a public-client identifier (no secret) and
+authentication still requires explicit per-user consent at
+microsoft.com/link.
 
-See [`docs/msa-setup.md`](docs/msa-setup.md) for the 5-minute walkthrough.
+**Forks and downstream redistributions** must register their own Azure
+AD app and override via `ICHR_MSA_CLIENT_ID` -- per the Minecraft Usage
+Guidelines each launcher needs its own approved AppID. Reusing the
+upstream ichr AppID for a fork attributes that fork's traffic to ichr
+and risks the AppID being revoked project-wide. See
+[`docs/msa-setup.md`](docs/msa-setup.md) for the registration
+walkthrough.
 
 CurseForge integration is in the codebase but disabled by default in v1 --
 it requires a CurseForge API key that must be obtained from
@@ -84,16 +92,8 @@ powershell -c "irm https://github.com/Lucasldab/ichr/releases/latest/download/ic
 
 ## First-run setup
 
-Set the Microsoft Account client ID per
-[`docs/msa-setup.md`](docs/msa-setup.md):
-
-```bash
-export ICHR_MSA_CLIENT_ID=<your-azure-app-client-id>
-ichr
-```
-
-This is a one-time setup. The launcher writes its data to platform-standard
-directories:
+None for end users -- launch and press `A` to sign in. The launcher
+writes its data to platform-standard directories:
 
 | Platform | Data | Config | Cache |
 |----------|------|--------|-------|
@@ -138,7 +138,6 @@ cargo test
 
 ## Roadmap
 
-- AppID approval (pending Microsoft review) -> embedded client ID, zero setup
 - Configurable keybinds and color theme via `~/.config/ichr/config.toml`
 - CurseForge integration enabled (post-API-key bureaucracy)
 - macOS support
