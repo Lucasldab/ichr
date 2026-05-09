@@ -337,6 +337,27 @@ pub enum ActiveView {
         mod_id: String,
         file_name: String,
     },
+    /// Phase 11 follow-up: error modal when a pack install fails.
+    /// Mirrors `ModInstallFailedModal` so the failure surfaces in UI rather
+    /// than only the log file (previously `PackInstallFailed` only emitted
+    /// `tracing::warn`).
+    PackInstallFailedModal {
+        slug: String,
+        kind: PackKind,
+        pack_title: String,
+        version_label: String,
+        error: String,
+        return_to: PackInstallFailedReturnTo,
+    },
+}
+
+/// Where to return after a `PackInstallFailedModal` is dismissed. Mirrors
+/// `ModInstallFailedReturnTo` so the back-navigation respects which view
+/// the user kicked the install off from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackInstallFailedReturnTo {
+    PackBrowser,
+    InstalledPacksList,
 }
 
 /// Where the `Action::DismissModInstallFailed` arm should return to.
@@ -1034,8 +1055,19 @@ pub enum Action {
     PackInstallFailed {
         slug: String,
         kind: PackKind,
+        /// User-facing project title for the failure modal heading.
+        /// Empty string is acceptable for tail-routed cases (e.g. version
+        /// fetch failures where the title is unknown); the modal renders
+        /// "(unknown)" in that case.
+        pack_title: String,
+        /// User-facing version label for the failure modal subtitle.
+        /// Empty when no version was selected yet.
+        version_label: String,
         error: String,
     },
+    /// Esc on PackInstallFailedModal -- returns to PackBrowser or
+    /// InstalledPacksList per `return_to`.
+    DismissPackInstallFailed,
     /// Pack drop-from-path install failed.
     PackDropFailed {
         slug: String,
@@ -4612,10 +4644,85 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![Effect::FetchInstalledPacks { slug, kind }]
         }
 
-        Action::PackInstallFailed { slug, kind, error } => {
+        Action::PackInstallFailed {
+            slug,
+            kind,
+            pack_title,
+            version_label,
+            error,
+        } => {
             state.running_pack_jobs.remove(&(slug.clone(), kind));
             tracing::warn!(?kind, %slug, %error, "PackInstallFailed");
+            // Surface to the user. Previously this arm only logged to
+            // tracing -- the install would silently revert to the pack
+            // browser with no indication of what went wrong.
+            let return_to = match &state.active_view {
+                ActiveView::PackBrowser { .. } => PackInstallFailedReturnTo::PackBrowser,
+                _ => PackInstallFailedReturnTo::InstalledPacksList,
+            };
+            state.active_view = ActiveView::PackInstallFailedModal {
+                slug,
+                kind,
+                pack_title: if pack_title.is_empty() {
+                    "(unknown pack)".to_string()
+                } else {
+                    pack_title
+                },
+                version_label,
+                error,
+                return_to,
+            };
             vec![]
+        }
+
+        Action::DismissPackInstallFailed => {
+            let captured = match &state.active_view {
+                ActiveView::PackInstallFailedModal {
+                    slug,
+                    kind,
+                    return_to,
+                    ..
+                } => Some((slug.clone(), *kind, *return_to)),
+                _ => None,
+            };
+            match captured {
+                Some((slug, kind, PackInstallFailedReturnTo::PackBrowser)) => {
+                    let mc = state
+                        .instances
+                        .iter()
+                        .find(|m| m.slug == slug)
+                        .map(|m| m.mc_version_id.clone());
+                    state.active_view = ActiveView::PackBrowser {
+                        slug: slug.clone(),
+                        kind,
+                        search: String::new(),
+                        is_searching: false,
+                        fetch_state: ModBrowserFetchState::Loading,
+                        results: Vec::new(),
+                        selected: 0,
+                    };
+                    vec![Effect::SearchPacks {
+                        slug,
+                        kind,
+                        query: String::new(),
+                        mc,
+                    }]
+                }
+                Some((slug, kind, PackInstallFailedReturnTo::InstalledPacksList)) => {
+                    state.active_view = ActiveView::InstalledPacksList {
+                        slug: slug.clone(),
+                        kind,
+                        packs: Vec::new(),
+                        selected: 0,
+                        transient_status: None,
+                    };
+                    vec![Effect::FetchInstalledPacks { slug, kind }]
+                }
+                None => {
+                    state.active_view = ActiveView::default();
+                    vec![]
+                }
+            }
         }
 
         Action::PackDropFailed { slug, kind, error } => {
@@ -4762,12 +4869,16 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             // Tail-route to the existing PackInstallFailed arm so the failure
             // UI surfaces uniformly. project_id is dropped; PackInstallFailed
             // does not carry it (the active PackBrowser view supplies context
-            // via slug + kind alone).
+            // via slug + kind alone). pack_title/version_label are unknown
+            // at this stage (the version list never resolved), so the modal
+            // falls back to "(unknown pack)" / "".
             update(
                 state,
                 Action::PackInstallFailed {
                     slug,
                     kind,
+                    pack_title: String::new(),
+                    version_label: String::new(),
                     error: message,
                 },
             )

@@ -21,7 +21,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::mods::error::ModrinthError;
 use crate::mods::filter::{
-    disabled_filename, is_safe_pack_filename, pick_primary_file, MAX_PACK_FILE_BYTES,
+    disabled_filename, is_safe_pack_filename, pick_primary_file, sanitize_pack_filename,
+    MAX_PACK_FILE_BYTES,
 };
 use crate::mods::installer::{sha1_hex, MOD_DOWNLOAD_CONCURRENCY};
 use crate::mods::ledger::{per_instance_lock, read_ledger, upsert_pack, write_ledger};
@@ -217,11 +218,23 @@ impl PackService {
         })?;
 
         // Step 2 (T-11-02-01): validate filename BEFORE any HTTP call.
-        if !is_safe_pack_filename(&file.filename) {
-            return Err(PackError::UnsafeFilename {
-                filename: file.filename.clone(),
-            });
-        }
+        // Modrinth pack uploads regularly include Minecraft formatting codes
+        // (`§6`, `§r`) and bracket characters in filenames. Project them
+        // through `sanitize_pack_filename` so legitimate uploads are not
+        // rejected; the strict allowlist still gates the result, so a
+        // sanitization that somehow produces a path-traversing name is
+        // still refused.
+        let safe_filename = sanitize_pack_filename(&file.filename).filter(|n| {
+            is_safe_pack_filename(n)
+        });
+        let safe_filename = match safe_filename {
+            Some(n) => n,
+            None => {
+                return Err(PackError::UnsafeFilename {
+                    filename: file.filename.clone(),
+                })
+            }
+        };
 
         // Step 3 (T-11-02-02): validate URL (HTTPS-only; loopback for test).
         if !is_acceptable_pack_url(&file.url) {
@@ -243,8 +256,11 @@ impl PackService {
             return Err(PackError::Cancelled);
         }
 
-        // Step 6: compute dest paths.
-        let final_path = paths.instance_pack_file(slug, kind, &file.filename);
+        // Step 6: compute dest paths. On-disk uses the sanitized filename
+        // (`safe_filename`) so the bytes hitting the filesystem are
+        // allowlist-clean; the original `file.filename` survives only in
+        // log/progress messages for user reference.
+        let final_path = paths.instance_pack_file(slug, kind, &safe_filename);
         let tmp_path = {
             let mut p = final_path.clone();
             let mut name = p.file_name().unwrap_or_default().to_os_string();
@@ -341,7 +357,7 @@ impl PackService {
             display_name: project_title.to_string(),
             version_id: version.id.clone(),
             version_label: version.version_number.clone(),
-            file_name: file.filename.clone(),
+            file_name: safe_filename.clone(),
             // Historical-naming carve-out: sha1 hex stored in sha512 field.
             sha512: file.hashes.sha1.clone(),
             size: file.size,

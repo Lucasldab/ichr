@@ -163,6 +163,87 @@ pub fn is_safe_pack_filename(s: &str) -> bool {
     })
 }
 
+/// Project a Modrinth pack filename to a strict-allowlist-safe variant.
+///
+/// Modrinth pack uploads frequently include filenames with Minecraft
+/// formatting codes (`§6`, `§r`), brackets (`[Border]`), parens, emoji,
+/// and other Unicode that fail `is_safe_pack_filename`'s allowlist. Those
+/// names are not malicious -- they're just not what `is_safe_pack_filename`
+/// permits -- so we transform them here:
+///
+///   * `§<any-char>` sequences (Minecraft color/style codes) are stripped
+///     entirely (the next char is the code; both bytes go).
+///   * Path separators (`/`, `\`) and `..` are replaced with `_`
+///     (defense in depth; still rejected by `is_safe_pack_filename` if
+///     somehow they survive).
+///   * Any other byte outside the allowlist (`A-Z`, `a-z`, `0-9`,
+///     `._+- `) becomes `_`.
+///   * Leading dots are stripped (no hidden files).
+///   * The `.zip` suffix is preserved if the original ended in `.zip`
+///     (case-insensitive). Otherwise the function returns `None`.
+///   * Empty / whitespace-only stems collapse to `pack.zip`.
+///
+/// Returns `None` if the input is not a `.zip` filename or if sanitization
+/// produces an empty string (caller should fall back to a safe constant).
+/// On success the result is guaranteed to satisfy `is_safe_pack_filename`.
+pub fn sanitize_pack_filename(s: &str) -> Option<String> {
+    if !s.to_ascii_lowercase().ends_with(".zip") {
+        return None;
+    }
+    // Path-traversal: reject up front rather than rewriting. Sanitize is
+    // for *decoration* (formatting codes, brackets, Unicode), not for
+    // laundering hostile inputs into safe ones. A filename containing
+    // `/`, `\`, or `..` is presumed malicious and dropped.
+    if s.contains('/') || s.contains('\\') || s.contains("..") {
+        return None;
+    }
+    // Split into stem + ".zip" (case-insensitive on the suffix).
+    let stem_len = s.len().saturating_sub(4);
+    let stem = &s[..stem_len];
+
+    // Strip §<X> Minecraft formatting code pairs.
+    let mut stripped = String::with_capacity(stem.len());
+    let mut chars = stem.chars();
+    while let Some(c) = chars.next() {
+        if c == '\u{00A7}' {
+            // Drop the code byte that follows (any single char).
+            let _ = chars.next();
+        } else {
+            stripped.push(c);
+        }
+    }
+
+    // Replace anything outside the allowlist with `_`.
+    let mut out: String = stripped
+        .bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric()
+                || b == b'.'
+                || b == b'_'
+                || b == b'+'
+                || b == b'-'
+                || b == b' '
+            {
+                b as char
+            } else {
+                '_'
+            }
+        })
+        .collect();
+
+    // Strip leading dots (hidden-file prevention) and collapse repeated
+    // underscores so the result stays readable.
+    while out.starts_with('.') {
+        out.remove(0);
+    }
+    while out.contains("__") {
+        out = out.replace("__", "_");
+    }
+    let trimmed = out.trim_matches(|c: char| c == '_' || c == ' ');
+    let stem_clean = if trimmed.is_empty() { "pack" } else { trimmed };
+    Some(format!("{stem_clean}.zip"))
+}
+
 // ============================================================================
 // === .jar.disabled toggle helpers (08-RESEARCH.md §Pattern 7)            ===
 // ============================================================================
@@ -530,5 +611,63 @@ mod tests {
     #[test]
     fn test_max_pack_file_bytes_is_500mb() {
         assert_eq!(MAX_PACK_FILE_BYTES, 500 * 1024 * 1024);
+    }
+
+    // --- sanitize_pack_filename ---------------------------------------------
+
+    #[test]
+    fn test_sanitize_strips_minecraft_formatting_codes() {
+        // Real-world Modrinth filename that triggered the original bug.
+        let got = sanitize_pack_filename("NewGlowingOres-§6[Border]§r.zip").unwrap();
+        // §6 / §r pairs disappear; brackets become `_`; result is
+        // allowlist-safe.
+        assert!(is_safe_pack_filename(&got), "got {got}");
+        assert!(!got.contains('§'));
+        assert!(!got.contains('['));
+        assert!(!got.contains(']'));
+    }
+
+    #[test]
+    fn test_sanitize_preserves_simple_names_unchanged() {
+        let got = sanitize_pack_filename("Faithful-32x.zip").unwrap();
+        assert_eq!(got, "Faithful-32x.zip");
+    }
+
+    #[test]
+    fn test_sanitize_rejects_path_traversal() {
+        assert!(sanitize_pack_filename("../escape.zip").is_none());
+        assert!(sanitize_pack_filename("foo/bar.zip").is_none());
+        assert!(sanitize_pack_filename("foo\\bar.zip").is_none());
+    }
+
+    #[test]
+    fn test_sanitize_rejects_non_zip() {
+        assert!(sanitize_pack_filename("pack.jar").is_none());
+        assert!(sanitize_pack_filename("plain").is_none());
+    }
+
+    #[test]
+    fn test_sanitize_collapses_runs_of_underscores() {
+        // Brackets + parens + emoji should not produce ugly `____` runs.
+        let got = sanitize_pack_filename("Pack [v2] (final).zip").unwrap();
+        assert!(is_safe_pack_filename(&got), "got {got}");
+        assert!(!got.contains("__"));
+    }
+
+    #[test]
+    fn test_sanitize_strips_leading_dot() {
+        // Single leading dot survives the `..` traversal guard but should
+        // be stripped (matches `is_safe_pack_filename` rejection of
+        // dotfiles). Multiple leading dots = path-traversal, rejected.
+        let got = sanitize_pack_filename(".weird.zip").unwrap();
+        assert!(!got.starts_with('.'));
+        assert!(is_safe_pack_filename(&got), "got {got}");
+    }
+
+    #[test]
+    fn test_sanitize_falls_back_to_pack_zip_for_empty_stem() {
+        // After stripping § codes the stem is empty -> falls back.
+        let got = sanitize_pack_filename("§6§r.zip").unwrap();
+        assert_eq!(got, "pack.zip");
     }
 }

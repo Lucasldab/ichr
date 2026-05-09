@@ -33,6 +33,7 @@ use super::views::{
     modpack_import_progress_modal::render_modpack_import_progress_modal,
     pack_browser::render_pack_browser,
     pack_drop_path_modal::render_pack_drop_path_modal,
+    pack_install_failed_modal::render_pack_install_failed_modal,
     uninstall_mod_confirm::render_uninstall_mod_confirm,
     uninstall_pack_confirm::render_uninstall_pack_confirm,
     version_picker::render_version_picker,
@@ -120,6 +121,9 @@ pub fn view(state: &AppState, f: &mut Frame) {
         ActiveView::PackBrowser { .. } => render_pack_browser(f, main, state),
         ActiveView::InstalledPacksList { .. } => render_installed_packs_list(f, main, state),
         ActiveView::PackDropPathInput { .. } => render_pack_drop_path_modal(f, main, state),
+        ActiveView::PackInstallFailedModal { .. } => {
+            render_pack_install_failed_modal(f, main, state)
+        }
         ActiveView::UninstallPackConfirm { .. } => render_uninstall_pack_confirm(f, main, state),
     }
 

@@ -325,6 +325,9 @@ fn map_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         ActiveView::UninstallPackConfirm { .. } => {
             super::views::uninstall_pack_confirm::map_uninstall_pack_confirm_event(ev)
         }
+        ActiveView::PackInstallFailedModal { .. } => {
+            super::views::pack_install_failed_modal::map_pack_install_failed_event(ev)
+        }
     }
 }
 
@@ -2171,6 +2174,8 @@ async fn execute_effects(
 
                 let slug_task = slug.clone();
                 let project_id_task = project_id.clone();
+                let project_title_task = project_title.clone();
+                let version_label_task = version.version_number.clone();
                 task_manager.spawn_task(job_id, move |_task_tx, token| async move {
                     let slug = slug_task;
                     match svc
@@ -2195,7 +2200,15 @@ async fn execute_effects(
                             tracing::info!(%slug, ?kind, %project_id_task, "pack install cancelled");
                         }
                         Err(e) => {
-                            let _ = tx.send(Action::PackInstallFailed { slug, kind, error: e.to_string() }).await;
+                            let _ = tx
+                                .send(Action::PackInstallFailed {
+                                    slug,
+                                    kind,
+                                    pack_title: project_title_task,
+                                    version_label: version_label_task,
+                                    error: e.to_string(),
+                                })
+                                .await;
                         }
                     }
                     Ok(())
