@@ -59,6 +59,9 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
     f.render_widget(header_para, chunks[0]);
 
     // ---- Search bar (vim-style focus indicator; mirrors mod_browser.rs) ----
+    // Color slots come from `state.config.colors` so users can re-skin
+    // the launcher via `~/.config/ichr/config.toml`.
+    let palette = &state.config.colors;
     let search_display = if *is_searching {
         format!("search: {search}_")
     } else if search.is_empty() {
@@ -67,18 +70,18 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
         format!("search: {search}")
     };
     let search_style = if *is_searching {
-        Style::default().fg(Color::Yellow)
+        Style::default().fg(palette.accent.to_color())
     } else if search.is_empty() {
         Style::default()
-            .fg(Color::DarkGray)
+            .fg(palette.dim.to_color())
             .add_modifier(Modifier::DIM)
     } else {
-        Style::default().fg(Color::Gray)
+        Style::default().fg(palette.text.to_color())
     };
     let border_color = if *is_searching {
-        Color::Yellow
+        palette.accent.to_color()
     } else {
-        Color::DarkGray
+        palette.dim.to_color()
     };
     let search_para = Paragraph::new(search_display).style(search_style).block(
         Block::default()

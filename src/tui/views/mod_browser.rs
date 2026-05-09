@@ -80,12 +80,13 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
         None => format!("MC: {inst_mc} (v=any)"),
         Some(_) => "MC: any (v=any)".to_string(),
     };
+    let chip_palette = &state.config.colors;
     let mc_chip_style = if mc_filter_override.is_none() {
         Style::default()
-            .fg(Color::DarkGray)
+            .fg(chip_palette.dim.to_color())
             .add_modifier(Modifier::DIM)
     } else {
-        Style::default().fg(Color::Yellow)
+        Style::default().fg(chip_palette.accent.to_color())
     };
     let loader_chip_text = match loader_filter_override.as_deref() {
         None => format!("Loader: {inst_loader} (l=any)"),
@@ -93,10 +94,10 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
     };
     let loader_chip_style = if loader_filter_override.is_none() {
         Style::default()
-            .fg(Color::DarkGray)
+            .fg(chip_palette.dim.to_color())
             .add_modifier(Modifier::DIM)
     } else {
-        Style::default().fg(Color::Yellow)
+        Style::default().fg(chip_palette.accent.to_color())
     };
 
     let header_line = Line::from(vec![
@@ -113,10 +114,11 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
     f.render_widget(header_para, chunks[0]);
 
     // ---- Search bar ---------------------------------------------------------
-    // Vim-style focus indicator: in browse mode the bar is dim (DarkGray
-    // border, hint to press `/`); in search mode the border is Yellow and a
-    // trailing cursor underscore is rendered. Empty search in browse mode
-    // shows the "press / to search" placeholder.
+    // Vim-style focus indicator: in browse mode the bar uses the `dim`
+    // palette slot (border + placeholder text); in search mode it
+    // switches to `accent`. Both colors are user-configurable via
+    // `~/.config/ichr/config.toml -> [colors] accent / dim / text`.
+    let palette = &state.config.colors;
     let search_display = if *is_searching {
         format!("search: {search}_")
     } else if search.is_empty() {
@@ -125,18 +127,18 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
         format!("search: {search}")
     };
     let search_style = if *is_searching {
-        Style::default().fg(Color::Yellow)
+        Style::default().fg(palette.accent.to_color())
     } else if search.is_empty() {
         Style::default()
-            .fg(Color::DarkGray)
+            .fg(palette.dim.to_color())
             .add_modifier(Modifier::DIM)
     } else {
-        Style::default().fg(Color::Gray)
+        Style::default().fg(palette.text.to_color())
     };
     let border_color = if *is_searching {
-        Color::Yellow
+        palette.accent.to_color()
     } else {
-        Color::DarkGray
+        palette.dim.to_color()
     };
     let search_para = Paragraph::new(search_display).style(search_style).block(
         Block::default()
