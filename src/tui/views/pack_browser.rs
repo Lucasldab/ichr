@@ -26,6 +26,7 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
         slug,
         kind,
         search,
+        is_searching,
         fetch_state,
         results,
         selected,
@@ -57,24 +58,33 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
     );
     f.render_widget(header_para, chunks[0]);
 
-    // ---- Search bar ----
-    let search_display = if search.is_empty() {
-        format!("search: type to search Modrinth {kind_label}...")
-    } else {
+    // ---- Search bar (vim-style focus indicator; mirrors mod_browser.rs) ----
+    let search_display = if *is_searching {
         format!("search: {search}_")
+    } else if search.is_empty() {
+        format!("press / to search Modrinth {kind_label}")
+    } else {
+        format!("search: {search}")
     };
-    let search_style = if search.is_empty() {
+    let search_style = if *is_searching {
+        Style::default().fg(Color::Yellow)
+    } else if search.is_empty() {
         Style::default()
             .fg(Color::DarkGray)
             .add_modifier(Modifier::DIM)
     } else {
-        Style::default().fg(Color::Yellow)
+        Style::default().fg(Color::Gray)
+    };
+    let border_color = if *is_searching {
+        Color::Yellow
+    } else {
+        Color::DarkGray
     };
     let search_para = Paragraph::new(search_display).style(search_style).block(
         Block::default()
             .borders(Borders::ALL)
-            .title("Search")
-            .border_style(Style::default().fg(Color::Yellow)),
+            .title(if *is_searching { "Search [Esc]" } else { "Search [/]" })
+            .border_style(Style::default().fg(border_color)),
     );
     f.render_widget(search_para, chunks[1]);
 
@@ -256,17 +266,26 @@ fn thousands(n: u64) -> String {
 
 /// Map crossterm events to Actions for the PackBrowser view.
 ///
-/// j/k disambiguation (same as mod_browser.rs):
-///  - When search is empty, j/k navigate.
-///  - When search is non-empty, j/k type into the buffer.
-///  - Up/Down arrows always navigate.
-///  - `D` (uppercase) → PackDropPathOpen with current slug+kind.
-///  - Esc → PackBrowserClose.
+/// Vim-style two-mode dispatch (mirrors `mod_browser::map_mod_browser_event`).
+///   - **Browse mode** (`is_searching == false`, default on open):
+///       - Up/Down/`j`/`k` → nav.
+///       - Enter → InstallPackFromBrowser.
+///       - `D` (uppercase) → PackDropPathOpen.
+///       - `/` → PackBrowserBeginSearch.
+///       - Esc → PackBrowserClose.
+///   - **Search mode** (`is_searching == true`):
+///       - Up/Down → nav. Enter still installs.
+///       - Esc → PackBrowserExitSearch.
+///       - Backspace → pop char. Printable chars → type.
+///       - Bracketed paste → PackBrowserPasteSearch.
 pub fn map_pack_browser_event(ev: CtEvent, state: &AppState) -> Option<Action> {
-    let (search_empty, slug, kind) = match &state.active_view {
+    let (is_searching, slug, kind) = match &state.active_view {
         ActiveView::PackBrowser {
-            search, slug, kind, ..
-        } => (search.is_empty(), slug.clone(), *kind),
+            is_searching,
+            slug,
+            kind,
+            ..
+        } => (*is_searching, slug.clone(), *kind),
         _ => return None,
     };
 
@@ -279,17 +298,37 @@ pub fn map_pack_browser_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             ..
         }) => Some(Action::PackBrowserMove(1)),
         CtEvent::Key(KeyEvent {
-            code: KeyCode::Esc, ..
-        }) => Some(Action::PackBrowserClose),
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Backspace,
-            ..
-        }) => Some(Action::PackBrowserBackspaceSearch),
-        CtEvent::Key(KeyEvent {
             code: KeyCode::Enter,
             ..
         }) => Some(Action::InstallPackFromBrowser { slug, kind }),
-        // D (uppercase) opens the drop-from-path modal -- kind inherited.
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Esc, ..
+        }) => Some(if is_searching {
+            Action::PackBrowserExitSearch
+        } else {
+            Action::PackBrowserClose
+        }),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        }) if is_searching => Some(Action::PackBrowserBackspaceSearch),
+        // ── Search-mode dispatch ──────────────────────────────────────────
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers,
+            ..
+        }) if is_searching && !modifiers.contains(KeyModifiers::CONTROL) => {
+            Some(Action::PackBrowserTypeSearch(c))
+        }
+        // Paste works in both modes; auto-enters search in browse mode
+        // (handled in the update arm). Mirrors mod_browser behavior.
+        CtEvent::Paste(s) => Some(Action::PackBrowserPasteSearch(s)),
+        // ── Browse-mode dispatch ──────────────────────────────────────────
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('/'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::PackBrowserBeginSearch),
         CtEvent::Key(KeyEvent {
             code: KeyCode::Char('D'),
             modifiers,
@@ -297,36 +336,16 @@ pub fn map_pack_browser_event(ev: CtEvent, state: &AppState) -> Option<Action> {
         }) if !modifiers.contains(KeyModifiers::CONTROL) => {
             Some(Action::PackDropPathOpen { slug, kind })
         }
-        // j/k disambiguation.
         CtEvent::Key(KeyEvent {
             code: KeyCode::Char('k'),
             modifiers,
             ..
-        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
-            if search_empty {
-                Some(Action::PackBrowserMove(-1))
-            } else {
-                Some(Action::PackBrowserTypeSearch('k'))
-            }
-        }
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::PackBrowserMove(-1)),
         CtEvent::Key(KeyEvent {
             code: KeyCode::Char('j'),
             modifiers,
             ..
-        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
-            if search_empty {
-                Some(Action::PackBrowserMove(1))
-            } else {
-                Some(Action::PackBrowserTypeSearch('j'))
-            }
-        }
-        // All other printable chars → search input.
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Char(c),
-            modifiers,
-            ..
-        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::PackBrowserTypeSearch(c)),
-        CtEvent::Paste(s) => Some(Action::PackBrowserPasteSearch(s)),
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::PackBrowserMove(1)),
         _ => None,
     }
 }
@@ -351,6 +370,10 @@ mod tests {
                 slug: slug.into(),
                 kind,
                 search: search.to_string(),
+                // Mirror mod_browser fixture: non-empty `search` implies the
+                // user is in vim search mode (pre-vim-mode tests assumed
+                // typing semantics once `search` was non-empty).
+                is_searching: !search.is_empty(),
                 fetch_state: ModBrowserFetchState::Ready,
                 results: Vec::new(),
                 selected: 0,

@@ -34,6 +34,7 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
     let ActiveView::ModBrowser {
         slug,
         search,
+        is_searching,
         mc_filter_override,
         loader_filter_override,
         results,
@@ -111,31 +112,37 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
     );
     f.render_widget(header_para, chunks[0]);
 
-    // ---- Search bar (always-focused, single-line, Yellow when non-empty) ----
-    // UI-SPEC §"Mod Browser" lines 215-219: empty → DarkGray placeholder;
-    // non-empty → Yellow + trailing cursor underscore.
-    let search_display = if search.is_empty() {
-        "search: type to search Modrinth...".to_string()
-    } else {
+    // ---- Search bar ---------------------------------------------------------
+    // Vim-style focus indicator: in browse mode the bar is dim (DarkGray
+    // border, hint to press `/`); in search mode the border is Yellow and a
+    // trailing cursor underscore is rendered. Empty search in browse mode
+    // shows the "press / to search" placeholder.
+    let search_display = if *is_searching {
         format!("search: {search}_")
+    } else if search.is_empty() {
+        "press / to search Modrinth".to_string()
+    } else {
+        format!("search: {search}")
     };
-    let search_style = if search.is_empty() {
+    let search_style = if *is_searching {
+        Style::default().fg(Color::Yellow)
+    } else if search.is_empty() {
         Style::default()
             .fg(Color::DarkGray)
             .add_modifier(Modifier::DIM)
     } else {
-        Style::default().fg(Color::Yellow)
+        Style::default().fg(Color::Gray)
     };
-    // GAP-FOCUS-INDICATOR-08 (Phase 8.2): Yellow border signals the search
-    // input is the focused widget -- distinguishes the input from passive
-    // surrounding panes (header / results / detail / footer) regardless of
-    // whether the buffer is empty. Mirrors the established Yellow=active
-    // palette already used by the chip styles and the inner Paragraph.
+    let border_color = if *is_searching {
+        Color::Yellow
+    } else {
+        Color::DarkGray
+    };
     let search_para = Paragraph::new(search_display).style(search_style).block(
         Block::default()
             .borders(Borders::ALL)
-            .title("Search")
-            .border_style(Style::default().fg(Color::Yellow)),
+            .title(if *is_searching { "Search [Esc]" } else { "Search [/]" })
+            .border_style(Style::default().fg(border_color)),
     );
     f.render_widget(search_para, chunks[1]);
 
@@ -392,17 +399,32 @@ fn loader_kind_str(kind: crate::domain::instance::ModloaderKind) -> &'static str
 /// j/k disambiguation (UI-SPEC §Keybind Contract lines 564-581):
 ///  - When `state.active_view.search` is empty, `j`/`k` navigate.
 ///  - When `search` is non-empty, `j`/`k` go into the search input.
-///  - Up/Down arrows always navigate.
-///  - Enter → ModBrowserOpenVersions.
-///  - Esc → ModBrowserCancel.
-///  - `v` / `l` → toggle MC / loader filter chips.
-///  - Backspace → pop char from search.
-///  - All other printable chars (incl. space, `/`, digits) → search input.
+///  Vim-style two-mode dispatch:
+///   - **Browse mode** (`is_searching == false`, default on open):
+///       - Up/Down/`j`/`k` → nav.
+///       - Enter → ModBrowserOpenVersions.
+///       - `v` / `l` → toggle MC / loader filter chips.
+///       - `/` → ModBrowserBeginSearch (enter search mode).
+///       - Esc → ModBrowserCancel (leave browser).
+///       - Other printable chars are ignored (do NOT type into search).
+///   - **Search mode** (`is_searching == true`):
+///       - Up/Down → nav (lets user pick a row without leaving search).
+///       - Enter → ModBrowserOpenVersions.
+///       - Esc → ModBrowserExitSearch (back to browse, clears query).
+///       - Backspace → pop char from search.
+///       - Every printable char → type into search.
+///       - Bracketed paste → ModBrowserPasteSearch.
+///   The previous "letters type once `search` is non-empty" rule meant queries
+///   could not start with `v`/`l`/`j`/`k`; the explicit `/` toggle removes
+///   that ambiguity.
 pub fn map_mod_browser_event(ev: CtEvent, state: &AppState) -> Option<Action> {
-    let search_empty = match &state.active_view {
-        ActiveView::ModBrowser { search, .. } => search.is_empty(),
-        _ => true,
-    };
+    let is_searching = matches!(
+        &state.active_view,
+        ActiveView::ModBrowser {
+            is_searching: true,
+            ..
+        }
+    );
     match ev {
         // Up/Down arrows always navigate (per UI-SPEC line 742).
         CtEvent::Key(KeyEvent {
@@ -413,66 +435,62 @@ pub fn map_mod_browser_event(ev: CtEvent, state: &AppState) -> Option<Action> {
             ..
         }) => Some(Action::ModBrowserMove(1)),
         CtEvent::Key(KeyEvent {
-            code: KeyCode::Esc, ..
-        }) => Some(Action::ModBrowserCancel),
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Backspace,
-            ..
-        }) => Some(Action::ModBrowserBackspaceSearch),
-        CtEvent::Key(KeyEvent {
             code: KeyCode::Enter,
             ..
         }) => Some(Action::ModBrowserOpenVersions),
-        // Filter chip toggles (only fire when search is empty, otherwise letters
-        // type into the search input -- matches UI-SPEC §Keybind Contract).
+        // Esc: in search mode, exit search; in browse mode, leave the browser.
         CtEvent::Key(KeyEvent {
-            code: KeyCode::Char('v'),
-            modifiers,
-            ..
-        }) if search_empty && !modifiers.contains(KeyModifiers::CONTROL) => {
-            Some(Action::ToggleModMcFilter)
-        }
+            code: KeyCode::Esc, ..
+        }) => Some(if is_searching {
+            Action::ModBrowserExitSearch
+        } else {
+            Action::ModBrowserCancel
+        }),
+        // Backspace: only meaningful in search mode (popping the buffer).
         CtEvent::Key(KeyEvent {
-            code: KeyCode::Char('l'),
-            modifiers,
+            code: KeyCode::Backspace,
             ..
-        }) if search_empty && !modifiers.contains(KeyModifiers::CONTROL) => {
-            Some(Action::ToggleModLoaderFilter)
-        }
-        // j/k disambiguation: navigate when search empty, otherwise type.
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Char('k'),
-            modifiers,
-            ..
-        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
-            if search_empty {
-                Some(Action::ModBrowserMove(-1))
-            } else {
-                Some(Action::ModBrowserTypeSearch('k'))
-            }
-        }
-        CtEvent::Key(KeyEvent {
-            code: KeyCode::Char('j'),
-            modifiers,
-            ..
-        }) if !modifiers.contains(KeyModifiers::CONTROL) => {
-            if search_empty {
-                Some(Action::ModBrowserMove(1))
-            } else {
-                Some(Action::ModBrowserTypeSearch('j'))
-            }
-        }
-        // All other printable chars → search input.
+        }) if is_searching => Some(Action::ModBrowserBackspaceSearch),
+        // ── Search-mode dispatch ──────────────────────────────────────────
         CtEvent::Key(KeyEvent {
             code: KeyCode::Char(c),
             modifiers,
             ..
-        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::ModBrowserTypeSearch(c)),
-        // Bracketed-paste payload (08.1-04 / GAP-8-C): the terminal delivers
-        // pasted text as a single `Event::Paste(String)` when bracketed paste
-        // is enabled at terminal init. Route the whole payload through one
-        // action dispatch instead of a stream of synthetic key events.
+        }) if is_searching && !modifiers.contains(KeyModifiers::CONTROL) => {
+            Some(Action::ModBrowserTypeSearch(c))
+        }
+        // Bracketed paste works in both modes: in browse mode it auto-enters
+        // search mode (handled in the update arm) so users can paste a query
+        // without first pressing `/`.
         CtEvent::Paste(s) => Some(Action::ModBrowserPasteSearch(s)),
+        // ── Browse-mode dispatch ──────────────────────────────────────────
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('/'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::ModBrowserBeginSearch),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('v'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::ToggleModMcFilter),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('l'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::ToggleModLoaderFilter),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('k'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::ModBrowserMove(-1)),
+        CtEvent::Key(KeyEvent {
+            code: KeyCode::Char('j'),
+            modifiers,
+            ..
+        }) if !modifiers.contains(KeyModifiers::CONTROL) => Some(Action::ModBrowserMove(1)),
+        // All other browse-mode keys: ignored. Pasted text in browse mode is
+        // also ignored (must enter search mode first via `/`).
         _ => None,
     }
 }
@@ -492,6 +510,11 @@ mod tests {
             active_view: ActiveView::ModBrowser {
                 slug: "foo".into(),
                 search: s.to_string(),
+                // Tests pre-vim-mode assumed letters typed once `search` was
+                // non-empty; preserve that semantic by treating any non-empty
+                // fixture as already in search mode. Empty fixtures default to
+                // browse mode (matches OpenModBrowser's initial state).
+                is_searching: !s.is_empty(),
                 mc_filter_override: None,
                 loader_filter_override: None,
                 results: Vec::new(),

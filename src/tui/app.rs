@@ -12,7 +12,7 @@
 //! Phase 5 adds the Java picker modal (JavaPickerModal view, OpenJavaPicker,
 //! JavaPickerOptionsLoaded, etc.) for per-instance java_override management.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use tokio_util::sync::CancellationToken;
@@ -153,6 +153,15 @@ pub enum ActiveView {
     ModBrowser {
         slug: String,
         search: String,
+        /// Vim-style explicit search mode. `false` = browse: arrows / `j`/`k`
+        /// nav, `v`/`l` toggle filter chips, Enter opens versions, `/` enters
+        /// search, Esc closes browser. `true` = search: every printable char
+        /// types into `search`, Backspace pops, Esc returns to browse mode.
+        /// Default `false` so users can press filter shortcuts immediately
+        /// after opening the browser. Closes the bug where typing a query
+        /// starting with `v`/`l`/`k`/`j` was impossible because those keys
+        /// were unconditionally consumed as commands while `search` was empty.
+        is_searching: bool,
         /// None = use instance's MC version; Some("any") = no MC filter; Some(version) = explicit override.
         mc_filter_override: Option<String>,
         /// Same shape as mc_filter_override. Default: None (use instance loader).
@@ -297,6 +306,8 @@ pub enum ActiveView {
         slug: String,
         kind: PackKind,
         search: String,
+        /// Vim-style explicit search mode (mirrors ModBrowser.is_searching).
+        is_searching: bool,
         fetch_state: ModBrowserFetchState,
         results: Vec<ModrinthSearchHit>,
         selected: usize,
@@ -412,6 +423,15 @@ pub struct AppState {
     /// Populated by Effect::DropInstallPack / InstallPackFromModrinth;
     /// cleared by Action::PackInstalled / PackInstallFailed / PackDropFailed.
     pub running_pack_jobs: HashMap<(String, PackKind), CancellationToken>,
+    /// Per-instance set of installed Modrinth project_ids (mods).
+    /// Source of truth for stamping `already_installed` on ModBrowser results
+    /// independent of the search/install timing race. Refreshed from the ledger
+    /// via `InstalledModsLoaded`; updated optimistically on
+    /// `ModInstalled`/`ModUninstalled`.
+    pub installed_mod_project_ids: HashMap<String, HashSet<String>>,
+    /// Per-(instance, kind) set of installed Modrinth project_ids (packs).
+    /// Mirrors `installed_mod_project_ids` for the pack browsers.
+    pub installed_pack_project_ids: HashMap<(String, PackKind), HashSet<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -678,6 +698,13 @@ pub enum Action {
     ToggleModLoaderFilter,
     /// Backspace in ModBrowser search input -- pops last char, re-emits search if empty.
     ModBrowserBackspaceSearch,
+    /// `/` in ModBrowser browse mode -- enters vim-style search mode so the
+    /// next printable character types into the search bar instead of being
+    /// consumed as a filter / nav shortcut.
+    ModBrowserBeginSearch,
+    /// Esc in ModBrowser search mode -- exits search mode (clears `search`
+    /// and returns to browse mode without closing the browser).
+    ModBrowserExitSearch,
     /// Esc in ModBrowser -- returns to InstanceList.
     ModBrowserCancel,
     /// Printable char into ModBrowser search input. j/k disambiguation lives in the
@@ -943,6 +970,12 @@ pub enum Action {
     PackBrowserBackspaceSearch,
     /// Paste a string into the pack browser search buffer.
     PackBrowserPasteSearch(String),
+    /// `/` in PackBrowser browse mode -- enters vim-style search mode
+    /// (mirrors ModBrowserBeginSearch).
+    PackBrowserBeginSearch,
+    /// Esc in PackBrowser search mode -- exits search mode without closing
+    /// the browser (mirrors ModBrowserExitSearch).
+    PackBrowserExitSearch,
     /// Pack browser search results arrived -- slug+kind match guard applied in update().
     PackBrowserSearchLoaded {
         slug: String,
@@ -2344,6 +2377,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             state.active_view = ActiveView::ModBrowser {
                 slug: slug.clone(),
                 search: String::new(),
+                is_searching: false,
                 mc_filter_override: None,
                 loader_filter_override: None,
                 results: Vec::new(),
@@ -2351,15 +2385,22 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 fetch_state: ModBrowserFetchState::Loading,
                 selected_detail: None,
             };
-            vec![Effect::SearchModrinth {
-                slug,
-                query: String::new(),
-                mc,
-                loader,
-            }]
+            vec![
+                Effect::SearchModrinth {
+                    slug: slug.clone(),
+                    query: String::new(),
+                    mc,
+                    loader,
+                },
+                // Refresh installed-set cache so ModBrowserSearchLoaded can
+                // stamp `already_installed` immune to install/search race.
+                Effect::FetchInstalledMods { slug },
+            ]
         }
 
         Action::ModBrowserSearchLoaded { slug, hits } => {
+            // Snapshot installed-set before mutably borrowing active_view.
+            let installed = state.installed_mod_project_ids.get(&slug).cloned();
             if let ActiveView::ModBrowser {
                 slug: cur_slug,
                 results,
@@ -2371,6 +2412,17 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 if *cur_slug == slug {
                     let new_len = hits.len();
                     *results = hits;
+                    // Re-stamp `already_installed` from the in-memory set:
+                    // the search result's pre-stamp from the service is a
+                    // ledger snapshot taken at search-issue time and may miss
+                    // installs that completed during the round-trip.
+                    if let Some(set) = installed.as_ref() {
+                        for r in results.iter_mut() {
+                            if set.contains(&r.project_id) {
+                                r.already_installed = true;
+                            }
+                        }
+                    }
                     *fetch_state = ModBrowserFetchState::Ready;
                     *selected = (*selected).min(new_len.saturating_sub(1));
                 }
@@ -2576,6 +2628,61 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
 
+        Action::ModBrowserBeginSearch => {
+            if let ActiveView::ModBrowser { is_searching, .. } = &mut state.active_view {
+                *is_searching = true;
+            }
+            vec![]
+        }
+
+        Action::ModBrowserExitSearch => {
+            // Exit search mode and clear the buffer. If the buffer had
+            // content, re-emit a fresh search so results reflect the
+            // empty query (matches ModBrowserBackspaceSearch's contract).
+            let captured = match &mut state.active_view {
+                ActiveView::ModBrowser {
+                    slug,
+                    search,
+                    is_searching,
+                    mc_filter_override,
+                    loader_filter_override,
+                    ..
+                } => {
+                    *is_searching = false;
+                    let had_query = !search.is_empty();
+                    search.clear();
+                    if had_query {
+                        Some((
+                            slug.clone(),
+                            mc_filter_override.clone(),
+                            loader_filter_override.clone(),
+                        ))
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+            let Some((slug, mc_override, loader_override)) = captured else {
+                return vec![];
+            };
+            let inst = state.instances.iter().find(|m| m.slug == slug);
+            let mc = match mc_override.as_deref() {
+                Some("any") => None,
+                _ => inst.map(|m| m.mc_version_id.clone()),
+            };
+            let loader = match loader_override.as_deref() {
+                Some("any") => None,
+                _ => inst.and_then(|m| m.loader.clone()),
+            };
+            vec![Effect::SearchModrinth {
+                slug,
+                query: String::new(),
+                mc,
+                loader,
+            }]
+        }
+
         Action::ModBrowserTypeSearch(c) => {
             // The j/k disambiguation lives in the keymap (08-08); the update arm
             // unconditionally appends. Re-emit the search with the new query.
@@ -2620,15 +2727,19 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         Action::ModBrowserPasteSearch(s) => {
             // Bracketed-paste payload: append the full pasted string in one
             // dispatch (08.1-04 / GAP-8-C). Mirrors ModBrowserTypeSearch
-            // including the search re-fire.
+            // including the search re-fire. Paste in browse mode also flips
+            // `is_searching` so the user lands in search mode with the
+            // pasted query already applied (no need to press `/` first).
             let captured = match &mut state.active_view {
                 ActiveView::ModBrowser {
                     slug,
                     search,
+                    is_searching,
                     mc_filter_override,
                     loader_filter_override,
                     ..
                 } => {
+                    *is_searching = true;
                     search.push_str(&s);
                     Some((
                         slug.clone(),
@@ -2766,6 +2877,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             state.active_view = ActiveView::ModBrowser {
                 slug: slug.clone(),
                 search: String::new(),
+                is_searching: false,
                 mc_filter_override: None,
                 loader_filter_override: None,
                 results: Vec::new(),
@@ -2928,6 +3040,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             state.active_view = ActiveView::ModBrowser {
                 slug: slug.clone(),
                 search: String::new(),
+                is_searching: false,
                 mc_filter_override: None,
                 loader_filter_override: None,
                 results: Vec::new(),
@@ -2945,6 +3058,16 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
 
         Action::ModInstalled { slug, project_id } => {
             state.running_mod_jobs.remove(&slug);
+            // Update authoritative installed-set first so any subsequent
+            // ModBrowserSearchLoaded (e.g. user re-searches) sees the new
+            // membership. Closes the install/search race that previously
+            // left "Install" stale until another keystroke triggered a
+            // ledger-fresh search.
+            state
+                .installed_mod_project_ids
+                .entry(slug.clone())
+                .or_default()
+                .insert(project_id.clone());
             // Pitfall 10 (08-RESEARCH.md §Pitfall 10): if the user is still in
             // the ModBrowser for this instance, walk results and stamp
             // already_installed = true on every hit matching project_id.
@@ -3007,6 +3130,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     state.active_view = ActiveView::ModBrowser {
                         slug: slug.clone(),
                         search: String::new(),
+                        is_searching: false,
                         mc_filter_override: None,
                         loader_filter_override: None,
                         results: Vec::new(),
@@ -3046,6 +3170,34 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::InstalledModsLoaded { slug, mods } => {
+            // Refresh the authoritative installed-set from the ledger before
+            // mutating active_view. Used by ModBrowserSearchLoaded to stamp
+            // `already_installed` immune to install/search race.
+            state.installed_mod_project_ids.insert(
+                slug.clone(),
+                mods.iter().map(|r| r.mod_id.clone()).collect(),
+            );
+            // If the user is currently in the ModBrowser for this instance,
+            // re-stamp existing results from the freshly-loaded set so a late
+            // FetchInstalledMods response after SearchLoaded still updates
+            // visible flags.
+            let installed = state.installed_mod_project_ids.get(&slug).cloned();
+            if let ActiveView::ModBrowser {
+                slug: cur_slug,
+                results,
+                ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug {
+                    if let Some(set) = installed.as_ref() {
+                        for r in results.iter_mut() {
+                            if set.contains(&r.project_id) {
+                                r.already_installed = true;
+                            }
+                        }
+                    }
+                }
+            }
             if let ActiveView::InstalledModsList {
                 slug: cur_slug,
                 mods: ref mut m,
@@ -3179,6 +3331,28 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::ModUninstalled { slug, mod_id } => {
+            // Drop from authoritative installed-set so a subsequent
+            // ModBrowser search reflects the uninstall immediately.
+            if let Some(set) = state.installed_mod_project_ids.get_mut(&slug) {
+                set.remove(&mod_id);
+            }
+            // Also clear the cached `already_installed` flag on any open
+            // ModBrowser results for this instance (mirrors the optimistic
+            // stamp performed by ModInstalled).
+            if let ActiveView::ModBrowser {
+                slug: cur_slug,
+                results,
+                ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug {
+                    for r in results.iter_mut() {
+                        if r.project_id == mod_id {
+                            r.already_installed = false;
+                        }
+                    }
+                }
+            }
             if let ActiveView::InstalledModsList {
                 slug: cur_slug,
                 mods,
@@ -3883,6 +4057,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 slug: slug.clone(),
                 kind,
                 search: String::new(),
+                is_searching: false,
                 fetch_state: ModBrowserFetchState::Loading,
                 results: Vec::new(),
                 selected: 0,
@@ -3899,6 +4074,11 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::PackBrowserSearchLoaded { slug, kind, hits } => {
+            // Snapshot installed-set before mutably borrowing active_view.
+            let installed = state
+                .installed_pack_project_ids
+                .get(&(slug.clone(), kind))
+                .cloned();
             // Slug-AND-kind match guard (mirrors Phase 08.1-05 ModBrowserSearchLoaded).
             if let ActiveView::PackBrowser {
                 slug: cur_slug,
@@ -3912,6 +4092,15 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 if *cur_slug == slug && *cur_kind == kind {
                     let new_len = hits.len();
                     *results = hits;
+                    // Re-stamp `already_installed` from the in-memory set
+                    // (see ModBrowserSearchLoaded; same install/search race).
+                    if let Some(set) = installed.as_ref() {
+                        for r in results.iter_mut() {
+                            if set.contains(&r.project_id) {
+                                r.already_installed = true;
+                            }
+                        }
+                    }
                     *fetch_state = ModBrowserFetchState::Ready;
                     *selected = (*selected).min(new_len.saturating_sub(1));
                 }
@@ -4016,10 +4205,14 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 slug,
                 kind,
                 search,
+                is_searching,
                 fetch_state,
                 ..
             } = &mut state.active_view
             {
+                // Paste in browse mode auto-enters search mode (mirrors
+                // ModBrowserPasteSearch).
+                *is_searching = true;
                 search.push_str(&s);
                 *fetch_state = ModBrowserFetchState::Loading;
                 let slug2 = slug.clone();
@@ -4043,6 +4236,51 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         Action::PackBrowserClose => {
             state.active_view = ActiveView::InstanceList { selected: 0 };
             vec![]
+        }
+
+        Action::PackBrowserBeginSearch => {
+            if let ActiveView::PackBrowser { is_searching, .. } = &mut state.active_view {
+                *is_searching = true;
+            }
+            vec![]
+        }
+
+        Action::PackBrowserExitSearch => {
+            // Mirrors ModBrowserExitSearch: drop search-mode flag, clear
+            // buffer, re-emit search if the buffer had content.
+            let captured = match &mut state.active_view {
+                ActiveView::PackBrowser {
+                    slug,
+                    kind,
+                    search,
+                    is_searching,
+                    ..
+                } => {
+                    *is_searching = false;
+                    let had_query = !search.is_empty();
+                    search.clear();
+                    if had_query {
+                        Some((slug.clone(), *kind))
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+            let Some((slug, kind)) = captured else {
+                return vec![];
+            };
+            let mc = state
+                .instances
+                .iter()
+                .find(|m| m.slug == slug)
+                .map(|m| m.mc_version_id.clone());
+            vec![Effect::SearchPacks {
+                slug,
+                kind,
+                query: String::new(),
+                mc,
+            }]
         }
 
         Action::PackDropPathOpen { slug, kind } => {
@@ -4101,6 +4339,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     slug: slug.clone(),
                     kind,
                     search: String::new(),
+                    is_searching: false,
                     fetch_state: ModBrowserFetchState::Loading,
                     results: Vec::new(),
                     selected: 0,
@@ -4130,6 +4369,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 slug: slug.clone(),
                 kind,
                 search: String::new(),
+                is_searching: false,
                 fetch_state: ModBrowserFetchState::Loading,
                 results: Vec::new(),
                 selected: 0,
@@ -4143,6 +4383,37 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::InstalledPacksLoaded { slug, kind, packs } => {
+            // Refresh authoritative installed-set from ledger (parallels
+            // InstalledModsLoaded). Used by PackBrowserSearchLoaded to stamp
+            // `already_installed` immune to install/search race.
+            state.installed_pack_project_ids.insert(
+                (slug.clone(), kind),
+                packs.iter().map(|r| r.mod_id.clone()).collect(),
+            );
+            // If the user is currently in the PackBrowser for this
+            // (instance, kind), re-stamp existing results from the freshly
+            // loaded set.
+            let installed = state
+                .installed_pack_project_ids
+                .get(&(slug.clone(), kind))
+                .cloned();
+            if let ActiveView::PackBrowser {
+                slug: cur_slug,
+                kind: cur_kind,
+                results,
+                ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug && *cur_kind == kind {
+                    if let Some(set) = installed.as_ref() {
+                        for r in results.iter_mut() {
+                            if set.contains(&r.project_id) {
+                                r.already_installed = true;
+                            }
+                        }
+                    }
+                }
+            }
             if let ActiveView::InstalledPacksList {
                 slug: cur_slug,
                 kind: cur_kind,
@@ -4363,11 +4634,30 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![]
         }
 
-        Action::PackUninstalled {
-            slug,
-            kind,
-            mod_id: _,
-        } => {
+        Action::PackUninstalled { slug, kind, mod_id } => {
+            // Optimistic drop so the PackBrowser updates before the
+            // FetchInstalledPacks round-trip finishes (mirrors ModUninstalled).
+            if let Some(set) = state
+                .installed_pack_project_ids
+                .get_mut(&(slug.clone(), kind))
+            {
+                set.remove(&mod_id);
+            }
+            if let ActiveView::PackBrowser {
+                slug: cur_slug,
+                kind: cur_kind,
+                results,
+                ..
+            } = &mut state.active_view
+            {
+                if *cur_slug == slug && *cur_kind == kind {
+                    for r in results.iter_mut() {
+                        if r.project_id == mod_id {
+                            r.already_installed = false;
+                        }
+                    }
+                }
+            }
             vec![Effect::FetchInstalledPacks { slug, kind }]
         }
 
@@ -5185,6 +5475,7 @@ mod tests {
             active_view: ActiveView::ModBrowser {
                 slug: "myinst".into(),
                 search: String::new(),
+                is_searching: false,
                 mc_filter_override: None,
                 loader_filter_override: None,
                 results: Vec::<ModrinthSearchHit>::new(),
@@ -5218,6 +5509,7 @@ mod tests {
             active_view: ActiveView::ModBrowser {
                 slug: "myinst".into(),
                 search: String::new(),
+                is_searching: false,
                 mc_filter_override: None,
                 loader_filter_override: None,
                 results: Vec::<ModrinthSearchHit>::new(),
@@ -5270,6 +5562,7 @@ mod tests {
                 slug: slug.into(),
                 kind,
                 search: "faithful".into(),
+                is_searching: true,
                 fetch_state: ModBrowserFetchState::Ready,
                 results: vec![ModrinthSearchHit {
                     project_id: "w0TnApzs".into(),
@@ -5345,6 +5638,7 @@ mod tests {
                 slug: "test-inst".into(),
                 kind: PackKind::Resource,
                 search: String::new(),
+                is_searching: false,
                 fetch_state: ModBrowserFetchState::Ready,
                 results: Vec::<ModrinthSearchHit>::new(),
                 selected: 0,
