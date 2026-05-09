@@ -320,9 +320,7 @@ fn test_view_renders_empty_state_without_crash() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
     let state = AppState::default();
-    terminal
-        .draw(|f| ichr::tui::view::view(&state, f))
-        .unwrap();
+    terminal.draw(|f| ichr::tui::view::view(&state, f)).unwrap();
 }
 
 #[test]
@@ -335,9 +333,7 @@ fn test_view_dispatches_without_panic() {
 
     // InstanceList (default)
     let state = AppState::default();
-    terminal
-        .draw(|f| ichr::tui::view::view(&state, f))
-        .unwrap();
+    terminal.draw(|f| ichr::tui::view::view(&state, f)).unwrap();
 
     // CreateModal / NameInput
     let state = AppState {
@@ -347,9 +343,7 @@ fn test_view_dispatches_without_panic() {
         }),
         ..AppState::default()
     };
-    terminal
-        .draw(|f| ichr::tui::view::view(&state, f))
-        .unwrap();
+    terminal.draw(|f| ichr::tui::view::view(&state, f)).unwrap();
 
     // CreateModal / VersionPicker
     let state = AppState {
@@ -361,9 +355,7 @@ fn test_view_dispatches_without_panic() {
         }),
         ..AppState::default()
     };
-    terminal
-        .draw(|f| ichr::tui::view::view(&state, f))
-        .unwrap();
+    terminal.draw(|f| ichr::tui::view::view(&state, f)).unwrap();
 
     // DeleteConfirm
     let state = AppState {
@@ -373,9 +365,7 @@ fn test_view_dispatches_without_panic() {
         },
         ..AppState::default()
     };
-    terminal
-        .draw(|f| ichr::tui::view::view(&state, f))
-        .unwrap();
+    terminal.draw(|f| ichr::tui::view::view(&state, f)).unwrap();
 
     // RenameInline
     let state = AppState {
@@ -386,9 +376,7 @@ fn test_view_dispatches_without_panic() {
         },
         ..AppState::default()
     };
-    terminal
-        .draw(|f| ichr::tui::view::view(&state, f))
-        .unwrap();
+    terminal.draw(|f| ichr::tui::view::view(&state, f)).unwrap();
 
     // GroupInline
     let state = AppState {
@@ -400,9 +388,7 @@ fn test_view_dispatches_without_panic() {
         instances: vec![],
         ..AppState::default()
     };
-    terminal
-        .draw(|f| ichr::tui::view::view(&state, f))
-        .unwrap();
+    terminal.draw(|f| ichr::tui::view::view(&state, f)).unwrap();
 }
 
 // ---- INST-06 group-assign smoke tests (Task 2-09-01) ------------------------
@@ -1357,18 +1343,23 @@ fn test_open_mod_browser_emits_search_effect_and_sets_active_view() {
     let mut state = make_state_with_one_instance("foo", "1.20.4");
     let effects = update(&mut state, Action::OpenModBrowser { slug: "foo".into() });
     assert!(matches!(state.active_view, ActiveView::ModBrowser { .. }));
+    // Two effects fire: the Modrinth search itself, plus a
+    // FetchInstalledMods that warms the installed-set cache so
+    // SearchLoaded can stamp `already_installed` immune to the
+    // install/search round-trip race.
     match effects.as_slice() {
         [Effect::SearchModrinth {
             slug,
             query,
             mc,
             loader: _,
-        }] => {
+        }, Effect::FetchInstalledMods { slug: slug2 }] => {
             assert_eq!(slug, "foo");
             assert_eq!(query, "");
             assert_eq!(mc.as_deref(), Some("1.20.4"));
+            assert_eq!(slug2, "foo");
         }
-        other => panic!("expected SearchModrinth; got {other:?}"),
+        other => panic!("expected [SearchModrinth, FetchInstalledMods]; got {other:?}"),
     }
 }
 
@@ -1399,6 +1390,7 @@ fn test_mod_browser_search_loaded_replaces_results() {
     state.active_view = ActiveView::ModBrowser {
         slug: "foo".into(),
         search: String::new(),
+        is_searching: false,
         mc_filter_override: None,
         loader_filter_override: None,
         results: Vec::new(),
@@ -1432,6 +1424,7 @@ fn test_mod_browser_move_clamps_to_results_len() {
     state.active_view = ActiveView::ModBrowser {
         slug: "foo".into(),
         search: String::new(),
+        is_searching: false,
         mc_filter_override: None,
         loader_filter_override: None,
         results: vec![hit("P1", "sodium"), hit("P2", "iris")],
@@ -1579,6 +1572,7 @@ fn test_mod_installed_stamps_already_installed_in_browser_results() {
     state.active_view = ActiveView::ModBrowser {
         slug: "foo".into(),
         search: String::new(),
+        is_searching: false,
         mc_filter_override: None,
         loader_filter_override: None,
         results: vec![hit("P1", "sodium"), hit("P2", "iris")],
@@ -1613,6 +1607,7 @@ fn test_install_failed_routes_to_failed_modal_with_return_to() {
     state.active_view = ActiveView::ModBrowser {
         slug: "foo".into(),
         search: String::new(),
+        is_searching: false,
         mc_filter_override: None,
         loader_filter_override: None,
         results: vec![],
@@ -1727,6 +1722,7 @@ fn test_toggle_mc_filter_cycles_state_and_re_emits_search() {
     state.active_view = ActiveView::ModBrowser {
         slug: "foo".into(),
         search: String::new(),
+        is_searching: false,
         mc_filter_override: None,
         loader_filter_override: None,
         results: vec![],
@@ -1831,6 +1827,7 @@ fn test_mod_browser_jk_navigates_when_search_empty() {
         active_view: ActiveView::ModBrowser {
             slug: "alpha".into(),
             search: String::new(),
+            is_searching: false,
             mc_filter_override: None,
             loader_filter_override: None,
             results: vec![],
@@ -1853,12 +1850,17 @@ fn test_mod_browser_jk_navigates_when_search_empty() {
 }
 
 #[test]
-fn test_mod_browser_jk_types_when_search_nonempty() {
+fn test_mod_browser_jk_types_when_in_search_mode() {
+    // Vim-style: typing into search requires `is_searching: true`,
+    // which the user enters by pressing `/`. Non-empty `search` no
+    // longer implicitly enables typing (closes the v/l/j/k starting-
+    // letter bug).
     use ichr::mods::types::ModBrowserFetchState;
     let state = AppState {
         active_view: ActiveView::ModBrowser {
             slug: "alpha".into(),
             search: "fa".into(),
+            is_searching: true,
             mc_filter_override: None,
             loader_filter_override: None,
             results: vec![],
@@ -1887,6 +1889,7 @@ fn test_mod_browser_arrows_always_navigate_even_with_search() {
         active_view: ActiveView::ModBrowser {
             slug: "alpha".into(),
             search: "fabric".into(),
+            is_searching: false,
             mc_filter_override: None,
             loader_filter_override: None,
             results: vec![],
@@ -2237,9 +2240,7 @@ fn render_state_to_string(state: &AppState, width: u16, height: u16) -> String {
     use ratatui::Terminal;
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).unwrap();
-    terminal
-        .draw(|f| ichr::tui::view::view(state, f))
-        .unwrap();
+    terminal.draw(|f| ichr::tui::view::view(state, f)).unwrap();
     let buf = terminal.backend().buffer().clone();
     let mut out = String::new();
     for row in 0..height {
@@ -2941,6 +2942,7 @@ fn test_uppercase_D_inside_resource_browser_opens_drop_modal_with_resource_kind(
             slug: "foo".into(),
             kind: PackKind::Resource,
             search: String::new(),
+            is_searching: false,
             fetch_state: ichr::mods::types::ModBrowserFetchState::Ready,
             results: Vec::new(),
             selected: 0,
@@ -2975,6 +2977,7 @@ fn test_uppercase_D_inside_shader_browser_opens_drop_modal_with_shader_kind() {
             slug: "bar".into(),
             kind: PackKind::Shader,
             search: String::new(),
+            is_searching: false,
             fetch_state: ichr::mods::types::ModBrowserFetchState::Ready,
             results: Vec::new(),
             selected: 0,
@@ -3239,6 +3242,7 @@ fn test_pack_browser_search_loaded_with_matching_slug_kind_populates_results() {
             slug: "foo".into(),
             kind: PackKind::Resource,
             search: String::new(),
+            is_searching: false,
             fetch_state: ichr::mods::types::ModBrowserFetchState::Loading,
             results: Vec::new(),
             selected: 0,
@@ -3260,10 +3264,7 @@ fn test_pack_browser_search_loaded_with_matching_slug_kind_populates_results() {
     } = &s.active_view
     {
         assert_eq!(results.len(), 1, "results should be populated");
-        assert_eq!(
-            *fetch_state,
-            ichr::mods::types::ModBrowserFetchState::Ready
-        );
+        assert_eq!(*fetch_state, ichr::mods::types::ModBrowserFetchState::Ready);
     } else {
         panic!("active_view changed unexpectedly");
     }
@@ -3277,6 +3278,7 @@ fn test_pack_browser_search_loaded_with_mismatched_slug_does_not_overwrite() {
             slug: "foo".into(),
             kind: PackKind::Resource,
             search: String::new(),
+            is_searching: false,
             fetch_state: ichr::mods::types::ModBrowserFetchState::Loading,
             results: Vec::new(),
             selected: 0,
@@ -3316,6 +3318,7 @@ fn test_pack_browser_search_loaded_with_mismatched_kind_does_not_overwrite() {
             slug: "foo".into(),
             kind: PackKind::Resource,
             search: String::new(),
+            is_searching: false,
             fetch_state: ichr::mods::types::ModBrowserFetchState::Loading,
             results: Vec::new(),
             selected: 0,

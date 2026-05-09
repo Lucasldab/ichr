@@ -270,8 +270,7 @@ async fn live_restricted_mod_returns_file_not_downloadable() {
             let ledger_path = paths.instance_mod_ledger(slug);
             if ledger_path.exists() {
                 let raw = tokio::fs::read_to_string(&ledger_path).await.unwrap();
-                let ledger: ichr::mods::types::Ledger =
-                    toml::from_str(&raw).unwrap_or_default();
+                let ledger: ichr::mods::types::Ledger = toml::from_str(&raw).unwrap_or_default();
                 assert!(
                     ledger.mods.is_empty(),
                     "ledger MUST be empty after failed install"

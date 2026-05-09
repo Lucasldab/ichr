@@ -178,8 +178,7 @@ async fn test_classpath_emits_at_least_six_fabric_libraries_after_install() {
     let vanilla: VersionJson = serde_json::from_slice(vanilla_json).unwrap();
     let mut parents = std::collections::HashMap::new();
     parents.insert(vanilla_id.to_string(), vanilla);
-    let resolved =
-        ichr::mojang::inherits::resolve_inherits(&loader, &parents).expect("resolve ok");
+    let resolved = ichr::mojang::inherits::resolve_inherits(&loader, &parents).expect("resolve ok");
 
     // Build classpath. Use a stubbed RuleContext that allows everything.
     let ctx = ichr::mojang::rules::RuleContext::current();

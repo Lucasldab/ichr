@@ -224,9 +224,8 @@ impl PackService {
         // rejected; the strict allowlist still gates the result, so a
         // sanitization that somehow produces a path-traversing name is
         // still refused.
-        let safe_filename = sanitize_pack_filename(&file.filename).filter(|n| {
-            is_safe_pack_filename(n)
-        });
+        let safe_filename =
+            sanitize_pack_filename(&file.filename).filter(|n| is_safe_pack_filename(n));
         let safe_filename = match safe_filename {
             Some(n) => n,
             None => {

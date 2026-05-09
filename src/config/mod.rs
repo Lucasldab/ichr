@@ -128,7 +128,10 @@ mod tests {
         let p = td.path().join("config.toml");
         std::fs::write(&p, "[colors]\naccent = \"red\"\n").unwrap();
         let c = Config::load(&p);
-        assert_eq!(c.colors.accent, palette::ColorSpec::Named(palette::NamedColor::Red));
+        assert_eq!(
+            c.colors.accent,
+            palette::ColorSpec::Named(palette::NamedColor::Red)
+        );
         // Untouched slot stays at default.
         assert_eq!(c.colors.dim, Config::default().colors.dim);
     }

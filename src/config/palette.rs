@@ -187,17 +187,18 @@ impl<'de> Deserialize<'de> for ColorSpec {
             return Ok(ColorSpec::Rgb(r, g, b));
         }
         // Re-deserialize as a `NamedColor` via its serde rename.
-        let named: NamedColor = serde::Deserialize::deserialize(
-            serde::de::value::StrDeserializer::<serde::de::value::Error>::new(&s),
-        )
-        .map_err(|e| {
-            serde::de::Error::custom(format!(
-                "unknown color {s:?}: must be one of black, red, green, yellow, \
+        let named: NamedColor =
+            serde::Deserialize::deserialize(serde::de::value::StrDeserializer::<
+                serde::de::value::Error,
+            >::new(&s))
+            .map_err(|e| {
+                serde::de::Error::custom(format!(
+                    "unknown color {s:?}: must be one of black, red, green, yellow, \
                  blue, magenta, cyan, gray, darkgray, lightred, lightgreen, \
                  lightyellow, lightblue, lightmagenta, lightcyan, white, reset, \
                  or a #RRGGBB hex literal ({e})"
-            ))
-        })?;
+                ))
+            })?;
         Ok(ColorSpec::Named(named))
     }
 }
@@ -231,7 +232,10 @@ mod tests {
 
     #[test]
     fn rgb_roundtrips() {
-        assert_eq!(roundtrip(ColorSpec::Rgb(0xFF, 0xAA, 0)), ColorSpec::Rgb(0xFF, 0xAA, 0));
+        assert_eq!(
+            roundtrip(ColorSpec::Rgb(0xFF, 0xAA, 0)),
+            ColorSpec::Rgb(0xFF, 0xAA, 0)
+        );
     }
 
     #[test]

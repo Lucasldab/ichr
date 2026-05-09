@@ -411,27 +411,26 @@ fn loader_kind_str(kind: crate::domain::instance::ModloaderKind) -> &'static str
 
 /// Translate a crossterm event to an Action for the ModBrowser view.
 ///
-/// j/k disambiguation (UI-SPEC §Keybind Contract lines 564-581):
-///  - When `state.active_view.search` is empty, `j`/`k` navigate.
-///  - When `search` is non-empty, `j`/`k` go into the search input.
-///  Vim-style two-mode dispatch:
-///   - **Browse mode** (`is_searching == false`, default on open):
-///       - Up/Down/`j`/`k` → nav.
-///       - Enter → ModBrowserOpenVersions.
-///       - `v` / `l` → toggle MC / loader filter chips.
-///       - `/` → ModBrowserBeginSearch (enter search mode).
-///       - Esc → ModBrowserCancel (leave browser).
-///       - Other printable chars are ignored (do NOT type into search).
-///   - **Search mode** (`is_searching == true`):
-///       - Up/Down → nav (lets user pick a row without leaving search).
-///       - Enter → ModBrowserOpenVersions.
-///       - Esc → ModBrowserExitSearch (back to browse, clears query).
-///       - Backspace → pop char from search.
-///       - Every printable char → type into search.
-///       - Bracketed paste → ModBrowserPasteSearch.
-///   The previous "letters type once `search` is non-empty" rule meant queries
-///   could not start with `v`/`l`/`j`/`k`; the explicit `/` toggle removes
-///   that ambiguity.
+/// Vim-style two-mode dispatch:
+///
+/// - **Browse mode** (`is_searching == false`, default on open):
+///   - Up/Down/`j`/`k` -> nav.
+///   - Enter -> ModBrowserOpenVersions.
+///   - `v` / `l` -> toggle MC / loader filter chips.
+///   - `/` -> ModBrowserBeginSearch (enter search mode).
+///   - Esc -> ModBrowserCancel (leave browser).
+///   - Other printable chars are ignored (do NOT type into search).
+/// - **Search mode** (`is_searching == true`):
+///   - Up/Down -> nav (lets user pick a row without leaving search).
+///   - Enter -> ModBrowserOpenVersions.
+///   - Esc -> ModBrowserExitSearch (back to browse, clears query).
+///   - Backspace -> pop char from search.
+///   - Every printable char -> type into search.
+///   - Bracketed paste -> ModBrowserPasteSearch.
+///
+/// The previous "letters type once `search` is non-empty" rule meant
+/// queries could not start with `v`/`l`/`j`/`k`; the explicit `/`
+/// toggle removes that ambiguity.
 pub fn map_mod_browser_event(ev: CtEvent, state: &AppState) -> Option<Action> {
     let is_searching = matches!(
         &state.active_view,

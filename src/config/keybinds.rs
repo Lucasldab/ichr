@@ -82,17 +82,33 @@ impl KeySpec {
     /// match is exact (`Ctrl+L` does NOT match plain `L`); code match
     /// is exact for `Char(_)` (case-sensitive, deliberately).
     pub fn matches(&self, ev: &KeyEvent) -> bool {
-        // crossterm reports Ctrl-modifiers with the shifted form
-        // sometimes -- normalize by ignoring case mismatches when
-        // modifiers carry CONTROL (so `"Ctrl+l"` and `"Ctrl+L"` both
-        // work). For non-CONTROL bindings we keep case-sensitivity so
-        // `"L"` (Shift+L) and `"l"` are distinct slots.
-        if self.modifiers != ev.modifiers {
+        // Modifier comparison is mostly exact, with one tolerance: for
+        // an uppercase Char binding, the SHIFT bit is treated as
+        // already-implied by the letter case. Some terminals report
+        // Shift+L as `Char('L')` with NO SHIFT modifier (the case
+        // alone signals Shift); others set the bit. Accept both.
+        let is_uppercase_char = matches!(
+            self.code,
+            KeyCode::Char(c) if c.is_ascii_uppercase()
+        );
+        let self_mods = if is_uppercase_char {
+            self.modifiers - KeyModifiers::SHIFT
+        } else {
+            self.modifiers
+        };
+        let ev_mods = if matches!(ev.code, KeyCode::Char(c) if c.is_ascii_uppercase()) {
+            ev.modifiers - KeyModifiers::SHIFT
+        } else {
+            ev.modifiers
+        };
+        if self_mods != ev_mods {
             return false;
         }
         match (self.code, ev.code) {
             (KeyCode::Char(a), KeyCode::Char(b)) => {
                 if self.modifiers.contains(KeyModifiers::CONTROL) {
+                    // Ctrl-letter is case-insensitive (some terminals
+                    // report Ctrl+L as either case).
                     a.eq_ignore_ascii_case(&b)
                 } else {
                     a == b
@@ -163,7 +179,7 @@ impl Default for Keybinds {
             (OpenPackResourceBrowser, KeySpec::new(Char('R'), shift)),
             (OpenPackShaderBrowser, KeySpec::new(Char('S'), shift)),
             (OpenAccountsList, KeySpec::new(Char('A'), shift)),
-            (OpenJavaPicker, KeySpec::new(Char('J'), shift)),
+            (OpenJavaPicker, KeySpec::new(Char('j'), none)),
             (OpenCfBrowser, KeySpec::new(Char('F'), shift)),
             (BrowserBeginSearch, KeySpec::new(Char('/'), none)),
             (BrowserToggleMcFilter, KeySpec::new(Char('v'), none)),
@@ -443,7 +459,10 @@ mod tests {
         let k = keyspec_from_wire("Ctrl+L").unwrap();
         assert_eq!(
             k,
-            KeySpec::new(KeyCode::Char('L'), KeyModifiers::CONTROL | KeyModifiers::SHIFT)
+            KeySpec::new(
+                KeyCode::Char('L'),
+                KeyModifiers::CONTROL | KeyModifiers::SHIFT
+            )
         );
     }
 

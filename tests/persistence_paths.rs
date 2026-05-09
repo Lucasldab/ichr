@@ -55,10 +55,7 @@ fn log_file_lives_under_data_dir() {
         log,
         paths.data_dir
     );
-    assert_eq!(
-        log.file_name().and_then(|f| f.to_str()),
-        Some("ichr.log")
-    );
+    assert_eq!(log.file_name().and_then(|f| f.to_str()), Some("ichr.log"));
 }
 
 #[test]

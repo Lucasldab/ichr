@@ -66,9 +66,7 @@ pub fn render_pack_install_failed_modal(f: &mut Frame, area: Rect, state: &AppSt
     } else {
         format!(" {version_label}")
     };
-    let headline = format!(
-        "Failed to install {kind_label} {pack_title}{version_part}: {error}"
-    );
+    let headline = format!("Failed to install {kind_label} {pack_title}{version_part}: {error}");
     let err_p = Paragraph::new(headline)
         .style(Style::default().add_modifier(Modifier::BOLD))
         .wrap(Wrap { trim: false });

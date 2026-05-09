@@ -33,9 +33,7 @@ use std::time::{Duration, Instant};
 
 use httpmock::prelude::*;
 use ichr::mods::error::ModrinthError;
-use ichr::mods::installer::{
-    install_mods_into_instance, InstallStep, MOD_DOWNLOAD_CONCURRENCY,
-};
+use ichr::mods::installer::{install_mods_into_instance, InstallStep, MOD_DOWNLOAD_CONCURRENCY};
 use ichr::mods::modrinth::ModrinthClient;
 use ichr::mods::service::ModrinthService;
 use ichr::mods::types::{

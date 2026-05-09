@@ -225,9 +225,6 @@ mod tests {
         // Default when ICHR_MSA_CLIENT_ID env var is unset -- pulled
         // from `auth::device_code::DEFAULT_MSA_CLIENT_ID` so the test
         // tracks the constant rather than restating its value.
-        assert_eq!(
-            a.clientid,
-            crate::auth::device_code::DEFAULT_MSA_CLIENT_ID
-        );
+        assert_eq!(a.clientid, crate::auth::device_code::DEFAULT_MSA_CLIENT_ID);
     }
 }

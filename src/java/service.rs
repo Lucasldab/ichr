@@ -537,10 +537,7 @@ mod tests {
         }
 
         let path = result.expect("should return Ok");
-        assert_eq!(
-            path, fake_java,
-            "must return the ICHR_JAVA path verbatim"
-        );
+        assert_eq!(path, fake_java, "must return the ICHR_JAVA path verbatim");
     }
 
     // -----------------------------------------------------------------------

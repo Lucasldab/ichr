@@ -43,8 +43,8 @@ pub fn init(paths: &AppPaths) -> anyhow::Result<WorkerGuard> {
 
     let (non_blocking, guard) = tracing_appender::non_blocking(file);
 
-    let filter = EnvFilter::try_from_env("RUST_LOG")
-        .unwrap_or_else(|_| EnvFilter::new("ichr=debug,info"));
+    let filter =
+        EnvFilter::try_from_env("RUST_LOG").unwrap_or_else(|_| EnvFilter::new("ichr=debug,info"));
 
     let fmt_layer = fmt::layer()
         .with_writer(non_blocking)

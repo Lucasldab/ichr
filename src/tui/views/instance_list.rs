@@ -88,9 +88,7 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
             "Launching as: {}  (press {accounts_label} to manage accounts)",
             a.mc_username
         ),
-        None => format!(
-            "Offline mode -- press {accounts_label} to add a Microsoft account"
-        ),
+        None => format!("Offline mode -- press {accounts_label} to add a Microsoft account"),
     };
     let footer = Paragraph::new(footer_text).style(Style::default().add_modifier(Modifier::DIM));
     f.render_widget(footer, footer_area);

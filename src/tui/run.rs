@@ -20,10 +20,10 @@ use tokio::time::interval;
 use super::app::{
     update, Action, ActiveView, AppState, CreateStep, Effect, JavaPickerRow, VersionFilter,
 };
-use crate::config::ActionKey;
 use super::terminal::Tui;
 use super::view::view;
 use crate::auth::service::{AccountAuthEvent, AccountService};
+use crate::config::ActionKey;
 use crate::install::install_version;
 use crate::java::service::JavaService;
 use crate::launcher;

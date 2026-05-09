@@ -99,10 +99,7 @@ async fn test_drop_resource_pack_happy_path() {
         .expect("read_ledger");
     assert_eq!(ledger.mods.len(), 1, "ledger must have exactly 1 row");
     let row = &ledger.mods[0];
-    assert_eq!(
-        row.kind,
-        ichr::mods::types::InstalledItemKind::ResourcePack
-    );
+    assert_eq!(row.kind, ichr::mods::types::InstalledItemKind::ResourcePack);
     assert_eq!(row.source, ichr::mods::types::ModSource::Local);
     assert_eq!(row.file_name, "faithful.zip");
     assert!(row.enabled, "newly dropped pack must be enabled");
@@ -421,10 +418,7 @@ async fn test_modrinth_install_resource_pack_end_to_end() {
         .expect("read_ledger");
     assert_eq!(ledger.mods.len(), 1);
     let r = &ledger.mods[0];
-    assert_eq!(
-        r.kind,
-        ichr::mods::types::InstalledItemKind::ResourcePack
-    );
+    assert_eq!(r.kind, ichr::mods::types::InstalledItemKind::ResourcePack);
     assert_eq!(r.source, ichr::mods::types::ModSource::Modrinth);
     assert_eq!(
         r.hash_algo,
