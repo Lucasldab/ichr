@@ -35,6 +35,12 @@ pub struct CurseForgeSearchHit {
     pub download_count: u64,
     #[serde(default)]
     pub categories: Vec<CurseForgeCategory>,
+    /// Phase 13: project logo wire field. Optional because CurseForge
+    /// returns `null` when the author has not uploaded a logo. The
+    /// nested object also carries `id`/`title`/`thumbnailUrl`/etc., but
+    /// the icon pipeline only needs `url`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logo: Option<CurseForgeLogo>,
     /// Stamped client-side from the per-instance ledger (NOT a wire field).
     #[serde(skip)]
     pub already_installed: bool,
@@ -44,6 +50,17 @@ pub struct CurseForgeSearchHit {
 pub struct CurseForgeCategory {
     pub id: i32,
     pub name: String,
+}
+
+/// CurseForge project logo wire shape. The full envelope returned by the
+/// API has `id` / `modId` / `title` / `description` / `thumbnailUrl` /
+/// `url`, but only `url` is load-bearing for icon rendering. Other fields
+/// would belong here if a future feature (e.g., gallery view) needs them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CurseForgeLogo {
+    /// Full-resolution logo URL. CurseForge serves PNG primarily.
+    #[serde(default)]
+    pub url: String,
 }
 
 // ============================================================================
@@ -251,6 +268,9 @@ mod tests {
             summary: "s".into(),
             download_count: 100,
             categories: vec![],
+            logo: Some(CurseForgeLogo {
+                url: "https://media.forgecdn.net/avatars/1/2/example.png".into(),
+            }),
             already_installed: false,
         };
         let json = serde_json::to_string(&h).unwrap();

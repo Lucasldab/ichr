@@ -22,7 +22,9 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
 use ratatui::Frame;
+use ratatui_image::Image;
 
+use crate::icons::IconSource;
 use crate::mods::curseforge::types::{CurseForgeProjectDetail, CurseForgeSearchHit};
 use crate::mods::types::ModBrowserFetchState;
 use crate::tui::app::{Action, ActiveView, AppState};
@@ -147,6 +149,7 @@ pub fn render_cf_browser(f: &mut Frame, area: Rect, state: &AppState) {
         results.get(*selected),
         selected_detail.as_ref(),
         fetch_state,
+        state,
     );
 
     // ---- Footer hint (DIM) ----
@@ -243,12 +246,13 @@ fn render_detail_pane(
     selected_hit: Option<&CurseForgeSearchHit>,
     selected_detail: Option<&CurseForgeProjectDetail>,
     fetch_state: &ModBrowserFetchState,
+    state: &AppState,
 ) {
     let block = Block::default().borders(Borders::ALL).title(" Detail ");
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    if selected_hit.is_none() {
+    let Some(hit) = selected_hit else {
         let p = Paragraph::new("Select a mod to see details").style(
             Style::default()
                 .fg(Color::DarkGray)
@@ -256,26 +260,75 @@ fn render_detail_pane(
         );
         f.render_widget(p, inner);
         return;
+    };
+
+    // Phase 13: top icon strip + body split when icons are enabled. Same
+    // shape as mod_browser/pack_browser. CurseForge project ids are
+    // numeric -- the IconService key is `(IconSource::Curseforge, id_string)`.
+    let (icon_strip, body_area) = if state.icon_rendering_enabled && inner.height >= 5 {
+        let strips = Layout::vertical([Constraint::Length(4), Constraint::Min(0)]).split(inner);
+        (Some(strips[0]), strips[1])
+    } else {
+        (None, inner)
+    };
+
+    if let Some(strip) = icon_strip {
+        let cols = Layout::horizontal([
+            Constraint::Length(8),
+            Constraint::Length(1),
+            Constraint::Min(0),
+        ])
+        .split(strip);
+        let icon_rect = cols[0];
+        let header_rect = cols[2];
+
+        if let Some(svc) = &state.icon_service {
+            if let Some(proto) = svc.try_get(IconSource::Curseforge, &hit.id.to_string()) {
+                f.render_widget(Image::new(&proto), icon_rect);
+            }
+        }
+
+        let mut header_lines: Vec<Line> = Vec::new();
+        header_lines.push(Line::from(Span::styled(
+            hit.name.clone(),
+            Style::default().add_modifier(Modifier::BOLD),
+        )));
+        if let Some(d) = selected_detail {
+            if !d.authors.is_empty() {
+                let authors_joined = d
+                    .authors
+                    .iter()
+                    .map(|a| a.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                header_lines.push(Line::from(Span::styled(
+                    format!("by {authors_joined}"),
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::DIM),
+                )));
+            }
+        }
+        f.render_widget(Paragraph::new(header_lines), header_rect);
     }
 
     let mut lines: Vec<Line> = Vec::new();
-    let hit = selected_hit.expect("checked above");
-    lines.push(Line::from(Span::styled(
-        hit.name.clone(),
-        Style::default().add_modifier(Modifier::BOLD),
-    )));
+    let header_in_strip = icon_strip.is_some();
+    if !header_in_strip {
+        lines.push(Line::from(Span::styled(
+            hit.name.clone(),
+            Style::default().add_modifier(Modifier::BOLD),
+        )));
+    }
 
     if let Some(d) = selected_detail {
-        let authors_joined = if d.authors.is_empty() {
-            String::new()
-        } else {
-            d.authors
+        if !header_in_strip && !d.authors.is_empty() {
+            let authors_joined = d
+                .authors
                 .iter()
                 .map(|a| a.name.as_str())
                 .collect::<Vec<_>>()
-                .join(", ")
-        };
-        if !authors_joined.is_empty() {
+                .join(", ");
             lines.push(Line::from(Span::styled(
                 format!("by {authors_joined}"),
                 Style::default()
@@ -283,7 +336,7 @@ fn render_detail_pane(
                     .add_modifier(Modifier::DIM),
             )));
         }
-        lines.push(divider_line(inner.width));
+        lines.push(divider_line(body_area.width));
         lines.push(Line::raw(d.summary.clone()));
         lines.push(Line::raw(""));
         lines.push(Line::raw(format!(
@@ -297,7 +350,7 @@ fn render_detail_pane(
             lines.push(Line::raw(format!("Website: {}", d.links.website_url)));
         }
     } else {
-        lines.push(divider_line(inner.width));
+        lines.push(divider_line(body_area.width));
         lines.push(Line::raw(hit.summary.clone()));
         lines.push(Line::raw(""));
         lines.push(Line::raw(format!(
@@ -316,7 +369,7 @@ fn render_detail_pane(
     }
 
     let p = Paragraph::new(lines).wrap(Wrap { trim: false });
-    f.render_widget(p, inner);
+    f.render_widget(p, body_area);
 }
 
 /// Truncate `s` to at most `max_w` columns, appending `…` if truncated.
@@ -511,6 +564,7 @@ mod tests {
             summary: String::new(),
             download_count: 0,
             categories: Vec::new(),
+            logo: None,
             already_installed: false,
         }
     }

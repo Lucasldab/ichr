@@ -3565,6 +3565,8 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::CfBrowserSearchLoaded { slug, hits } => {
+            let icons_on = state.icon_rendering_enabled;
+            let mut effects = Vec::new();
             if let ActiveView::CfBrowser {
                 slug: cur_slug,
                 results,
@@ -3578,9 +3580,25 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     *results = hits;
                     *fetch_state = ModBrowserFetchState::Ready;
                     *selected = (*selected).min(new_len.saturating_sub(1));
+                    if icons_on {
+                        if let Some(hit) = results.get(*selected) {
+                            if let Some(url) = hit
+                                .logo
+                                .as_ref()
+                                .map(|l| l.url.clone())
+                                .filter(|s| !s.is_empty())
+                            {
+                                effects.push(Effect::FetchIcon {
+                                    source: crate::icons::IconSource::Curseforge,
+                                    project_id: hit.id.to_string(),
+                                    url,
+                                });
+                            }
+                        }
+                    }
                 }
             }
-            vec![]
+            effects
         }
 
         Action::CfBrowserSearchFailed { slug, error } => {
@@ -3598,6 +3616,8 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::CfBrowserMoveSelection(delta) => {
+            let icons_on = state.icon_rendering_enabled;
+            let mut effects = Vec::new();
             if let ActiveView::CfBrowser {
                 results, selected, ..
             } = &mut state.active_view
@@ -3606,9 +3626,25 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 if len > 0 {
                     let new_idx = (*selected as i32 + delta).clamp(0, len as i32 - 1) as usize;
                     *selected = new_idx;
+                    if icons_on {
+                        if let Some(hit) = results.get(new_idx) {
+                            if let Some(url) = hit
+                                .logo
+                                .as_ref()
+                                .map(|l| l.url.clone())
+                                .filter(|s| !s.is_empty())
+                            {
+                                effects.push(Effect::FetchIcon {
+                                    source: crate::icons::IconSource::Curseforge,
+                                    project_id: hit.id.to_string(),
+                                    url,
+                                });
+                            }
+                        }
+                    }
                 }
             }
-            vec![]
+            effects
         }
 
         Action::CfBrowserToggleMcFilter => {

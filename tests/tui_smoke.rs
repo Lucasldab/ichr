@@ -1938,6 +1938,7 @@ fn cf_hit(id: u64, slug: &str) -> CurseForgeSearchHit {
         summary: "x".into(),
         download_count: 100,
         categories: vec![],
+        logo: None,
         already_installed: false,
     }
 }
