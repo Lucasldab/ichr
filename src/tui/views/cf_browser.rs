@@ -283,7 +283,11 @@ fn render_detail_pane(
         let header_rect = cols[2];
 
         if let Some(svc) = &state.icon_service {
-            if let Some(proto) = svc.try_get(IconSource::Curseforge, &hit.id.to_string()) {
+            if let Some(proto) = svc.try_get(
+                IconSource::Curseforge,
+                &hit.id.to_string(),
+                crate::icons::detail_icon_target_rect(),
+            ) {
                 f.render_widget(Image::new(&proto), icon_rect);
             }
         }

@@ -2321,6 +2321,7 @@ async fn execute_effects(
                 source,
                 project_id,
                 url,
+                purpose,
             } => {
                 // No-op when icons are disabled or the service didn't build.
                 let Some(svc) = state.icon_service.as_ref().map(Arc::clone) else {
@@ -2328,7 +2329,7 @@ async fn execute_effects(
                 };
                 let paths2 = paths.clone();
                 let tx = action_tx.clone();
-                let target = crate::icons::detail_icon_target_rect();
+                let target = purpose.target_rect();
                 tokio::spawn(async move {
                     match svc
                         .fetch_and_decode(&paths2, source, &project_id, &url, target)
@@ -2344,10 +2345,33 @@ async fn execute_effects(
                                 error = %e,
                                 ?source,
                                 %project_id,
+                                ?purpose,
                                 "icon fetch failed -- detail pane keeps blank icon area"
                             );
                         }
                     }
+                });
+            }
+
+            // Phase 14: stub. Wired with real registry calls in 14-05/14-06.
+            // For now, log + emit an empty `InstalledIconsResolved` so the
+            // action machinery is exercised end-to-end and downstream tests
+            // can verify the dispatch path without the actual API call.
+            Effect::ResolveInstalledIcons { slug, source } => {
+                let tx = action_tx.clone();
+                tokio::spawn(async move {
+                    tracing::debug!(
+                        %slug,
+                        ?source,
+                        "ResolveInstalledIcons stub -- real hydration lands in 14-05/14-06"
+                    );
+                    let _ = tx
+                        .send(Action::InstalledIconsResolved {
+                            slug,
+                            source,
+                            hits: Vec::new(),
+                        })
+                        .await;
                 });
             }
         }

@@ -37,6 +37,45 @@ pub fn detail_icon_target_rect() -> ratatui::layout::Rect {
     }
 }
 
+/// Pixel/cell size of the per-row icon in browser results / installed
+/// lists (Phase 14). Smaller than the detail-pane slot because list
+/// density beats per-row recognizability -- the icon is a "I've seen
+/// this" cue, the name is the source of truth.
+///
+/// 3 cells wide × 2 cells tall matches the existing 2-line row layout
+/// used by `mod_browser::render_results_pane` and friends.
+pub fn list_row_icon_target_rect() -> ratatui::layout::Rect {
+    ratatui::layout::Rect {
+        x: 0,
+        y: 0,
+        width: 3,
+        height: 2,
+    }
+}
+
+/// Why a `FetchIcon` was emitted -- determines which size the protocol
+/// is encoded for. Detail-pane fetches go to `detail_icon_target_rect`;
+/// list-row fetches go to `list_row_icon_target_rect`. Both can coexist
+/// in the LRU because the cache key includes width/height.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IconFetchPurpose {
+    /// Detail pane avatar slot. 8x4 cells.
+    Detail,
+    /// Inline row icon in browser results / installed lists. 3x2 cells.
+    ListRow,
+}
+
+impl IconFetchPurpose {
+    /// Resolve the target Rect for this purpose. Lock-in here so the
+    /// run-loop dispatcher and the render path agree on dimensions.
+    pub fn target_rect(self) -> ratatui::layout::Rect {
+        match self {
+            IconFetchPurpose::Detail => detail_icon_target_rect(),
+            IconFetchPurpose::ListRow => list_row_icon_target_rect(),
+        }
+    }
+}
+
 /// Predicate consumed by detail-pane renderers: should icons render at
 /// all given the terminal's detected image protocol?
 ///

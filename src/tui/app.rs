@@ -1151,6 +1151,16 @@ pub enum Action {
         source: crate::icons::IconSource,
         project_id: String,
     },
+    /// Phase 14: response from `Effect::ResolveInstalledIcons`. Carries
+    /// (project_id, icon_url) pairs hydrated for an installed-mods or
+    /// installed-packs view. The arm fans out one `Effect::FetchIcon`
+    /// per non-None URL so in-row cells populate without a per-frame
+    /// fetch storm.
+    InstalledIconsResolved {
+        slug: String,
+        source: crate::icons::IconSource,
+        hits: Vec<(String, Option<String>)>,
+    },
 }
 
 /// Effects requested by `update()`. NOTE: there is deliberately NO
@@ -1393,10 +1403,26 @@ pub enum Effect {
     /// `state.icon_rendering_enabled` is true. Completion is signalled
     /// via `Action::IconFetched`, which causes the next render frame to
     /// pick up the cached protocol via `IconService::try_get`.
+    ///
+    /// Phase 14 adds `purpose` so detail-pane and list-row fetches can
+    /// coexist in the LRU at different sizes (8x4 vs 3x2). The run-loop
+    /// resolves `purpose` to a `Rect` via `IconFetchPurpose::target_rect`.
     FetchIcon {
         source: crate::icons::IconSource,
         project_id: String,
         url: String,
+        purpose: crate::icons::IconFetchPurpose,
+    },
+    /// Phase 14: hydrate `icon_url`s for an installed-mods or
+    /// installed-packs list before the rich-path can show icons. The
+    /// installed-ledger persists `project_id` but not the URL; this
+    /// effect calls the registry's batch-projects endpoint and emits
+    /// `Action::InstalledIconsResolved` with `(project_id, icon_url)`
+    /// pairs. The action arm then fans out one `Effect::FetchIcon` per
+    /// non-None URL.
+    ResolveInstalledIcons {
+        slug: String,
+        source: crate::icons::IconSource,
     },
 }
 
@@ -1473,6 +1499,30 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         // frame picks it up via `try_get`. The variant exists so the
         // run-loop receives an action and triggers a redraw.
         Action::IconFetched { .. } => vec![],
+
+        // Phase 14: ResolveInstalledIcons returned (project_id, icon_url)
+        // pairs for the installed-list. Fan out one FetchIcon per
+        // non-None URL; the IconService LRU + on-disk cache absorb
+        // duplicates if the user opens the list multiple times.
+        Action::InstalledIconsResolved {
+            slug: _,
+            source,
+            hits,
+        } => {
+            if !state.icon_rendering_enabled {
+                return vec![];
+            }
+            hits.into_iter()
+                .filter_map(|(project_id, url)| {
+                    url.filter(|s| !s.is_empty()).map(|url| Effect::FetchIcon {
+                        source,
+                        project_id,
+                        url,
+                        purpose: crate::icons::IconFetchPurpose::ListRow,
+                    })
+                })
+                .collect()
+        }
 
         Action::OpenCreateModal => {
             state.active_view = ActiveView::CreateModal(CreateStep::NameInput {
@@ -2515,6 +2565,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                                     source: crate::icons::IconSource::Modrinth,
                                     project_id: hit.project_id.clone(),
                                     url,
+                                    purpose: crate::icons::IconFetchPurpose::Detail,
                                 });
                             }
                         }
@@ -2560,6 +2611,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                                     source: crate::icons::IconSource::Modrinth,
                                     project_id: hit.project_id.clone(),
                                     url,
+                                    purpose: crate::icons::IconFetchPurpose::Detail,
                                 });
                             }
                         }
@@ -3592,6 +3644,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                                     source: crate::icons::IconSource::Curseforge,
                                     project_id: hit.id.to_string(),
                                     url,
+                                    purpose: crate::icons::IconFetchPurpose::Detail,
                                 });
                             }
                         }
@@ -3638,6 +3691,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                                     source: crate::icons::IconSource::Curseforge,
                                     project_id: hit.id.to_string(),
                                     url,
+                                    purpose: crate::icons::IconFetchPurpose::Detail,
                                 });
                             }
                         }
@@ -4260,6 +4314,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                                     source: crate::icons::IconSource::Modrinth,
                                     project_id: hit.project_id.clone(),
                                     url,
+                                    purpose: crate::icons::IconFetchPurpose::Detail,
                                 });
                             }
                         }
@@ -4307,6 +4362,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                                     source: crate::icons::IconSource::Modrinth,
                                     project_id: hit.project_id.clone(),
                                     url,
+                                    purpose: crate::icons::IconFetchPurpose::Detail,
                                 });
                             }
                         }

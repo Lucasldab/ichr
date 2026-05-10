@@ -38,8 +38,12 @@ use crate::persistence::paths::AppPaths;
 pub const PROTOCOL_LRU_SIZE: usize = 64;
 
 /// Cache key. Sources are split per registry so id collisions across
-/// Modrinth and CurseForge can never shadow each other.
-type IconKey = (IconSource, String);
+/// Modrinth and CurseForge can never shadow each other. Phase 14 adds
+/// the target Rect's `(width, height)` to the key so a project icon
+/// rendered at multiple sizes (8×4 detail pane + 3×2 list row) keeps
+/// distinct cached `Protocol`s rather than overwriting on every
+/// re-encode.
+type IconKey = (IconSource, String, u16, u16);
 
 /// Owning facade. Cheap to clone the inner Arcs; pass via `Arc<IconService>`
 /// from `AppState` so spawned async tasks can share the LRU.
@@ -67,12 +71,18 @@ impl IconService {
         })
     }
 
-    /// Returns the cached `Protocol` for `(source, project_id)` if it's
-    /// already decoded in memory. Does NOT trigger a fetch -- callers
-    /// dispatch `Effect::FetchIcon` separately and wait for
-    /// `Action::IconFetched` before calling `try_get` again.
-    pub fn try_get(&self, source: IconSource, project_id: &str) -> Option<Protocol> {
-        let key: IconKey = (source, project_id.to_string());
+    /// Returns the cached `Protocol` for `(source, project_id, target)`
+    /// if it's already decoded in memory at the requested size. Does
+    /// NOT trigger a fetch -- callers dispatch `Effect::FetchIcon`
+    /// separately and wait for `Action::IconFetched` before calling
+    /// `try_get` again.
+    ///
+    /// `target` is the on-screen `Rect` the protocol will render into;
+    /// only its `width` and `height` participate in the cache key.
+    /// Detail-pane callers pass `icons::detail_icon_target_rect()`;
+    /// list-row callers pass `icons::list_row_icon_target_rect()`.
+    pub fn try_get(&self, source: IconSource, project_id: &str, target: Rect) -> Option<Protocol> {
+        let key: IconKey = (source, project_id.to_string(), target.width, target.height);
         let mut guard = self
             .protocols
             .lock()
@@ -121,7 +131,7 @@ impl IconService {
             .new_protocol(img, target, Resize::Fit(None))
             .map_err(|e| AppError::Http(format!("icon new_protocol: {e}")))?;
 
-        let key: IconKey = (source, project_id.to_string());
+        let key: IconKey = (source, project_id.to_string(), target.width, target.height);
         self.protocols
             .lock()
             .expect("icon LRU mutex poisoned")
@@ -168,7 +178,9 @@ mod tests {
     #[tokio::test]
     async fn try_get_returns_none_before_fetch() {
         let svc = IconService::new(Picker::halfblocks()).expect("service");
-        assert!(svc.try_get(IconSource::Modrinth, "AANobbMI").is_none());
+        assert!(svc
+            .try_get(IconSource::Modrinth, "AANobbMI", target_rect())
+            .is_none());
     }
 
     #[tokio::test]
@@ -196,7 +208,7 @@ mod tests {
         .await
         .expect("fetch_and_decode");
 
-        let proto = svc.try_get(IconSource::Modrinth, "AANobbMI");
+        let proto = svc.try_get(IconSource::Modrinth, "AANobbMI", target_rect());
         assert!(proto.is_some(), "protocol must be cached after fetch");
     }
 
@@ -226,13 +238,15 @@ mod tests {
 
         // The first inserted key (`p0`) must have been evicted.
         assert!(
-            svc.try_get(IconSource::Modrinth, "p0").is_none(),
+            svc.try_get(IconSource::Modrinth, "p0", target_rect())
+                .is_none(),
             "oldest entry must be evicted past capacity"
         );
         // The most recent insertion is still present.
         let last_id = format!("p{}", PROTOCOL_LRU_SIZE);
         assert!(
-            svc.try_get(IconSource::Modrinth, &last_id).is_some(),
+            svc.try_get(IconSource::Modrinth, &last_id, target_rect())
+                .is_some(),
             "newest entry must still be cached"
         );
     }
@@ -257,8 +271,61 @@ mod tests {
 
         assert!(result.is_err(), "404 must propagate as Err");
         assert!(
-            svc.try_get(IconSource::Modrinth, "ZZZ").is_none(),
+            svc.try_get(IconSource::Modrinth, "ZZZ", target_rect())
+                .is_none(),
             "failed fetch must not insert a partial entry"
+        );
+    }
+
+    /// Phase 14: same project at two different target sizes (e.g. detail
+    /// pane 8x4 + list row 3x2) must keep BOTH cached, not overwrite one
+    /// with the other. Without the size in the cache key, the second
+    /// fetch would clobber the first and the next render at the original
+    /// size would silently re-fetch + re-decode.
+    #[tokio::test]
+    async fn dual_size_caching_keeps_both_protocols() {
+        let td = TempDir::new().unwrap();
+        let paths = make_paths(&td);
+        let server = MockServer::start();
+        let png = tiny_png_bytes();
+
+        let _m = server.mock(|when, then| {
+            when.method(GET).path("/icon.png");
+            then.status(200).body(&png[..]);
+        });
+
+        let svc = IconService::new(Picker::halfblocks()).expect("service");
+        let url = format!("{}/icon.png", server.base_url());
+
+        let detail_rect = Rect {
+            x: 0,
+            y: 0,
+            width: 8,
+            height: 4,
+        };
+        let row_rect = Rect {
+            x: 0,
+            y: 0,
+            width: 3,
+            height: 2,
+        };
+
+        svc.fetch_and_decode(&paths, IconSource::Modrinth, "AANobbMI", &url, detail_rect)
+            .await
+            .expect("detail fetch");
+        svc.fetch_and_decode(&paths, IconSource::Modrinth, "AANobbMI", &url, row_rect)
+            .await
+            .expect("row fetch");
+
+        assert!(
+            svc.try_get(IconSource::Modrinth, "AANobbMI", detail_rect)
+                .is_some(),
+            "detail-size protocol must survive the row-size insertion"
+        );
+        assert!(
+            svc.try_get(IconSource::Modrinth, "AANobbMI", row_rect)
+                .is_some(),
+            "row-size protocol must be cached too"
         );
     }
 }

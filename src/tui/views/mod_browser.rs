@@ -327,7 +327,11 @@ fn render_detail_pane(
         // ModBrowserSearchLoaded already do. Failed fetches stay blank
         // forever within the session per Phase 13 D-06.
         if let Some(svc) = &state.icon_service {
-            if let Some(proto) = svc.try_get(IconSource::Modrinth, &hit.project_id) {
+            if let Some(proto) = svc.try_get(
+                IconSource::Modrinth,
+                &hit.project_id,
+                crate::icons::detail_icon_target_rect(),
+            ) {
                 f.render_widget(Image::new(&proto), icon_rect);
             }
         }
