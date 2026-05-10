@@ -246,6 +246,37 @@ impl AppPaths {
         self.runtime_dir()
             .join(format!("{variant_id}-manifest.json"))
     }
+
+    // -------------------------------------------------------------------
+    // Icon cache (Phase 13)
+    // -------------------------------------------------------------------
+
+    /// Directory holding cached project icons for a single source:
+    /// `{cache_dir}/icons/{source.slug()}`.
+    ///
+    /// Sharded by source so `ichr cache clear icons modrinth` (future)
+    /// can scope cleanly, and so a project id colliding across registries
+    /// can never overwrite the wrong file.
+    pub fn icon_dir(&self, source: crate::icons::IconSource) -> PathBuf {
+        self.cache_dir.join("icons").join(source.slug())
+    }
+
+    /// Path to an individual project icon on disk:
+    /// `{cache_dir}/icons/{source.slug()}/{project_id}.{ext}`.
+    ///
+    /// `ext` is the format actually detected by `image::ImageReader::with_guessed_format()`,
+    /// not the URL extension -- Modrinth serves WebP at `.png` URLs for
+    /// some popular projects, and we want the cache filename to match the
+    /// real bytes on disk so future readers can pick the right decoder
+    /// without re-sniffing magic numbers.
+    pub fn icon_path(
+        &self,
+        source: crate::icons::IconSource,
+        project_id: &str,
+        ext: &str,
+    ) -> PathBuf {
+        self.icon_dir(source).join(format!("{project_id}.{ext}"))
+    }
 }
 
 /// Convenience: return `true` if `child` starts with `parent` after
@@ -308,6 +339,32 @@ mod jre_paths_tests {
         assert_eq!(exe, PathBuf::from("/data/runtime/adoptium-21/bin/java"));
         #[cfg(target_os = "windows")]
         assert_eq!(exe, PathBuf::from("/data/runtime/adoptium-21/bin/java.exe"));
+    }
+
+    #[test]
+    fn test_icon_dir_shards_by_source() {
+        let p = test_paths();
+        assert_eq!(
+            p.icon_dir(crate::icons::IconSource::Modrinth),
+            PathBuf::from("/cache/icons/modrinth")
+        );
+        assert_eq!(
+            p.icon_dir(crate::icons::IconSource::Curseforge),
+            PathBuf::from("/cache/icons/curseforge")
+        );
+    }
+
+    #[test]
+    fn test_icon_path_joins_id_and_extension() {
+        let p = test_paths();
+        assert_eq!(
+            p.icon_path(crate::icons::IconSource::Modrinth, "AANobbMI", "webp"),
+            PathBuf::from("/cache/icons/modrinth/AANobbMI.webp")
+        );
+        assert_eq!(
+            p.icon_path(crate::icons::IconSource::Curseforge, "238222", "png"),
+            PathBuf::from("/cache/icons/curseforge/238222.png")
+        );
     }
 
     #[test]
