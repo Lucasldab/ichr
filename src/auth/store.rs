@@ -438,7 +438,9 @@ mod tests {
             is_active: true,
             storage: StorageBackend::EncryptedFile,
         };
-        save_accounts(&cfg, std::slice::from_ref(&acc1)).await.unwrap();
+        save_accounts(&cfg, std::slice::from_ref(&acc1))
+            .await
+            .unwrap();
         let loaded = load_accounts(&cfg).await.unwrap();
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].id, "id-1");
