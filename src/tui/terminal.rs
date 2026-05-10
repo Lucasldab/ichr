@@ -44,7 +44,13 @@ pub fn init() -> std::io::Result<(Tui, Option<Picker>)> {
     // terminal's reply. Failures are non-fatal: ichr just runs without
     // icons, exactly like users on gnome-terminal / xterm / Konsole.
     let picker = match Picker::from_query_stdio() {
-        Ok(p) => Some(p),
+        Ok(p) => {
+            tracing::debug!(
+                protocol = ?p.protocol_type(),
+                "image protocol detected"
+            );
+            Some(p)
+        }
         Err(e) => {
             tracing::warn!(error = %e, "image protocol detection failed -- icons disabled");
             None
