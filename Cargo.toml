@@ -2,7 +2,7 @@
 name = "ichr"
 version = "0.2.0"
 edition = "2021"
-rust-version = "1.88"
+rust-version = "1.90"
 description = "Terminal-UI Minecraft Java Edition launcher"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Lucasldab/ichr"
@@ -42,6 +42,12 @@ tracing-appender = "0.2"
 
 ratatui-textarea = "0.9.1"  # Text input widget for create-instance modal (Phase 2)
 time = { version = "0.3", default-features = false, features = ["std", "formatting"] }
+
+# Image rendering in detail panes (Phase 13). Protocol-gated -- kitty/sixel/iterm2 get
+# inline icons; halfblocks falls back to text-only (verified unusable in spike 001).
+# Pulls Rust 1.90 MSRV via icy_sixel -> quantette transitive constraint.
+ratatui-image = "10.0.8"
+image = { version = "0.25", default-features = false, features = ["png", "webp"] }
 
 # --- Pre-wired for later phases (lock versions now so Cargo.lock is stable) ---
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream", "json", "gzip", "form"] }

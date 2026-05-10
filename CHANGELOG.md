@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Minimum supported Rust version (MSRV)** bumped from 1.88 to 1.90 to
+  pull in `ratatui-image 10.0.8` for in-terminal mod / pack / shader icon
+  previews (Phase 13). The bump comes from `icy_sixel` →
+  `quantette 0.5.1`, which requires Rust 1.90+. Forks pinned to 1.88
+  must update `rust-toolchain.toml` and any local `rust-version`
+  pin alongside ichr.
+
 ## [0.2.0] -- 2026-05-09
 
 ### Added

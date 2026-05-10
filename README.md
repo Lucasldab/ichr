@@ -72,7 +72,7 @@ console.curseforge.com.
 cargo install --git https://github.com/Lucasldab/ichr
 ```
 
-Requires the Rust toolchain (>= 1.88; pinned in `rust-toolchain.toml`).
+Requires the Rust toolchain (>= 1.90; pinned in `rust-toolchain.toml`).
 
 ### From a release archive
 

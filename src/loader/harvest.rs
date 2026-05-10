@@ -455,7 +455,7 @@ mod tests {
         let token = CancellationToken::new();
 
         // First call -- should copy.
-        copy_libraries_into_shared(&paths, &[lib.clone()], &token)
+        copy_libraries_into_shared(&paths, std::slice::from_ref(&lib), &token)
             .await
             .unwrap();
         let dst = paths.library_path(&maven_path);
