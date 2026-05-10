@@ -1,17 +1,24 @@
 //! Icon rendering domain (Phase 13).
 //!
-//! This phase ships only the foundation pieces:
+//! Pieces shipped so far:
 //!
 //! - `IconSource` -- enum tagging where an icon came from. Mirrors the
 //!   on-disk cache directory split (`{cache}/icons/modrinth/...` vs
 //!   `{cache}/icons/curseforge/...`).
+//! - `client::IconClient` -- HTTP fetcher with cache-first probe. Owns
+//!   the `reqwest::Client` and a `Semaphore(4)` cap on concurrent
+//!   downloads.
 //!
-//! Subsequent plans (13-03 / 13-04 / 13-05 / 13-06) layer the HTTP client,
-//! terminal protocol detection, in-memory `Protocol` LRU, and detail-pane
-//! render on top. List-row icons are deferred to Phase B per
+//! Subsequent plans (13-04 / 13-05 / 13-06) layer terminal protocol
+//! detection, in-memory `Protocol` LRU, and detail-pane render on top.
+//! List-row icons are deferred to Phase B per
 //! `.planning/spikes/001-icon-rendering-quality/README.md` (halfblocks
 //! quality is unusable, so per-row icons must be protocol-gated and
 //! require rewriting the existing `Table`-based list views).
+
+pub mod client;
+
+pub use client::IconClient;
 
 /// Where an icon was sourced from. Used as the cache directory shard so
 /// two projects sharing an id across registries can never collide on
