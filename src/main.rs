@@ -37,10 +37,12 @@ async fn main() -> anyhow::Result<()> {
 
     // 3. Terminal -- panic hook is installed inside tui::init_terminal so that
     //    even a panic during setup leaves the terminal in a usable state.
-    let terminal = tui::init_terminal().context("initializing terminal")?;
+    //    Phase 13: init also runs image-protocol detection (Kitty / Sixel /
+    //    iTerm2) before flipping raw mode. `None` means "icons disabled".
+    let (terminal, image_picker) = tui::init_terminal().context("initializing terminal")?;
 
     // 4. Event loop. Restore on both success and error paths.
-    let run_result = tui::run(terminal).await;
+    let run_result = tui::run(terminal, image_picker).await;
 
     // 5. Restore. Ignore secondary errors -- we're already exiting and cannot
     //    write to a potentially dead terminal.

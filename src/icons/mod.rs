@@ -20,6 +20,45 @@ pub mod client;
 
 pub use client::IconClient;
 
+/// Predicate consumed by detail-pane renderers: should icons render at
+/// all given the terminal's detected image protocol?
+///
+/// Returns `true` only when the picker exists AND the detected protocol
+/// is something better than halfblocks. Halfblocks is intentionally
+/// rejected: Spike 001 verified that halfblocks output at the sizes
+/// usable in a TUI row is unrecognizable mush, so showing it to users
+/// is worse than showing nothing.
+///
+/// `None` (detection failed -- terminal didn't respond, or terminfo
+/// missing) is also treated as "icons disabled". Better to fall back
+/// silently than to risk a broken rendering.
+pub fn rendering_enabled(picker: Option<&ratatui_image::picker::Picker>) -> bool {
+    matches!(
+        picker.map(|p| p.protocol_type()),
+        Some(t) if t != ratatui_image::picker::ProtocolType::Halfblocks
+    )
+}
+
+#[cfg(test)]
+mod predicate_tests {
+    use super::*;
+    use ratatui_image::picker::Picker;
+
+    #[test]
+    fn rendering_disabled_when_picker_is_none() {
+        assert!(!rendering_enabled(None));
+    }
+
+    #[test]
+    fn rendering_disabled_for_halfblocks_picker() {
+        let picker = Picker::halfblocks();
+        assert!(
+            !rendering_enabled(Some(&picker)),
+            "halfblocks must disable icons -- spike 001 verdict"
+        );
+    }
+}
+
 /// Where an icon was sourced from. Used as the cache directory shard so
 /// two projects sharing an id across registries can never collide on
 /// disk, and so a future `ichr cache clear icons modrinth` command can

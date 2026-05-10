@@ -462,6 +462,16 @@ pub struct AppState {
     /// hardcoded UX so introducing this field is a no-op until
     /// renderers / handlers migrate to read from it.
     pub config: Arc<Config>,
+    /// Phase 13: image-protocol picker, populated at startup if the
+    /// terminal supports kitty / sixel / iterm2. Owned here so the
+    /// (incoming) IconService can borrow it for `new_protocol(...)`.
+    /// `None` on halfblocks-only terminals or when detection failed.
+    pub image_picker: Option<ratatui_image::picker::Picker>,
+    /// Phase 13: derived flag -- true iff `image_picker` is Some AND the
+    /// detected protocol is something better than halfblocks. Detail-pane
+    /// renderers consult this before carving an icon Rect; on false they
+    /// keep the existing text-only layout (no flicker, no empty box).
+    pub icon_rendering_enabled: bool,
 }
 
 #[derive(Debug, Clone)]

@@ -72,7 +72,16 @@ pub fn filter_version_list<'a>(
 ///
 /// Consumes the terminal; callers must call `tui::restore_terminal` after
 /// this returns (whether Ok or Err).
-pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
+///
+/// `image_picker` is the Phase 13 image-protocol picker built in
+/// `tui::init_terminal`. `None` means the terminal didn't respond to the
+/// protocol query (or returned `Halfblocks`, which Spike 001 verified is
+/// unusable at row sizes); callers downstream check `state.icon_rendering_enabled`
+/// before carving icon Rects in the detail pane.
+pub async fn run(
+    mut terminal: Tui,
+    image_picker: Option<ratatui_image::picker::Picker>,
+) -> anyhow::Result<()> {
     // Resolve platform paths.
     let paths =
         AppPaths::resolve().ok_or_else(|| anyhow::anyhow!("cannot resolve platform paths"))?;
@@ -140,9 +149,16 @@ pub async fn run(mut terminal: Tui) -> anyhow::Result<()> {
     let config = std::sync::Arc::new(crate::config::Config::load(
         &paths.config_dir.join("config.toml"),
     ));
+    // Phase 13: derive the icon-rendering toggle from the detected
+    // protocol. Predicate lives in `icons::rendering_enabled` so the
+    // halfblocks-rejection rule stays unit-testable (Spike 001 verdict).
+    let icon_rendering_enabled = crate::icons::rendering_enabled(image_picker.as_ref());
+
     let mut state = AppState {
         cf_api_key_present: cf_service.api_key_present(),
         config,
+        image_picker,
+        icon_rendering_enabled,
         ..AppState::default()
     };
 
