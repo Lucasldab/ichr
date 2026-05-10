@@ -26,7 +26,9 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
 use ratatui::Frame;
+use ratatui_image::Image;
 
+use crate::icons::IconSource;
 use crate::mods::types::{ModBrowserFetchState, ModrinthSearchHit};
 use crate::tui::app::{Action, ActiveView, AppState};
 
@@ -176,6 +178,7 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
         results.get(*selected),
         selected_detail.as_ref(),
         fetch_state,
+        state,
     );
 
     // ---- Footer hint (DIM) ----
@@ -279,13 +282,14 @@ fn render_detail_pane(
     selected_hit: Option<&ModrinthSearchHit>,
     selected_detail: Option<&crate::mods::types::ModrinthProjectDetail>,
     fetch_state: &ModBrowserFetchState,
+    state: &AppState,
 ) {
     let block = Block::default().borders(Borders::ALL).title(" Detail ");
     let inner = block.inner(area);
     f.render_widget(block, area);
 
     // Empty state (no hit selected) -- UI-SPEC line 244-246.
-    if selected_hit.is_none() {
+    let Some(hit) = selected_hit else {
         let p = Paragraph::new("Select a mod to see details").style(
             Style::default()
                 .fg(Color::DarkGray)
@@ -293,29 +297,79 @@ fn render_detail_pane(
         );
         f.render_widget(p, inner);
         return;
+    };
+
+    // Phase 13: when icons are enabled, carve a top strip for the avatar
+    // and render the title / author block to its right. The body Paragraph
+    // (description, downloads, license, etc.) renders below in the
+    // remaining height. When icons are disabled, fall through to the
+    // existing single-Paragraph layout untouched (no Rect carve, no
+    // visual difference for halfblocks-only users).
+    let (icon_strip, body_area) = if state.icon_rendering_enabled && inner.height >= 5 {
+        let strips = Layout::vertical([Constraint::Length(4), Constraint::Min(0)]).split(inner);
+        (Some(strips[0]), strips[1])
+    } else {
+        (None, inner)
+    };
+
+    if let Some(strip) = icon_strip {
+        let cols = Layout::horizontal([
+            Constraint::Length(8), // avatar slot (matches detail_icon_target_rect)
+            Constraint::Length(1), // gutter
+            Constraint::Min(0),    // title + author
+        ])
+        .split(strip);
+        let icon_rect = cols[0];
+        let header_rect = cols[2];
+
+        // Render the icon if the IconService has decoded it. Cache miss is
+        // silent: render fns don't dispatch fetches; ModBrowserMove and
+        // ModBrowserSearchLoaded already do. Failed fetches stay blank
+        // forever within the session per Phase 13 D-06.
+        if let Some(svc) = &state.icon_service {
+            if let Some(proto) = svc.try_get(IconSource::Modrinth, &hit.project_id) {
+                f.render_widget(Image::new(&proto), icon_rect);
+            }
+        }
+
+        let mut header_lines: Vec<Line> = Vec::new();
+        header_lines.push(Line::from(Span::styled(
+            hit.title.clone(),
+            Style::default().add_modifier(Modifier::BOLD),
+        )));
+        if let Some(d) = selected_detail {
+            header_lines.push(Line::from(Span::styled(
+                format!("by {}", d.author),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
+            )));
+        }
+        f.render_widget(Paragraph::new(header_lines), header_rect);
     }
 
-    // While the lazy detail fetch is in flight (08-UI-SPEC line 645).
-    // Q4 lock-in (08-RESEARCH.md): detail is fetched on Enter into the version
-    // picker, not on row dwell. So selected_detail is generally None here and
-    // the detail pane shows the search-hit summary only.
-
-    // Build vertical metadata stack from search-hit + optional detail.
+    // Body content (or full content when icon strip is absent). When the
+    // icon strip is present, we omit the title/author lines from the body
+    // since the strip already shows them.
     let mut lines: Vec<Line> = Vec::new();
-    let hit = selected_hit.expect("checked above");
-    lines.push(Line::from(Span::styled(
-        hit.title.clone(),
-        Style::default().add_modifier(Modifier::BOLD),
-    )));
+    let header_in_strip = icon_strip.is_some();
+    if !header_in_strip {
+        lines.push(Line::from(Span::styled(
+            hit.title.clone(),
+            Style::default().add_modifier(Modifier::BOLD),
+        )));
+    }
 
     if let Some(d) = selected_detail {
-        lines.push(Line::from(Span::styled(
-            format!("by {}", d.author),
-            Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::DIM),
-        )));
-        lines.push(divider_line(inner.width));
+        if !header_in_strip {
+            lines.push(Line::from(Span::styled(
+                format!("by {}", d.author),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM),
+            )));
+        }
+        lines.push(divider_line(body_area.width));
         // Wrap the body across multiple lines via Paragraph::wrap() applied
         // separately below -- for now push the raw body then break out.
         lines.push(Line::raw(d.body.clone()));
@@ -332,7 +386,7 @@ fn render_detail_pane(
         )));
     } else {
         // Summary-only fallback (Q4 lock-in: detail pane stays summary-only).
-        lines.push(divider_line(inner.width));
+        lines.push(divider_line(body_area.width));
         lines.push(Line::raw(hit.description.clone()));
         lines.push(Line::raw(""));
         lines.push(Line::raw(format!(
@@ -352,7 +406,7 @@ fn render_detail_pane(
     }
 
     let p = Paragraph::new(lines).wrap(Wrap { trim: false });
-    f.render_widget(p, inner);
+    f.render_widget(p, body_area);
 }
 
 /// Truncate `s` to at most `max_w` columns, appending `…` if truncated.

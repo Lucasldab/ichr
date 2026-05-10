@@ -472,6 +472,10 @@ pub struct AppState {
     /// renderers consult this before carving an icon Rect; on false they
     /// keep the existing text-only layout (no flicker, no empty box).
     pub icon_rendering_enabled: bool,
+    /// Phase 13: shared icon service (HTTP fetch + LRU). Set when
+    /// `icon_rendering_enabled` is true. `Arc` so spawned `Effect::FetchIcon`
+    /// tasks can share the same LRU view.
+    pub icon_service: Option<std::sync::Arc<crate::icons::IconService>>,
 }
 
 #[derive(Debug, Clone)]
@@ -1138,6 +1142,15 @@ pub enum Action {
         project_id: String,
         message: String,
     },
+    /// Phase 13: an `Effect::FetchIcon` task completed; the IconService
+    /// LRU now holds the decoded `Protocol` for `(source, project_id)`.
+    /// Carries no payload -- consumers re-read via `service.try_get()`.
+    /// State change is a no-op; the variant exists so the receive loop
+    /// triggers a re-render frame.
+    IconFetched {
+        source: crate::icons::IconSource,
+        project_id: String,
+    },
 }
 
 /// Effects requested by `update()`. NOTE: there is deliberately NO
@@ -1375,6 +1388,16 @@ pub enum Effect {
         kind: PackKind,
         mod_id: String,
     },
+    /// Phase 13: fetch a project icon, decode it, and cache the protocol
+    /// in `IconService`. Triggered when a browser selection changes and
+    /// `state.icon_rendering_enabled` is true. Completion is signalled
+    /// via `Action::IconFetched`, which causes the next render frame to
+    /// pick up the cached protocol via `IconService::try_get`.
+    FetchIcon {
+        source: crate::icons::IconSource,
+        project_id: String,
+        url: String,
+    },
 }
 
 /// Format a loader for the status cell or switch dialog: "fabric:0.16.9".
@@ -1444,6 +1467,12 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             vec![Effect::FetchInstances]
         }
         Action::Tick => vec![],
+
+        // Phase 13: icon fetch completed. State doesn't change -- the
+        // protocol now sits in `IconService`'s LRU and the next render
+        // frame picks it up via `try_get`. The variant exists so the
+        // run-loop receives an action and triggers a redraw.
+        Action::IconFetched { .. } => vec![],
 
         Action::OpenCreateModal => {
             state.active_view = ActiveView::CreateModal(CreateStep::NameInput {
@@ -2452,6 +2481,8 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         Action::ModBrowserSearchLoaded { slug, hits } => {
             // Snapshot installed-set before mutably borrowing active_view.
             let installed = state.installed_mod_project_ids.get(&slug).cloned();
+            let icons_on = state.icon_rendering_enabled;
+            let mut effects = Vec::new();
             if let ActiveView::ModBrowser {
                 slug: cur_slug,
                 results,
@@ -2476,9 +2507,21 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     }
                     *fetch_state = ModBrowserFetchState::Ready;
                     *selected = (*selected).min(new_len.saturating_sub(1));
+                    // Phase 13: kick off the icon fetch for the initial selection.
+                    if icons_on {
+                        if let Some(hit) = results.get(*selected) {
+                            if let Some(url) = hit.icon_url.clone() {
+                                effects.push(Effect::FetchIcon {
+                                    source: crate::icons::IconSource::Modrinth,
+                                    project_id: hit.project_id.clone(),
+                                    url,
+                                });
+                            }
+                        }
+                    }
                 }
             }
-            vec![]
+            effects
         }
 
         Action::ModBrowserSearchFailed { slug, message } => {
@@ -2496,6 +2539,8 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::ModBrowserMove(delta) => {
+            let icons_on = state.icon_rendering_enabled;
+            let mut effects = Vec::new();
             if let ActiveView::ModBrowser {
                 results, selected, ..
             } = &mut state.active_view
@@ -2504,9 +2549,24 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 if len > 0 {
                     let new_idx = (*selected as isize + delta).clamp(0, len as isize - 1) as usize;
                     *selected = new_idx;
+                    // Phase 13: dispatch icon fetch for the new selection.
+                    // The IconService LRU dedupes repeats, so revisiting an
+                    // already-cached project is a no-op fetch (cache-hit
+                    // disk read + LRU upsert).
+                    if icons_on {
+                        if let Some(hit) = results.get(new_idx) {
+                            if let Some(url) = hit.icon_url.clone() {
+                                effects.push(Effect::FetchIcon {
+                                    source: crate::icons::IconSource::Modrinth,
+                                    project_id: hit.project_id.clone(),
+                                    url,
+                                });
+                            }
+                        }
+                    }
                 }
             }
-            vec![]
+            effects
         }
 
         Action::ModBrowserOpenVersions => {
@@ -5701,6 +5761,7 @@ mod tests {
                     description: "fixture".into(),
                     downloads: 0,
                     already_installed: false,
+                    icon_url: None,
                 }],
                 selected: 0,
             },

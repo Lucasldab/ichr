@@ -122,6 +122,8 @@ impl ModrinthClient {
             description: String,
             #[serde(default)]
             downloads: u64,
+            #[serde(default)]
+            icon_url: Option<String>,
         }
         let env: SearchEnv = serde_json::from_slice(&bytes)
             .map_err(|e| ModrinthError::Parse(format!("search {url}: {e}")))?;
@@ -135,6 +137,7 @@ impl ModrinthClient {
                 description: h.description,
                 downloads: h.downloads,
                 already_installed: false, // caller stamps from ledger
+                icon_url: h.icon_url.filter(|s| !s.is_empty()),
             })
             .collect())
     }
@@ -184,6 +187,8 @@ impl ModrinthClient {
             description: String,
             #[serde(default)]
             downloads: u64,
+            #[serde(default)]
+            icon_url: Option<String>,
         }
         let env: SearchEnv = serde_json::from_slice(&bytes)
             .map_err(|e| ModrinthError::Parse(format!("search_with_project_type {url}: {e}")))?;
@@ -197,6 +202,7 @@ impl ModrinthClient {
                 description: h.description,
                 downloads: h.downloads,
                 already_installed: false,
+                icon_url: h.icon_url.filter(|s| !s.is_empty()),
             })
             .collect())
     }

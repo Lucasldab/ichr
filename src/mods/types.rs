@@ -87,6 +87,10 @@ pub struct ModrinthSearchHit {
     pub description: String, // single-line summary
     pub downloads: u64,
     pub already_installed: bool, // computed against current instance ledger
+    /// Modrinth CDN URL for the project's square avatar (Phase 13).
+    /// May be `None` for projects that never uploaded an icon. Format
+    /// is content-addressed -- treat as immutable per project version.
+    pub icon_url: Option<String>,
 }
 
 /// Detail-pane view of a single project (right pane).
@@ -498,6 +502,7 @@ installed_at = "2026-01-01T00:00:00Z"
             description: "Modern rendering engine".into(),
             downloads: 12345,
             already_installed: true,
+            icon_url: Some("https://cdn.modrinth.com/data/AANobbMI/icon.png".into()),
         };
         let json = serde_json::to_string(&h).unwrap();
         let parsed: ModrinthSearchHit = serde_json::from_str(&json).unwrap();

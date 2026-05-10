@@ -22,6 +22,21 @@ pub mod service;
 pub use client::IconClient;
 pub use service::IconService;
 
+/// Pixel/cell size of the detail-pane avatar slot. Locked here so the
+/// fetch path (which must size the protocol up-front) and the render
+/// path (which carves the matching `Rect`) cannot drift.
+///
+/// 8 cells wide × 4 cells tall matches the avatar layout the user
+/// selected during discuss-phase.
+pub fn detail_icon_target_rect() -> ratatui::layout::Rect {
+    ratatui::layout::Rect {
+        x: 0,
+        y: 0,
+        width: 8,
+        height: 4,
+    }
+}
+
 /// Predicate consumed by detail-pane renderers: should icons render at
 /// all given the terminal's detected image protocol?
 ///

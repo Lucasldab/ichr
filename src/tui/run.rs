@@ -154,11 +154,31 @@ pub async fn run(
     // halfblocks-rejection rule stays unit-testable (Spike 001 verdict).
     let icon_rendering_enabled = crate::icons::rendering_enabled(image_picker.as_ref());
 
+    // Build the icon service iff icons are enabled. The service owns its
+    // own picker clone (Picker is `Clone`) so AppState's copy can be used
+    // directly for any future picker introspection without locking the
+    // service.
+    let icon_service = if icon_rendering_enabled {
+        match image_picker.clone() {
+            Some(picker) => match crate::icons::IconService::new(picker) {
+                Ok(svc) => Some(std::sync::Arc::new(svc)),
+                Err(e) => {
+                    tracing::warn!(error = %e, "icon service failed to build -- icons disabled");
+                    None
+                }
+            },
+            None => None,
+        }
+    } else {
+        None
+    };
+
     let mut state = AppState {
         cf_api_key_present: cf_service.api_key_present(),
         config,
         image_picker,
         icon_rendering_enabled,
+        icon_service,
         ..AppState::default()
     };
 
@@ -2293,6 +2313,40 @@ async fn execute_effects(
                                 .await;
                         }
                         Err(e) => tracing::warn!(error = %e, %slug, ?kind, "uninstall_pack failed"),
+                    }
+                });
+            }
+
+            Effect::FetchIcon {
+                source,
+                project_id,
+                url,
+            } => {
+                // No-op when icons are disabled or the service didn't build.
+                let Some(svc) = state.icon_service.as_ref().map(Arc::clone) else {
+                    continue;
+                };
+                let paths2 = paths.clone();
+                let tx = action_tx.clone();
+                let target = crate::icons::detail_icon_target_rect();
+                tokio::spawn(async move {
+                    match svc
+                        .fetch_and_decode(&paths2, source, &project_id, &url, target)
+                        .await
+                    {
+                        Ok(()) => {
+                            let _ = tx.send(Action::IconFetched { source, project_id }).await;
+                        }
+                        Err(e) => {
+                            // Per Phase 13 D-05/D-06: blank icon area + warn.
+                            // No user-facing toast, no retry.
+                            tracing::warn!(
+                                error = %e,
+                                ?source,
+                                %project_id,
+                                "icon fetch failed -- detail pane keeps blank icon area"
+                            );
+                        }
                     }
                 });
             }

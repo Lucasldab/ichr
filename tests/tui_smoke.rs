@@ -1290,6 +1290,7 @@ fn hit(project_id: &str, slug: &str) -> ModrinthSearchHit {
         description: "x".into(),
         downloads: 0,
         already_installed: false,
+        icon_url: None,
     }
 }
 
@@ -3236,6 +3237,7 @@ fn test_pack_browser_search_loaded_with_matching_slug_kind_populates_results() {
         description: "nice".into(),
         downloads: 100,
         already_installed: false,
+        icon_url: None,
     }];
     let mut s = AppState {
         active_view: ActiveView::PackBrowser {
@@ -3297,6 +3299,7 @@ fn test_pack_browser_search_loaded_with_mismatched_slug_does_not_overwrite() {
                 description: "x".into(),
                 downloads: 0,
                 already_installed: false,
+                icon_url: None,
             }],
         },
     );
@@ -3337,6 +3340,7 @@ fn test_pack_browser_search_loaded_with_mismatched_kind_does_not_overwrite() {
                 description: "x".into(),
                 downloads: 0,
                 already_installed: false,
+                icon_url: None,
             }],
         },
     );
