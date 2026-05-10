@@ -7,14 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Project-icon previews in detail panes** (Phase 13). Modrinth `icon_url`
+  and CurseForge `logo.url` are fetched on demand, cached on disk
+  (`{cache_dir}/icons/{source}/{project_id}.{ext}`), decoded once into a
+  `ratatui-image` `Protocol` held in a 64-entry LRU, and rendered into a
+  fixed 8×4 avatar slot at the top-left of the detail pane. Wired across
+  the Modrinth mod browser, the resource-pack / shader browser, and the
+  CurseForge mod browser; the same shape applies to all three.
+- **Terminal image-protocol detection at startup** -- `Picker::from_query_stdio()`
+  runs in cooked mode before `enable_raw_mode()` and stores the result on
+  `AppState`. On detection failure (timeout, non-supporting terminal,
+  missing terminfo) the launcher continues normally with icons disabled.
+  Logged at DEBUG so `RUST_LOG=ichr=debug` shows the detected protocol.
+
 ### Changed
 
 - **Minimum supported Rust version (MSRV)** bumped from 1.88 to 1.90 to
-  pull in `ratatui-image 10.0.8` for in-terminal mod / pack / shader icon
-  previews (Phase 13). The bump comes from `icy_sixel` →
-  `quantette 0.5.1`, which requires Rust 1.90+. Forks pinned to 1.88
-  must update `rust-toolchain.toml` and any local `rust-version`
-  pin alongside ichr.
+  pull in `ratatui-image 10.0.8` for the icon-preview pipeline. The
+  transitive constraint comes from `icy_sixel` → `quantette 0.5.1`,
+  which requires Rust 1.90+. Forks pinned to 1.88 must update
+  `rust-toolchain.toml` and any local `rust-version` pin alongside ichr.
+- **Halfblocks-only terminals fall back to text-only** -- on
+  gnome-terminal / xterm / Konsole / VS Code's integrated terminal, the
+  detail pane renders as before with no icon Rect carve. Halfblocks
+  output at TUI row sizes was verified unrecognizable in Spike 001, so
+  showing it would be worse than nothing.
+
+### Fixed
+
+- **Lists scroll past the viewport** in the installed-mods, installed-packs,
+  instances, and accounts views. Previously the highlighted row could
+  scroll off-screen with no way to bring it back; the views now wrap their
+  `Table` widgets in `render_stateful_widget` + `TableState` so ratatui
+  computes the scroll offset and keeps the selection visible.
+- **Offline launch with a cached JRE** no longer fails with `GET jre all.json`
+  HTTP errors. `JreService::resolve_jre_for_launch` now probes
+  `paths.jre_executable(component)` before contacting `piston-meta.mojang.com`;
+  on a cache hit it returns the cached executable and skips the network
+  fetch entirely. Online launches are unchanged (cache-miss still fetches).
 
 ## [0.2.0] -- 2026-05-09
 

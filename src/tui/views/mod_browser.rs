@@ -710,3 +710,130 @@ mod tests {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Render-side tests for Phase 13 (ICN-04 -- text content survives icon-fetch
+// failures). Lives in its own module so we can pull in the ratatui test
+// backend without polluting the keybind tests above.
+// ---------------------------------------------------------------------------
+#[cfg(test)]
+mod render_tests {
+    use super::*;
+    use crate::icons::IconService;
+    use crate::mods::types::{ModBrowserFetchState, ModrinthSearchHit};
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+    use ratatui_image::picker::Picker;
+    use std::sync::Arc;
+
+    fn fixture_hit() -> ModrinthSearchHit {
+        ModrinthSearchHit {
+            project_id: "AANobbMI".into(),
+            slug: "sodium".into(),
+            title: "Sodium".into(),
+            description: "Lightweight rendering optimization mod for the Minecraft client".into(),
+            downloads: 27_184_221,
+            already_installed: false,
+            icon_url: Some("https://cdn.modrinth.com/data/AANobbMI/icon.png".into()),
+        }
+    }
+
+    fn state_with_browser(icons_enabled: bool, with_service: bool) -> AppState {
+        let mut state = AppState {
+            active_view: ActiveView::ModBrowser {
+                slug: "main".into(),
+                search: "sodium".into(),
+                is_searching: false,
+                mc_filter_override: None,
+                loader_filter_override: None,
+                results: vec![fixture_hit()],
+                selected: 0,
+                fetch_state: ModBrowserFetchState::Ready,
+                selected_detail: None,
+            },
+            icon_rendering_enabled: icons_enabled,
+            ..AppState::default()
+        };
+        if with_service {
+            // Halfblocks-flavoured service is fine -- the test never asks
+            // it to render, only to confirm `try_get` returns None for an
+            // un-fetched key (the ICN-04 failure path).
+            let svc = IconService::new(Picker::halfblocks()).expect("test service");
+            state.icon_service = Some(Arc::new(svc));
+        }
+        state
+    }
+
+    fn render_to_string(state: &AppState) -> String {
+        // Wide enough for the 40/60 split + body content; tall enough to
+        // cover header/search/body/footer chunks plus the icon strip.
+        let backend = TestBackend::new(120, 24);
+        let mut term = Terminal::new(backend).unwrap();
+        term.draw(|f| {
+            let area = f.area();
+            render_mod_browser(f, area, state);
+        })
+        .unwrap();
+        let buf = term.backend().buffer();
+        let area = buf.area();
+        let mut s = String::with_capacity((area.width as usize + 1) * area.height as usize);
+        for y in 0..area.height {
+            for x in 0..area.width {
+                s.push_str(buf[(x, y)].symbol());
+            }
+            s.push('\n');
+        }
+        s
+    }
+
+    /// Baseline: icons disabled -> existing single-Paragraph layout, title
+    /// and description both render in the detail pane. No regressions for
+    /// halfblocks-only users.
+    #[test]
+    fn detail_pane_text_renders_when_icons_disabled() {
+        let s = state_with_browser(false, false);
+        let out = render_to_string(&s);
+        assert!(out.contains("Sodium"), "title must render\n{out}");
+        assert!(
+            out.contains("Lightweight rendering optimization"),
+            "description must render\n{out}"
+        );
+        assert!(
+            out.contains("Downloads: 27,184,221"),
+            "downloads line must render\n{out}"
+        );
+    }
+
+    /// ICN-04: icons enabled but the IconService LRU is empty for this
+    /// project (simulates "fetch in flight" or "fetch failed"). The icon
+    /// strip is carved, but the title / author / body content must still
+    /// render in their respective slots -- no Rect collapse, no truncation.
+    #[test]
+    fn detail_pane_text_renders_when_icon_fetch_pending_or_failed() {
+        let s = state_with_browser(true, true);
+        let out = render_to_string(&s);
+        assert!(out.contains("Sodium"), "title must render\n{out}");
+        assert!(
+            out.contains("Lightweight rendering optimization"),
+            "description must render even with empty icon LRU\n{out}"
+        );
+        assert!(
+            out.contains("Downloads: 27,184,221"),
+            "downloads line must still render below the icon strip\n{out}"
+        );
+    }
+
+    /// Icons enabled but no service was constructed (e.g. the picker built
+    /// but service::new() errored). Should behave identically to the
+    /// disabled path -- text-only, no panic on the missing service.
+    #[test]
+    fn detail_pane_text_renders_when_service_is_none() {
+        let s = state_with_browser(true, false);
+        let out = render_to_string(&s);
+        assert!(out.contains("Sodium"), "title must render\n{out}");
+        assert!(
+            out.contains("Lightweight rendering optimization"),
+            "description must render\n{out}"
+        );
+    }
+}
