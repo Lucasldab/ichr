@@ -48,6 +48,9 @@ time = { version = "0.3", default-features = false, features = ["std", "formatti
 # Pulls Rust 1.90 MSRV via icy_sixel -> quantette transitive constraint.
 ratatui-image = "10.0.8"
 image = { version = "0.25", default-features = false, features = ["png", "webp"] }
+# Bounded in-memory cache of decoded icon `Protocol`s (Phase 13). Already
+# in the dep tree transitively; declaring it explicitly so we can `use lru::LruCache`.
+lru = "0.16"
 
 # --- Pre-wired for later phases (lock versions now so Cargo.lock is stable) ---
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream", "json", "gzip", "form"] }

@@ -17,8 +17,10 @@
 //! require rewriting the existing `Table`-based list views).
 
 pub mod client;
+pub mod service;
 
 pub use client::IconClient;
+pub use service::IconService;
 
 /// Predicate consumed by detail-pane renderers: should icons render at
 /// all given the terminal's detected image protocol?
