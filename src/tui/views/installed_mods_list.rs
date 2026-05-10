@@ -7,7 +7,7 @@
 use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table};
+use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState};
 use ratatui::Frame;
 
 use crate::mods::types::ModSource;
@@ -42,8 +42,7 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
 
     let rows: Vec<Row> = mods
         .iter()
-        .enumerate()
-        .map(|(i, m)| {
+        .map(|m| {
             // Source cell -- short tags for body sources (Phase 9 09-07
             // Pitfall 10 visual disambiguator: `[M]` Modrinth, `[CF]` CurseForge);
             // DIM long-form for the rare manual/modpack paths.
@@ -81,18 +80,12 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
                 )
             };
 
-            let row = Row::new(vec![
+            Row::new(vec![
                 Cell::from(m.display_name.clone()),
                 Cell::from(m.version_label.clone()),
                 Cell::from(source_label).style(source_style),
                 Cell::from(state_label).style(state_style),
-            ]);
-            // REVERSED across the entire row when selected (UI-SPEC line 362).
-            if i == *selected {
-                row.style(Style::default().add_modifier(Modifier::REVERSED))
-            } else {
-                row
-            }
+            ])
         })
         .collect();
 
@@ -106,12 +99,17 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
         ],
     )
     .header(Row::new(vec!["Name", "Version", "Source", "State"]))
+    // REVERSED across the entire row when selected (UI-SPEC line 362).
+    // Stateful render keeps the selected row in view even when the list
+    // exceeds the viewport.
+    .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
     .block(
         Block::default()
             .borders(Borders::ALL)
             .title(format!("Installed Mods -- {slug}  (e/x/Esc)")),
     );
-    f.render_widget(table, area);
+    let mut ts = TableState::default().with_selected(Some(*selected));
+    f.render_stateful_widget(table, area, &mut ts);
 }
 
 pub fn map_installed_mods_list_event(ev: CtEvent) -> Option<Action> {

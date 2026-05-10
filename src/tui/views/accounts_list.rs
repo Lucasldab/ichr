@@ -4,7 +4,7 @@
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Borders, Paragraph, Row, Table};
+use ratatui::widgets::{Block, Borders, Paragraph, Row, Table, TableState};
 use ratatui::Frame;
 
 use crate::tui::app::{ActiveView, AppState};
@@ -34,14 +34,8 @@ pub fn render_accounts_list(f: &mut Frame, area: Rect, state: &AppState) {
         let rows: Vec<Row> = state
             .accounts
             .iter()
-            .enumerate()
-            .map(|(i, a)| {
+            .map(|a| {
                 let marker = if a.is_active { "▶" } else { " " };
-                let style = if i == selected {
-                    Style::default().add_modifier(Modifier::REVERSED)
-                } else {
-                    Style::default()
-                };
                 let storage_label = match a.storage {
                     crate::auth::StorageBackend::Keyring => "Keyring",
                     crate::auth::StorageBackend::EncryptedFile => "File",
@@ -52,7 +46,6 @@ pub fn render_accounts_list(f: &mut Frame, area: Rect, state: &AppState) {
                     short_uuid(&a.mc_uuid),
                     storage_label.to_string(),
                 ])
-                .style(style)
             })
             .collect();
         let widths = [
@@ -63,8 +56,12 @@ pub fn render_accounts_list(f: &mut Frame, area: Rect, state: &AppState) {
         ];
         let table = Table::new(rows, widths)
             .header(Row::new(["", "Username", "UUID", "Storage"]))
+            // Stateful render scrolls the viewport so the selected account
+            // stays visible when the list exceeds the table area.
+            .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
             .block(Block::default().borders(Borders::ALL).title(" Accounts "));
-        f.render_widget(table, chunks[1]);
+        let mut ts = TableState::default().with_selected(Some(selected));
+        f.render_stateful_widget(table, chunks[1], &mut ts);
     }
 
     let hint = Paragraph::new(Line::from("a add  x remove  Enter activate  Esc close"))

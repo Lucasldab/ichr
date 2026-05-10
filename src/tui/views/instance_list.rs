@@ -1,6 +1,6 @@
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
-use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table};
+use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState};
 use ratatui::Frame;
 
 use crate::tui::app::{ActiveView, AppState};
@@ -19,13 +19,7 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
     let rows: Vec<Row> = state
         .instances
         .iter()
-        .enumerate()
-        .map(|(i, m)| {
-            let style = if Some(i) == selected {
-                Style::default().add_modifier(Modifier::REVERSED)
-            } else {
-                Style::default()
-            };
+        .map(|m| {
             let last_col = if state.running_instances.contains_key(&m.slug) {
                 Cell::from("running").style(Style::default().add_modifier(Modifier::BOLD))
             } else if let Some(loader) = &m.loader {
@@ -47,7 +41,6 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
                 Cell::from(m.group.clone().unwrap_or_default()),
                 last_col,
             ])
-            .style(style)
         })
         .collect();
     // Phase 9 (09-07): F keybind opens the CurseForge browser. Title shows the
@@ -68,8 +61,12 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
         ],
     )
     .header(Row::new(vec!["Name", "MC Version", "Group", "Last played"]))
+    // Stateful render keeps the selected instance in view when the list
+    // exceeds the terminal height.
+    .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
     .block(Block::default().borders(Borders::ALL).title(title));
-    f.render_widget(table, table_area);
+    let mut ts = TableState::default().with_selected(selected);
+    f.render_stateful_widget(table, table_area, &mut ts);
 
     // Active-account footer row. Hint reads the live keybind label so a
     // user-rebound `open_accounts_list` propagates into the footer text

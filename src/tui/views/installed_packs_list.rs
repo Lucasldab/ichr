@@ -13,7 +13,7 @@ use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table};
+use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState};
 use ratatui::Frame;
 
 use crate::mods::types::ModSource;
@@ -72,8 +72,7 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
     } else {
         let rows: Vec<Row> = packs
             .iter()
-            .enumerate()
-            .map(|(i, m)| {
+            .map(|m| {
                 let (source_label, source_style) = match m.source {
                     ModSource::Modrinth => ("[M]", Style::default()),
                     ModSource::CurseForge => ("[CF]", Style::default()),
@@ -118,17 +117,12 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
                     }
                 };
 
-                let row = Row::new(vec![
+                Row::new(vec![
                     Cell::from(m.display_name.clone()),
                     Cell::from(m.version_label.clone()),
                     Cell::from(source_label).style(source_style),
                     Cell::from(state_label).style(state_style),
-                ]);
-                if i == *selected {
-                    row.style(Style::default().add_modifier(Modifier::REVERSED))
-                } else {
-                    row
-                }
+                ])
             })
             .collect();
 
@@ -142,12 +136,16 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
             ],
         )
         .header(Row::new(vec!["Name", "Version", "Source", "State"]))
+        // Stateful render auto-scrolls so the selected pack stays visible
+        // when the list exceeds the viewport.
+        .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
         .block(
             Block::default()
                 .borders(Borders::ALL)
                 .title(format!("{kind_label} -- {slug}  (e/x/Tab/Esc)")),
         );
-        f.render_widget(table, table_area);
+        let mut ts = TableState::default().with_selected(Some(*selected));
+        f.render_stateful_widget(table, table_area, &mut ts);
     }
 
     // Transient status line (below table).
