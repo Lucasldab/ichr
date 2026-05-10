@@ -110,6 +110,20 @@ impl JavaService {
 
         // Step 3 -- auto Mojang: look up platform key then the component variant.
         if let Some(plat) = mojang_platform_key(self.os, self.arch) {
+            // Cache-first: if a JRE for this component is already extracted on
+            // disk, use it without touching the network. Critical for offline
+            // launches -- otherwise `fetch_all_json` against piston-meta fails
+            // with a generic HTTP error and the launch dies even though every
+            // file needed to start MC is already present locally.
+            let cached_exe = paths.jre_executable(&component_hint);
+            if tokio::fs::try_exists(&cached_exe).await? {
+                tracing::debug!(
+                    component = %component_hint,
+                    path = %cached_exe.display(),
+                    "JRE cache hit -- skipping all.json fetch"
+                );
+                return Ok(cached_exe);
+            }
             let index = self.mojang.fetch_all_json(None).await?;
             if let Some(variant) = MojangJreClient::select_variant(&index, plat, &component_hint) {
                 let exe = self
@@ -142,6 +156,19 @@ impl JavaService {
             JavaRuntimeId::Mojang { variant } => {
                 // Requires a Mojang platform entry -- fall through error if none.
                 let plat = mojang_platform_key(self.os, self.arch).ok_or(AppError::JavaNotFound)?;
+                // Cache-first: same offline-launch fix as `resolve_jre_for_launch`
+                // step 3. If the user pinned a Mojang variant via `java_override`
+                // and that variant is already extracted on disk, use it without
+                // contacting piston-meta.
+                let cached_exe = paths.jre_executable(variant);
+                if tokio::fs::try_exists(&cached_exe).await? {
+                    tracing::debug!(
+                        variant = %variant,
+                        path = %cached_exe.display(),
+                        "JRE override cache hit -- skipping all.json fetch"
+                    );
+                    return Ok(cached_exe);
+                }
                 let index = self.mojang.fetch_all_json(None).await?;
                 let entry = MojangJreClient::select_variant(&index, plat, variant)
                     .ok_or(AppError::JavaNotFound)?;
@@ -762,6 +789,68 @@ mod tests {
         assert!(exe.exists(), "java executable must exist at {exe:?}");
         let content = std::fs::read(&exe).unwrap();
         assert_eq!(content, fixture_bytes());
+    }
+
+    // -----------------------------------------------------------------------
+    // Offline launch: cached JRE on disk -> no network call
+    // -----------------------------------------------------------------------
+
+    /// Regression: when a JRE is already extracted on disk for the requested
+    /// component, `resolve_jre_for_launch` must NOT contact piston-meta.
+    /// Previously the unconditional `fetch_all_json` call killed offline
+    /// launches with a generic HTTP error even though the cached JRE was
+    /// fully usable. The mock here would 500 on any hit; we assert it
+    /// receives zero requests.
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn test_resolve_uses_cached_jre_when_present() {
+        let _guard = java_env_lock().lock().await;
+        std::env::remove_var("ICHR_JAVA");
+
+        let td = TempDir::new().unwrap();
+        let paths = make_paths(&td);
+        let server = MockServer::start();
+
+        let component = "java-runtime-delta";
+        // Pre-populate the cached executable so the cache-first guard fires.
+        let cached_exe = paths.jre_executable(component);
+        std::fs::create_dir_all(cached_exe.parent().unwrap()).unwrap();
+        std::fs::write(&cached_exe, b"cached-java\n").unwrap();
+
+        // Mock that 500s on any request -- if the cache-first guard is broken,
+        // the test fails with a clear "all.json status: 500" error.
+        let m_all = server.mock(|when, then| {
+            when.method(GET).path("/all.json");
+            then.status(500).body("must not be called");
+        });
+
+        let all_url = format!("{}/all.json", server.base_url());
+        let prior = std::env::var(crate::java::mojang_jre::MOJANG_JRE_URL_ENV).ok();
+        std::env::set_var(crate::java::mojang_jre::MOJANG_JRE_URL_ENV, &all_url);
+
+        let mojang = MojangJreClient::new().expect("mojang client");
+        let adoptium = AdoptiumClient::new().expect("adoptium client");
+        let svc = JavaService::with_clients(mojang, adoptium, Arch::X86_64, OsName::Linux);
+
+        let instance = instance_no_override("offline-cached");
+        let version = minimal_version(component, 21);
+
+        let result = svc
+            .resolve_jre_for_launch(&paths, &instance, &version)
+            .await;
+
+        match prior {
+            Some(v) => std::env::set_var(crate::java::mojang_jre::MOJANG_JRE_URL_ENV, v),
+            None => std::env::remove_var(crate::java::mojang_jre::MOJANG_JRE_URL_ENV),
+        }
+
+        let exe = result.expect("cached JRE must resolve without network");
+        assert_eq!(exe, cached_exe, "must return the cached executable path");
+        assert_eq!(
+            m_all.calls(),
+            0,
+            "all.json must NOT be fetched when cached JRE is on disk"
+        );
     }
 
     // -----------------------------------------------------------------------
