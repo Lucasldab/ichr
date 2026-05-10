@@ -4190,6 +4190,8 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 .installed_pack_project_ids
                 .get(&(slug.clone(), kind))
                 .cloned();
+            let icons_on = state.icon_rendering_enabled;
+            let mut effects = Vec::new();
             // Slug-AND-kind match guard (mirrors Phase 08.1-05 ModBrowserSearchLoaded).
             if let ActiveView::PackBrowser {
                 slug: cur_slug,
@@ -4214,9 +4216,21 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     }
                     *fetch_state = ModBrowserFetchState::Ready;
                     *selected = (*selected).min(new_len.saturating_sub(1));
+                    // Phase 13: kick off icon fetch for the initial selection.
+                    if icons_on {
+                        if let Some(hit) = results.get(*selected) {
+                            if let Some(url) = hit.icon_url.clone() {
+                                effects.push(Effect::FetchIcon {
+                                    source: crate::icons::IconSource::Modrinth,
+                                    project_id: hit.project_id.clone(),
+                                    url,
+                                });
+                            }
+                        }
+                    }
                 }
             }
-            vec![]
+            effects
         }
 
         Action::PackBrowserSearchFailed {
@@ -4239,6 +4253,8 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
         }
 
         Action::PackBrowserMove(delta) => {
+            let icons_on = state.icon_rendering_enabled;
+            let mut effects = Vec::new();
             if let ActiveView::PackBrowser {
                 results, selected, ..
             } = &mut state.active_view
@@ -4248,9 +4264,20 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     let new_idx =
                         (*selected as isize + delta as isize).clamp(0, len as isize - 1) as usize;
                     *selected = new_idx;
+                    if icons_on {
+                        if let Some(hit) = results.get(new_idx) {
+                            if let Some(url) = hit.icon_url.clone() {
+                                effects.push(Effect::FetchIcon {
+                                    source: crate::icons::IconSource::Modrinth,
+                                    project_id: hit.project_id.clone(),
+                                    url,
+                                });
+                            }
+                        }
+                    }
                 }
             }
-            vec![]
+            effects
         }
 
         Action::PackBrowserTypeSearch(c) => {

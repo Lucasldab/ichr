@@ -16,7 +16,9 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
 use ratatui::Frame;
+use ratatui_image::Image;
 
+use crate::icons::IconSource;
 use crate::mods::types::{ModBrowserFetchState, ModrinthSearchHit};
 use crate::packs::kind::PackKind;
 use crate::tui::app::{Action, ActiveView, AppState};
@@ -108,7 +110,7 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
         .split(chunks[2]);
 
     render_results_pane(f, body_split[0], results, *selected, fetch_state);
-    render_detail_pane(f, body_split[1], results.get(*selected), fetch_state);
+    render_detail_pane(f, body_split[1], results.get(*selected), fetch_state, state);
 
     // ---- Footer hint ----
     let footer_text = if search.is_empty() {
@@ -200,12 +202,13 @@ fn render_detail_pane(
     area: Rect,
     selected_hit: Option<&ModrinthSearchHit>,
     fetch_state: &ModBrowserFetchState,
+    state: &AppState,
 ) {
     let block = Block::default().borders(Borders::ALL).title(" Detail ");
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    if selected_hit.is_none() {
+    let Some(hit) = selected_hit else {
         let p = Paragraph::new("Select a pack to see details").style(
             Style::default()
                 .fg(Color::DarkGray)
@@ -213,15 +216,49 @@ fn render_detail_pane(
         );
         f.render_widget(p, inner);
         return;
+    };
+
+    // Phase 13: same icon-strip carve as mod_browser. When icons are
+    // disabled or pane is too narrow, fall through to single-Paragraph
+    // layout untouched.
+    let (icon_strip, body_area) = if state.icon_rendering_enabled && inner.height >= 5 {
+        let strips = Layout::vertical([Constraint::Length(4), Constraint::Min(0)]).split(inner);
+        (Some(strips[0]), strips[1])
+    } else {
+        (None, inner)
+    };
+
+    if let Some(strip) = icon_strip {
+        let cols = Layout::horizontal([
+            Constraint::Length(8),
+            Constraint::Length(1),
+            Constraint::Min(0),
+        ])
+        .split(strip);
+        let icon_rect = cols[0];
+        let header_rect = cols[2];
+
+        if let Some(svc) = &state.icon_service {
+            if let Some(proto) = svc.try_get(IconSource::Modrinth, &hit.project_id) {
+                f.render_widget(Image::new(&proto), icon_rect);
+            }
+        }
+
+        let header_lines = vec![Line::from(Span::styled(
+            hit.title.clone(),
+            Style::default().add_modifier(Modifier::BOLD),
+        ))];
+        f.render_widget(Paragraph::new(header_lines), header_rect);
     }
 
     let mut lines: Vec<Line> = Vec::new();
-    let hit = selected_hit.expect("checked above");
-    lines.push(Line::from(Span::styled(
-        hit.title.clone(),
-        Style::default().add_modifier(Modifier::BOLD),
-    )));
-    let divider: String = "─".repeat(inner.width.max(1) as usize);
+    if icon_strip.is_none() {
+        lines.push(Line::from(Span::styled(
+            hit.title.clone(),
+            Style::default().add_modifier(Modifier::BOLD),
+        )));
+    }
+    let divider: String = "─".repeat(body_area.width.max(1) as usize);
     lines.push(Line::from(Span::styled(
         divider,
         Style::default()
@@ -245,7 +282,7 @@ fn render_detail_pane(
     }
 
     let p = Paragraph::new(lines).wrap(Wrap { trim: false });
-    f.render_widget(p, inner);
+    f.render_widget(p, body_area);
 }
 
 fn truncate(s: &str, max_w: usize) -> String {
