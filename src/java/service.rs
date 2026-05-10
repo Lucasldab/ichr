@@ -353,17 +353,12 @@ mod tests {
     #[cfg(unix)]
     use httpmock::MockServer;
     use std::collections::HashMap;
-    use std::sync::OnceLock;
     use tempfile::TempDir;
-    use tokio::sync::Mutex;
 
-    // Global async-aware mutex serialising all tests that read or write
-    // ICHR_JAVA. tokio::sync::Mutex is held across await points safely
-    // and passes clippy::await_holding_lock because it is the async variant.
-    fn java_env_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
+    // Re-export of the crate-shared lock so existing call sites keep
+    // their short name. The lock lives in `crate::java::ichr_java_env_lock`
+    // so `launcher::service` tests can serialise against the same mutex.
+    use crate::java::ichr_java_env_lock as java_env_lock;
 
     // -----------------------------------------------------------------------
     // Test helpers

@@ -573,6 +573,12 @@ mod tests {
         use crate::domain::instance::ModloaderKind;
         use crate::loader::types::LoaderInfo;
 
+        // Serialise against `java::service` tests that also mutate ICHR_JAVA.
+        // Without this, parallel tokio test threads race on the global env
+        // and a stale ICHR_JAVA value bleeds across tests (surfaced after
+        // the MSRV bump to 1.90 changed scheduler ordering).
+        let _env_guard = crate::java::ichr_java_env_lock().lock().await;
+
         let td = TempDir::new().unwrap();
         let paths = paths_in(&td);
 
