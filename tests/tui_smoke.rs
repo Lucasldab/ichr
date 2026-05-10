@@ -1398,6 +1398,7 @@ fn test_mod_browser_search_loaded_replaces_results() {
         selected: 0,
         fetch_state: ModBrowserFetchState::Loading,
         selected_detail: None,
+        scroll_offset: 0,
     };
     let _ = update(
         &mut state,
@@ -1432,6 +1433,7 @@ fn test_mod_browser_move_clamps_to_results_len() {
         selected: 0,
         fetch_state: ModBrowserFetchState::Ready,
         selected_detail: None,
+        scroll_offset: 0,
     };
     // Move down 5 -- should saturate at 1 (len-1).
     for _ in 0..5 {
@@ -1580,6 +1582,7 @@ fn test_mod_installed_stamps_already_installed_in_browser_results() {
         selected: 0,
         fetch_state: ModBrowserFetchState::Ready,
         selected_detail: None,
+        scroll_offset: 0,
     };
     let _ = update(
         &mut state,
@@ -1615,6 +1618,7 @@ fn test_install_failed_routes_to_failed_modal_with_return_to() {
         selected: 0,
         fetch_state: ModBrowserFetchState::Ready,
         selected_detail: None,
+        scroll_offset: 0,
     };
     state
         .running_mod_jobs
@@ -1730,6 +1734,7 @@ fn test_toggle_mc_filter_cycles_state_and_re_emits_search() {
         selected: 0,
         fetch_state: ModBrowserFetchState::Ready,
         selected_detail: None,
+        scroll_offset: 0,
     };
     // First toggle: None -> Some("any"). Effect must use mc=None (any filter).
     let effects = update(&mut state, Action::ToggleModMcFilter);
@@ -1835,6 +1840,7 @@ fn test_mod_browser_jk_navigates_when_search_empty() {
             selected: 0,
             fetch_state: ModBrowserFetchState::Ready,
             selected_detail: None,
+            scroll_offset: 0,
         },
         ..AppState::default()
     };
@@ -1868,6 +1874,7 @@ fn test_mod_browser_jk_types_when_in_search_mode() {
             selected: 0,
             fetch_state: ModBrowserFetchState::Ready,
             selected_detail: None,
+            scroll_offset: 0,
         },
         ..AppState::default()
     };
@@ -1897,6 +1904,7 @@ fn test_mod_browser_arrows_always_navigate_even_with_search() {
             selected: 0,
             fetch_state: ModBrowserFetchState::Ready,
             selected_detail: None,
+            scroll_offset: 0,
         },
         ..AppState::default()
     };

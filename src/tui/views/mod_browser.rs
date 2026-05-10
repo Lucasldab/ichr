@@ -43,6 +43,7 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
         selected,
         fetch_state,
         selected_detail,
+        scroll_offset,
     } = &state.active_view
     else {
         return;
@@ -171,7 +172,15 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
     let results_area = body_split[0];
     let detail_area = body_split[1];
 
-    render_results_pane(f, results_area, results, *selected, fetch_state);
+    render_results_pane(
+        f,
+        results_area,
+        results,
+        *selected,
+        *scroll_offset,
+        fetch_state,
+        state,
+    );
     render_detail_pane(
         f,
         detail_area,
@@ -193,7 +202,38 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
     f.render_widget(footer, chunks[3]);
 }
 
+/// Dispatch on `state.icon_rendering_enabled`: rich path when icons are
+/// supported (Phase 14, manual per-row Rect layout with hand-rolled
+/// scroll offset), Table+ListState path otherwise (existing v0.2.x
+/// behavior, untouched, preserves the `5dd2349` scroll fix).
 fn render_results_pane(
+    f: &mut Frame,
+    area: Rect,
+    results: &[ModrinthSearchHit],
+    selected: usize,
+    scroll_offset: usize,
+    fetch_state: &ModBrowserFetchState,
+    state: &AppState,
+) {
+    if state.icon_rendering_enabled {
+        render_results_pane_rich(
+            f,
+            area,
+            results,
+            selected,
+            scroll_offset,
+            fetch_state,
+            state,
+        );
+    } else {
+        render_results_pane_table(f, area, results, selected, fetch_state);
+    }
+}
+
+/// Halfblocks-fallback path. Same `List` + `ListState` layout shipped in
+/// v0.2.x. Do NOT modify -- this is the regression baseline for users
+/// without kitty/sixel/iterm2 image support.
+fn render_results_pane_table(
     f: &mut Frame,
     area: Rect,
     results: &[ModrinthSearchHit],
@@ -225,7 +265,6 @@ fn render_results_pane(
     }
 
     // Two-line rows per result (UI-SPEC lines 222-225).
-    // Row width budget: inner.width − 1 (for left padding).
     let width = inner.width as usize;
     let items: Vec<ListItem> = results
         .iter()
@@ -237,7 +276,6 @@ fn render_results_pane(
                 ""
             };
             let cursor_glyph = if i == selected { " ▶" } else { "" };
-            // Truncate name to width − suffix-length − cursor-glyph-length − 1 (left pad).
             let max_name_w = width.saturating_sub(installed_suffix.len() + cursor_glyph.len() + 1);
             let name = truncate(&hit.title, max_name_w);
             let line1 = if hit.already_installed {
@@ -252,7 +290,6 @@ fn render_results_pane(
             } else {
                 Line::from(vec![Span::raw(name), Span::raw(cursor_glyph.to_string())])
             };
-            // Description line (DIM, indent 2, truncated to width − 3).
             let desc = truncate(&hit.description, width.saturating_sub(3));
             let line2 = Line::from(Span::styled(
                 format!("  {desc}"),
@@ -274,6 +311,169 @@ fn render_results_pane(
     let mut list_state = ratatui::widgets::ListState::default();
     list_state.select(Some(selected));
     f.render_stateful_widget(list, inner, &mut list_state);
+}
+
+/// Phase 14 rich-path render. Each visible row gets a manual layout:
+/// `[icon 3w] [gutter 1w] [name + description block (Min 0)]`. Scroll
+/// offset is supplied by the caller (lives on `ActiveView::ModBrowser`).
+/// Selected row is highlighted by overlaying a REVERSED-style block on
+/// the row Rect before drawing icon + text on top.
+fn render_results_pane_rich(
+    f: &mut Frame,
+    area: Rect,
+    results: &[ModrinthSearchHit],
+    selected: usize,
+    scroll_offset: usize,
+    fetch_state: &ModBrowserFetchState,
+    state: &AppState,
+) {
+    let block = Block::default().borders(Borders::ALL).title(" Results ");
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    // Loading / error / empty placeholders -- identical text + style to
+    // the table path so the visual idiom is preserved across modes.
+    let placeholder = match fetch_state {
+        ModBrowserFetchState::Loading => Some("Searching Modrinth..."),
+        ModBrowserFetchState::Error(_) => Some("Failed to reach Modrinth -- check network"),
+        ModBrowserFetchState::Ready if results.is_empty() => Some("No mods found"),
+        ModBrowserFetchState::Ready => None,
+    };
+    if let Some(text) = placeholder {
+        let style = match fetch_state {
+            ModBrowserFetchState::Loading | ModBrowserFetchState::Ready => Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
+            ModBrowserFetchState::Error(_) => Style::default(),
+        };
+        let p = Paragraph::new(text).style(style);
+        f.render_widget(p, inner);
+        return;
+    }
+
+    // Each row is 2 cells tall (matches the line1+line2 idiom of the
+    // table path). visible_rows is the cap from the available height.
+    let row_h: u16 = 2;
+    let visible_rows = (inner.height / row_h) as usize;
+    if visible_rows == 0 {
+        return;
+    }
+    // Clamp offset to keep the visible window inside the results.
+    let max_offset = results.len().saturating_sub(visible_rows);
+    let offset = scroll_offset.min(max_offset);
+
+    // Per-row Rects, top-aligned in the visible area. Trailing rows
+    // beyond `results.len()` are simply not drawn (no padding rectangle
+    // -- the block's interior already shows blank).
+    let row_constraints: Vec<Constraint> = (0..visible_rows)
+        .map(|_| Constraint::Length(row_h))
+        .collect();
+    let row_rects = Layout::vertical(row_constraints).split(inner);
+
+    for (visible_i, &row_rect) in row_rects.iter().enumerate() {
+        let i = offset + visible_i;
+        let Some(hit) = results.get(i) else {
+            break;
+        };
+        let is_selected = i == selected;
+
+        // Highlight: paint the whole row Rect with REVERSED before
+        // drawing content. ratatui-image renders into a Rect that
+        // overrides the cell content, so the icon stays correct color.
+        if is_selected {
+            let highlight =
+                Block::default().style(Style::default().add_modifier(Modifier::REVERSED));
+            f.render_widget(highlight, row_rect);
+        }
+
+        // Split the row into [icon | gutter | text].
+        let cols = Layout::horizontal([
+            Constraint::Length(3),
+            Constraint::Length(1),
+            Constraint::Min(0),
+        ])
+        .split(row_rect);
+        let icon_rect = cols[0];
+        let text_rect = cols[2];
+
+        // Icon -- only render if cached. Cache miss is silent (Phase 13
+        // D-04: no spinner, no skeleton). Selection-move and
+        // SearchLoaded both pre-fetch via Effect::FetchIcon; the next
+        // frame after Action::IconFetched picks up the new protocol.
+        if let Some(svc) = &state.icon_service {
+            if let Some(proto) = svc.try_get(
+                IconSource::Modrinth,
+                &hit.project_id,
+                crate::icons::list_row_icon_target_rect(),
+            ) {
+                f.render_widget(Image::new(&proto), icon_rect);
+            }
+        }
+
+        // Text -- same line1 + line2 idiom as the table path. Width is
+        // text_rect.width because we lost the icon column.
+        let width = text_rect.width as usize;
+        let installed_suffix = if hit.already_installed {
+            "   ✓ installed"
+        } else {
+            ""
+        };
+        let cursor_glyph = if is_selected { " ▶" } else { "" };
+        let max_name_w = width.saturating_sub(installed_suffix.len() + cursor_glyph.len());
+        let name = truncate(&hit.title, max_name_w);
+        let line1 = if hit.already_installed {
+            Line::from(vec![
+                Span::raw(name),
+                Span::styled(
+                    installed_suffix.to_string(),
+                    Style::default().fg(Color::Green),
+                ),
+                Span::raw(cursor_glyph.to_string()),
+            ])
+        } else {
+            Line::from(vec![Span::raw(name), Span::raw(cursor_glyph.to_string())])
+        };
+        let desc = truncate(&hit.description, width);
+        let line2 = Line::from(Span::styled(
+            desc,
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
+        ));
+        f.render_widget(Paragraph::new(vec![line1, line2]), text_rect);
+    }
+}
+
+/// Phase 14 helper: recompute scroll offset on selection change.
+///
+/// `selected` is the new selection index (already clamped to [0, results.len())).
+/// `current_offset` is the previous scroll offset.
+/// `visible_rows` is `inner.height / row_height_cells` for the rich path.
+///
+/// Returns the new offset clamped so:
+///   - selected stays inside `[offset, offset + visible_rows)`
+///   - offset stays inside `[0, results.len() - visible_rows]`
+///
+/// Lives in this module rather than `icons` because the math depends on
+/// the row layout shape (`row_h`), which is per-view.
+pub(crate) fn next_scroll_offset(
+    selected: usize,
+    current_offset: usize,
+    visible_rows: usize,
+    results_len: usize,
+) -> usize {
+    if visible_rows == 0 {
+        return 0;
+    }
+    let mut offset = current_offset;
+    if selected >= offset + visible_rows {
+        offset = selected + 1 - visible_rows;
+    }
+    if selected < offset {
+        offset = selected;
+    }
+    let max_offset = results_len.saturating_sub(visible_rows);
+    offset.min(max_offset)
 }
 
 fn render_detail_pane(
@@ -568,6 +768,56 @@ pub fn map_mod_browser_event(ev: CtEvent, state: &AppState) -> Option<Action> {
 }
 
 #[cfg(test)]
+mod scroll_math_tests {
+    use super::next_scroll_offset;
+
+    #[test]
+    fn no_change_when_selection_inside_viewport() {
+        // selected = 3, offset = 0, visible = 8 -> selected is inside [0, 8), no change.
+        assert_eq!(next_scroll_offset(3, 0, 8, 50), 0);
+    }
+
+    #[test]
+    fn scrolls_down_when_selection_passes_bottom() {
+        // selected = 8, offset = 0, visible = 8 -> selected past bottom of [0, 8).
+        // New offset = 8 + 1 - 8 = 1.
+        assert_eq!(next_scroll_offset(8, 0, 8, 50), 1);
+    }
+
+    #[test]
+    fn scrolls_up_when_selection_passes_top() {
+        // selected = 5, offset = 10, visible = 8 -> selected before top of [10, 18).
+        // New offset = 5.
+        assert_eq!(next_scroll_offset(5, 10, 8, 50), 5);
+    }
+
+    #[test]
+    fn clamps_offset_to_results_len() {
+        // results_len = 10, visible = 8 -> max_offset = 2.
+        // Even though selected = 9 would push offset to 9+1-8 = 2, that's at the cap.
+        assert_eq!(next_scroll_offset(9, 0, 8, 10), 2);
+    }
+
+    #[test]
+    fn handles_empty_results_safely() {
+        // visible = 8, results_len = 0 -> max_offset = 0; selected meaningless.
+        assert_eq!(next_scroll_offset(0, 0, 8, 0), 0);
+    }
+
+    #[test]
+    fn handles_zero_visible_rows_safely() {
+        // visible = 0 (terminal too small) -> always 0.
+        assert_eq!(next_scroll_offset(5, 3, 0, 50), 0);
+    }
+
+    #[test]
+    fn last_row_visible_at_max_offset() {
+        // 50 results, viewport 8, last selected = 49 -> offset = 50 - 8 = 42.
+        assert_eq!(next_scroll_offset(49, 0, 8, 50), 42);
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::mods::types::ModBrowserFetchState;
@@ -593,6 +843,7 @@ mod tests {
                 selected: 0,
                 fetch_state: ModBrowserFetchState::Ready,
                 selected_detail: None,
+                scroll_offset: 0,
             },
             ..AppState::default()
         }
@@ -754,6 +1005,7 @@ mod render_tests {
                 selected: 0,
                 fetch_state: ModBrowserFetchState::Ready,
                 selected_detail: None,
+                scroll_offset: 0,
             },
             icon_rendering_enabled: icons_enabled,
             ..AppState::default()

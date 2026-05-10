@@ -176,6 +176,11 @@ pub enum ActiveView {
         fetch_state: ModBrowserFetchState,
         /// Cached project detail for the right-pane preview. None while in flight.
         selected_detail: Option<ModrinthProjectDetail>,
+        /// Phase 14: rich-path scroll offset (top of viewport into `results`).
+        /// Halfblocks path ignores this entirely -- it uses `TableState`
+        /// for scroll. Reset to 0 on every `ModBrowserSearchLoaded` so a
+        /// new query starts at the top.
+        scroll_offset: usize,
     },
     /// Phase 8 (MOD-01): centered modal of available versions for a mod.
     /// Rendered by `src/tui/views/mod_version_picker_modal.rs` (added in 08-08).
@@ -2514,6 +2519,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 selected: 0,
                 fetch_state: ModBrowserFetchState::Loading,
                 selected_detail: None,
+                scroll_offset: 0,
             };
             vec![
                 Effect::SearchModrinth {
@@ -2538,16 +2544,13 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 results,
                 selected,
                 fetch_state,
+                scroll_offset,
                 ..
             } = &mut state.active_view
             {
                 if *cur_slug == slug {
                     let new_len = hits.len();
                     *results = hits;
-                    // Re-stamp `already_installed` from the in-memory set:
-                    // the search result's pre-stamp from the service is a
-                    // ledger snapshot taken at search-issue time and may miss
-                    // installs that completed during the round-trip.
                     if let Some(set) = installed.as_ref() {
                         for r in results.iter_mut() {
                             if set.contains(&r.project_id) {
@@ -2557,8 +2560,10 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     }
                     *fetch_state = ModBrowserFetchState::Ready;
                     *selected = (*selected).min(new_len.saturating_sub(1));
-                    // Phase 13: kick off the icon fetch for the initial selection.
+                    // Phase 14: new search resets to the top of the list.
+                    *scroll_offset = 0;
                     if icons_on {
+                        // Phase 13: detail-pane fetch for the highlighted hit.
                         if let Some(hit) = results.get(*selected) {
                             if let Some(url) = hit.icon_url.clone() {
                                 effects.push(Effect::FetchIcon {
@@ -2566,6 +2571,19 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                                     project_id: hit.project_id.clone(),
                                     url,
                                     purpose: crate::icons::IconFetchPurpose::Detail,
+                                });
+                            }
+                        }
+                        // Phase 14: pre-fetch list-row icons for ALL hits so
+                        // the rich path's icon column starts populating
+                        // immediately. IconClient::Semaphore(4) caps in-flight.
+                        for hit in results.iter() {
+                            if let Some(url) = hit.icon_url.clone() {
+                                effects.push(Effect::FetchIcon {
+                                    source: crate::icons::IconSource::Modrinth,
+                                    project_id: hit.project_id.clone(),
+                                    url,
+                                    purpose: crate::icons::IconFetchPurpose::ListRow,
                                 });
                             }
                         }
@@ -2593,17 +2611,30 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             let icons_on = state.icon_rendering_enabled;
             let mut effects = Vec::new();
             if let ActiveView::ModBrowser {
-                results, selected, ..
+                results,
+                selected,
+                scroll_offset,
+                ..
             } = &mut state.active_view
             {
                 let len = results.len();
                 if len > 0 {
                     let new_idx = (*selected as isize + delta).clamp(0, len as isize - 1) as usize;
                     *selected = new_idx;
-                    // Phase 13: dispatch icon fetch for the new selection.
-                    // The IconService LRU dedupes repeats, so revisiting an
-                    // already-cached project is a no-op fetch (cache-hit
-                    // disk read + LRU upsert).
+                    // Phase 14: rich-path scroll math. We don't know the actual
+                    // viewport row count at action-handling time (render fn has
+                    // the Rect); use a conservative VISIBLE_ROWS_GUESS that
+                    // covers the typical 80x24 terminal layout. The render
+                    // path further clamps via min(actual_visible_rows). Off by
+                    // one row at the bottom is acceptable for navigation.
+                    const VISIBLE_ROWS_GUESS: usize = 8;
+                    *scroll_offset = crate::tui::views::mod_browser::next_scroll_offset(
+                        new_idx,
+                        *scroll_offset,
+                        VISIBLE_ROWS_GUESS,
+                        len,
+                    );
+                    // Phase 13: detail-pane fetch for the new selection.
                     if icons_on {
                         if let Some(hit) = results.get(new_idx) {
                             if let Some(url) = hit.icon_url.clone() {
@@ -3047,6 +3078,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 selected: 0,
                 fetch_state: ModBrowserFetchState::Loading,
                 selected_detail: None,
+                scroll_offset: 0,
             };
             vec![Effect::SearchModrinth {
                 slug,
@@ -3210,6 +3242,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 selected: 0,
                 fetch_state: ModBrowserFetchState::Loading,
                 selected_detail: None,
+                scroll_offset: 0,
             };
             vec![Effect::SearchModrinth {
                 slug,
@@ -3300,6 +3333,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                         selected: 0,
                         fetch_state: ModBrowserFetchState::Loading,
                         selected_detail: None,
+                        scroll_offset: 0,
                     };
                     vec![Effect::SearchModrinth {
                         slug,
@@ -5791,6 +5825,7 @@ mod tests {
                 selected: 0,
                 fetch_state: ModBrowserFetchState::Loading,
                 selected_detail: None,
+                scroll_offset: 0,
             },
             ..AppState::default()
         };
@@ -5825,6 +5860,7 @@ mod tests {
                 selected: 0,
                 fetch_state: ModBrowserFetchState::Loading,
                 selected_detail: None,
+                scroll_offset: 0,
             },
             ..AppState::default()
         };
