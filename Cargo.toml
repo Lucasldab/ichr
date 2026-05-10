@@ -1,6 +1,6 @@
 [package]
 name = "ichr"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 rust-version = "1.90"
 description = "Terminal-UI Minecraft Java Edition launcher"
@@ -46,7 +46,12 @@ time = { version = "0.3", default-features = false, features = ["std", "formatti
 # Image rendering in detail panes (Phase 13). Protocol-gated -- kitty/sixel/iterm2 get
 # inline icons; halfblocks falls back to text-only (verified unusable in spike 001).
 # Pulls Rust 1.90 MSRV via icy_sixel -> quantette transitive constraint.
-ratatui-image = "10.0.8"
+# Default features include `chafa-dyn`, which requires libchafa via
+# pkg-config -- not available on the Windows GitHub runner and broke the
+# v0.2.1 release pipeline. We don't use chafa (we render via
+# kitty/sixel/iterm2/halfblocks), so disable defaults and pull just the
+# pieces we need.
+ratatui-image = { version = "10.0.8", default-features = false, features = ["crossterm", "image-defaults"] }
 image = { version = "0.25", default-features = false, features = ["png", "webp"] }
 # Bounded in-memory cache of decoded icon `Protocol`s (Phase 13). Already
 # in the dep tree transitively; declaring it explicitly so we can `use lru::LruCache`.

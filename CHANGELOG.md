@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] -- 2026-05-10
+
+### Fixed
+
+- **Windows release build** failed in v0.2.1 because `ratatui-image`'s
+  default features include `chafa-dyn`, which links to libchafa via
+  pkg-config -- neither pkg-config nor libchafa is available on the
+  Windows GitHub runner. ichr never used chafa (icon rendering goes
+  through kitty / sixel / iterm2 / halfblocks instead), so the dep
+  declaration is corrected to `default-features = false` with only the
+  features we actually use (`crossterm`, `image-defaults`). Linux build
+  was also affected; both targets now succeed. v0.2.1 was tagged but
+  never produced release artifacts; this is the first download-able
+  successor to v0.2.0 with the Phase 13 icon previews.
+
 ## [0.2.1] -- 2026-05-10
 
 ### Added
