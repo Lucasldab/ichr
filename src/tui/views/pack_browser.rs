@@ -32,6 +32,7 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
         fetch_state,
         results,
         selected,
+        scroll_offset,
     } = &state.active_view
     else {
         return;
@@ -109,7 +110,15 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
         .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
         .split(chunks[2]);
 
-    render_results_pane(f, body_split[0], results, *selected, fetch_state);
+    render_results_pane(
+        f,
+        body_split[0],
+        results,
+        *selected,
+        *scroll_offset,
+        fetch_state,
+        state,
+    );
     render_detail_pane(f, body_split[1], results.get(*selected), fetch_state, state);
 
     // ---- Footer hint ----
@@ -122,7 +131,34 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
     f.render_widget(footer, chunks[3]);
 }
 
+/// Phase 14 dispatch: rich path on terminals with image-protocol support,
+/// else the existing `List` + `ListState` fallback.
 fn render_results_pane(
+    f: &mut Frame,
+    area: Rect,
+    results: &[ModrinthSearchHit],
+    selected: usize,
+    scroll_offset: usize,
+    fetch_state: &ModBrowserFetchState,
+    state: &AppState,
+) {
+    if state.icon_rendering_enabled {
+        render_results_pane_rich(
+            f,
+            area,
+            results,
+            selected,
+            scroll_offset,
+            fetch_state,
+            state,
+        );
+    } else {
+        render_results_pane_table(f, area, results, selected, fetch_state);
+    }
+}
+
+/// Halfblocks fallback -- existing v0.2.x layout, untouched.
+fn render_results_pane_table(
     f: &mut Frame,
     area: Rect,
     results: &[ModrinthSearchHit],
@@ -195,6 +231,116 @@ fn render_results_pane(
     let mut list_state = ratatui::widgets::ListState::default();
     list_state.select(Some(selected));
     f.render_stateful_widget(list, inner, &mut list_state);
+}
+
+/// Phase 14 rich-path render. Mirrors `mod_browser::render_results_pane_rich`
+/// (same row layout, same scroll math via `mod_browser::next_scroll_offset`).
+/// Pack source is always Modrinth in current scope.
+fn render_results_pane_rich(
+    f: &mut Frame,
+    area: Rect,
+    results: &[ModrinthSearchHit],
+    selected: usize,
+    scroll_offset: usize,
+    fetch_state: &ModBrowserFetchState,
+    state: &AppState,
+) {
+    let block = Block::default().borders(Borders::ALL).title(" Results ");
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let placeholder = match fetch_state {
+        ModBrowserFetchState::Loading => Some("Searching Modrinth..."),
+        ModBrowserFetchState::Error(_) => Some("Failed to reach Modrinth -- check network"),
+        ModBrowserFetchState::Ready if results.is_empty() => Some("No packs found"),
+        ModBrowserFetchState::Ready => None,
+    };
+    if let Some(text) = placeholder {
+        let style = match fetch_state {
+            ModBrowserFetchState::Loading | ModBrowserFetchState::Ready => Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
+            ModBrowserFetchState::Error(_) => Style::default(),
+        };
+        f.render_widget(Paragraph::new(text).style(style), inner);
+        return;
+    }
+
+    let row_h: u16 = 2;
+    let visible_rows = (inner.height / row_h) as usize;
+    if visible_rows == 0 {
+        return;
+    }
+    let max_offset = results.len().saturating_sub(visible_rows);
+    let offset = scroll_offset.min(max_offset);
+
+    let row_constraints: Vec<Constraint> = (0..visible_rows)
+        .map(|_| Constraint::Length(row_h))
+        .collect();
+    let row_rects = Layout::vertical(row_constraints).split(inner);
+
+    for (visible_i, &row_rect) in row_rects.iter().enumerate() {
+        let i = offset + visible_i;
+        let Some(hit) = results.get(i) else {
+            break;
+        };
+        let is_selected = i == selected;
+
+        if is_selected {
+            let highlight =
+                Block::default().style(Style::default().add_modifier(Modifier::REVERSED));
+            f.render_widget(highlight, row_rect);
+        }
+
+        let cols = Layout::horizontal([
+            Constraint::Length(3),
+            Constraint::Length(1),
+            Constraint::Min(0),
+        ])
+        .split(row_rect);
+        let icon_rect = cols[0];
+        let text_rect = cols[2];
+
+        if let Some(svc) = &state.icon_service {
+            if let Some(proto) = svc.try_get(
+                IconSource::Modrinth,
+                &hit.project_id,
+                crate::icons::list_row_icon_target_rect(),
+            ) {
+                f.render_widget(Image::new(&proto), icon_rect);
+            }
+        }
+
+        let width = text_rect.width as usize;
+        let installed_suffix = if hit.already_installed {
+            "   ✓ installed"
+        } else {
+            ""
+        };
+        let cursor_glyph = if is_selected { " ▶" } else { "" };
+        let max_name_w = width.saturating_sub(installed_suffix.len() + cursor_glyph.len());
+        let name = truncate(&hit.title, max_name_w);
+        let line1 = if hit.already_installed {
+            Line::from(vec![
+                Span::raw(name),
+                Span::styled(
+                    installed_suffix.to_string(),
+                    Style::default().fg(Color::Green),
+                ),
+                Span::raw(cursor_glyph.to_string()),
+            ])
+        } else {
+            Line::from(vec![Span::raw(name), Span::raw(cursor_glyph.to_string())])
+        };
+        let desc = truncate(&hit.description, width);
+        let line2 = Line::from(Span::styled(
+            desc,
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
+        ));
+        f.render_widget(Paragraph::new(vec![line1, line2]), text_rect);
+    }
 }
 
 fn render_detail_pane(
@@ -431,6 +577,7 @@ mod tests {
                 fetch_state: ModBrowserFetchState::Ready,
                 results: Vec::new(),
                 selected: 0,
+                scroll_offset: 0,
             },
             ..AppState::default()
         }

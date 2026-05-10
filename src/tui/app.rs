@@ -318,6 +318,8 @@ pub enum ActiveView {
         fetch_state: ModBrowserFetchState,
         results: Vec<ModrinthSearchHit>,
         selected: usize,
+        /// Phase 14: rich-path scroll offset. See ModBrowser doc.
+        scroll_offset: usize,
     },
     /// Full-screen installed-packs list (Resource or Shader).
     /// The `m` keybind opens `InstalledModsList` (Mod kind); Tab cycles to this view.
@@ -4296,6 +4298,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 fetch_state: ModBrowserFetchState::Loading,
                 results: Vec::new(),
                 selected: 0,
+                scroll_offset: 0,
             };
             vec![
                 Effect::SearchPacks {
@@ -4323,14 +4326,13 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 results,
                 selected,
                 fetch_state,
+                scroll_offset,
                 ..
             } = &mut state.active_view
             {
                 if *cur_slug == slug && *cur_kind == kind {
                     let new_len = hits.len();
                     *results = hits;
-                    // Re-stamp `already_installed` from the in-memory set
-                    // (see ModBrowserSearchLoaded; same install/search race).
                     if let Some(set) = installed.as_ref() {
                         for r in results.iter_mut() {
                             if set.contains(&r.project_id) {
@@ -4340,7 +4342,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     }
                     *fetch_state = ModBrowserFetchState::Ready;
                     *selected = (*selected).min(new_len.saturating_sub(1));
-                    // Phase 13: kick off icon fetch for the initial selection.
+                    *scroll_offset = 0; // Phase 14: reset on new search.
                     if icons_on {
                         if let Some(hit) = results.get(*selected) {
                             if let Some(url) = hit.icon_url.clone() {
@@ -4349,6 +4351,17 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                                     project_id: hit.project_id.clone(),
                                     url,
                                     purpose: crate::icons::IconFetchPurpose::Detail,
+                                });
+                            }
+                        }
+                        // Phase 14: pre-fetch list-row icons for ALL hits.
+                        for hit in results.iter() {
+                            if let Some(url) = hit.icon_url.clone() {
+                                effects.push(Effect::FetchIcon {
+                                    source: crate::icons::IconSource::Modrinth,
+                                    project_id: hit.project_id.clone(),
+                                    url,
+                                    purpose: crate::icons::IconFetchPurpose::ListRow,
                                 });
                             }
                         }
@@ -4381,7 +4394,10 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
             let icons_on = state.icon_rendering_enabled;
             let mut effects = Vec::new();
             if let ActiveView::PackBrowser {
-                results, selected, ..
+                results,
+                selected,
+                scroll_offset,
+                ..
             } = &mut state.active_view
             {
                 let len = results.len();
@@ -4389,6 +4405,13 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     let new_idx =
                         (*selected as isize + delta as isize).clamp(0, len as isize - 1) as usize;
                     *selected = new_idx;
+                    const VISIBLE_ROWS_GUESS: usize = 8;
+                    *scroll_offset = crate::tui::views::mod_browser::next_scroll_offset(
+                        new_idx,
+                        *scroll_offset,
+                        VISIBLE_ROWS_GUESS,
+                        len,
+                    );
                     if icons_on {
                         if let Some(hit) = results.get(new_idx) {
                             if let Some(url) = hit.icon_url.clone() {
@@ -4607,6 +4630,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                     fetch_state: ModBrowserFetchState::Loading,
                     results: Vec::new(),
                     selected: 0,
+                    scroll_offset: 0,
                 };
                 vec![Effect::DropInstallPack { slug, kind, path }]
             } else {
@@ -4637,6 +4661,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                 fetch_state: ModBrowserFetchState::Loading,
                 results: Vec::new(),
                 selected: 0,
+                scroll_offset: 0,
             };
             vec![Effect::SearchPacks {
                 slug,
@@ -4932,6 +4957,7 @@ pub fn update(state: &mut AppState, action: Action) -> Vec<Effect> {
                         fetch_state: ModBrowserFetchState::Loading,
                         results: Vec::new(),
                         selected: 0,
+                        scroll_offset: 0,
                     };
                     vec![Effect::SearchPacks {
                         slug,
@@ -5919,6 +5945,7 @@ mod tests {
                     icon_url: None,
                 }],
                 selected: 0,
+                scroll_offset: 0,
             },
             ..AppState::default()
         }
@@ -5988,6 +6015,7 @@ mod tests {
                 fetch_state: ModBrowserFetchState::Ready,
                 results: Vec::<ModrinthSearchHit>::new(),
                 selected: 0,
+                scroll_offset: 0,
             },
             ..AppState::default()
         };

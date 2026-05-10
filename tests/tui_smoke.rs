@@ -2956,6 +2956,7 @@ fn test_uppercase_D_inside_resource_browser_opens_drop_modal_with_resource_kind(
             fetch_state: ichr::mods::types::ModBrowserFetchState::Ready,
             results: Vec::new(),
             selected: 0,
+            scroll_offset: 0,
         },
         ..AppState::default()
     };
@@ -2991,6 +2992,7 @@ fn test_uppercase_D_inside_shader_browser_opens_drop_modal_with_shader_kind() {
             fetch_state: ichr::mods::types::ModBrowserFetchState::Ready,
             results: Vec::new(),
             selected: 0,
+            scroll_offset: 0,
         },
         ..AppState::default()
     };
@@ -3257,6 +3259,7 @@ fn test_pack_browser_search_loaded_with_matching_slug_kind_populates_results() {
             fetch_state: ichr::mods::types::ModBrowserFetchState::Loading,
             results: Vec::new(),
             selected: 0,
+            scroll_offset: 0,
         },
         ..AppState::default()
     };
@@ -3293,6 +3296,7 @@ fn test_pack_browser_search_loaded_with_mismatched_slug_does_not_overwrite() {
             fetch_state: ichr::mods::types::ModBrowserFetchState::Loading,
             results: Vec::new(),
             selected: 0,
+            scroll_offset: 0,
         },
         ..AppState::default()
     };
@@ -3334,6 +3338,7 @@ fn test_pack_browser_search_loaded_with_mismatched_kind_does_not_overwrite() {
             fetch_state: ichr::mods::types::ModBrowserFetchState::Loading,
             results: Vec::new(),
             selected: 0,
+            scroll_offset: 0,
         },
         ..AppState::default()
     };
