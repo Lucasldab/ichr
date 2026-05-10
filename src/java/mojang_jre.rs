@@ -741,7 +741,7 @@ mod tests {
         // Serve WRONG bytes -- SHA1 mismatch
         let _m_file = server.mock(|when, then| {
             when.method(GET).path("/bin/java");
-            then.status(200).body(wrong_bytes.as_ref());
+            then.status(200).body(&wrong_bytes[..]);
         });
 
         let all_url = format!("{}/all.json", server.base_url());

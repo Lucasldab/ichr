@@ -45,7 +45,10 @@ fn cargo_metadata_declares_required_publish_fields() {
         "Cargo.toml [package].categories must have at least one entry"
     );
     let rv = pkg["rust_version"].as_str().expect("rust_version set");
-    assert_eq!(rv, "1.88", "MSRV must be 1.88 (zip 8.5.1 floor)");
+    assert_eq!(
+        rv, "1.90",
+        "MSRV must be 1.90 (ratatui-image 10.0.8 -> icy_sixel -> quantette floor; Phase 13)"
+    );
 }
 
 #[test]

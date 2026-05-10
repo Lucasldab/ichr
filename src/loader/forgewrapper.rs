@@ -11,11 +11,13 @@
 //! IndexOutOfBoundsException). The install path instead invokes the official
 //! Forge/NeoForge installer JAR directly:
 //!
-//!     java -Djava.awt.headless=true
-//!          -jar <installer.jar>
-//!          --installClient <staging>      # Forge
-//!          # OR
-//!          --install-client <staging>     # NeoForge (canonical; both accepted)
+//! ```text
+//! java -Djava.awt.headless=true
+//!      -jar <installer.jar>
+//!      --installClient <staging>      # Forge
+//!      # OR
+//!      --install-client <staging>     # NeoForge (canonical; both accepted)
+//! ```
 //!
 //! Launch-time wiring (Phase 12) supplies `FORGE_WRAPPER_MAIN_CLASS` as the
 //! version JSON `mainClass` override.

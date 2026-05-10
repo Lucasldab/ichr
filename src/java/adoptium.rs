@@ -502,7 +502,7 @@ mod tests {
         h.set_mode(0o755);
         h.set_size(content.len() as u64);
         h.set_cksum();
-        builder.append(&h, content.as_ref()).unwrap();
+        builder.append(&h, &content[..]).unwrap();
 
         let gz = builder.into_inner().unwrap();
         gz.finish().unwrap()
@@ -691,7 +691,7 @@ mod tests {
 
         let _mock = server.mock(|when, then| {
             when.method(GET).path("/archive.tar.gz");
-            then.status(200).body(content.as_ref());
+            then.status(200).body(&content[..]);
         });
 
         let client = make_client(&server);
@@ -860,7 +860,7 @@ mod tests {
         let _mock_archive = server.mock(|when, then| {
             when.method(GET)
                 .path("/OpenJDK21U-jre_x64_linux_hotspot_21.0.10_7.tar.gz");
-            then.status(200).body(wrong_bytes.as_ref());
+            then.status(200).body(&wrong_bytes[..]);
         });
 
         let client = make_client(&server);

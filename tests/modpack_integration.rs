@@ -83,7 +83,7 @@ async fn end_to_end_import_minimal_pack() {
 
     let _mock = server.mock(|when, then| {
         when.method(GET).path("/minimal-mod.jar");
-        then.status(200).body(mod_body.as_ref());
+        then.status(200).body(&mod_body[..]);
     });
 
     let tmp = TempDir::new().unwrap();
@@ -311,7 +311,7 @@ async fn import_with_unsupported_client_skips_files() {
 
     let mock_required = server.mock(|when, then| {
         when.method(GET).path("/client-req.jar");
-        then.status(200).body(required_body.as_ref());
+        then.status(200).body(&required_body[..]);
     });
 
     // The unsupported file must never be requested

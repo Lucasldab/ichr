@@ -605,7 +605,7 @@ mod tests {
 
         let _mock = server.mock(|when, then| {
             when.method(GET).path("/required-mod.jar");
-            then.status(200).body(mod_body.as_ref());
+            then.status(200).body(&mod_body[..]);
         });
 
         let tmp = TempDir::new().unwrap();
@@ -1009,7 +1009,7 @@ mod tests {
 
         let _mock = server.mock(|when, then| {
             when.method(GET).path("/idem-mod.jar");
-            then.status(200).body(mod_body.as_ref());
+            then.status(200).body(&mod_body[..]);
         });
 
         let tmp = TempDir::new().unwrap();
@@ -1102,7 +1102,7 @@ mod tests {
 
         let _mock = server.mock(|when, then| {
             when.method(GET).path("/prog-mod.jar");
-            then.status(200).body(mod_body.as_ref());
+            then.status(200).body(&mod_body[..]);
         });
 
         let tmp = TempDir::new().unwrap();
@@ -1189,7 +1189,7 @@ mod tests {
 
         let _mock = server.mock(|when, then| {
             when.method(GET).path("/loader-fail-mod.jar");
-            then.status(200).body(mod_body.as_ref());
+            then.status(200).body(&mod_body[..]);
         });
 
         let tmp = TempDir::new().unwrap();
@@ -1246,7 +1246,7 @@ mod tests {
         // Mock for the Required file (must be hit exactly once)
         let mock_required = server.mock(|when, then| {
             when.method(GET).path("/client-req.jar");
-            then.status(200).body(mod_body.as_ref());
+            then.status(200).body(&mod_body[..]);
         });
 
         // Mock for the Unsupported file (must NOT be hit)

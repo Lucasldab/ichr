@@ -27,7 +27,9 @@ fn is_safe_maven_segment(s: &str) -> bool {
 /// Parsed Maven coordinate. Lifetime-borrowed from the input slice -- no
 /// allocation. Fields mirror the canonical Apache Maven layout:
 ///
-///     groupId:artifactId:version[:classifier[:extension]]
+/// ```text
+/// groupId:artifactId:version[:classifier[:extension]]
+/// ```
 ///
 /// `classifier` is `Some` for 4- and 5-segment coords; `extension` is
 /// `Some` only for 5-segment coords (defaults to `"jar"` at the
