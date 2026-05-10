@@ -6,6 +6,10 @@
 **/*.rs.bk
 Cargo.lock.*
 
+# Per-machine local cargo config (absolute target-dir override pointing
+# to a different disk -- not portable across dev machines).
+/.cargo/
+
 # Editor
 .idea/
 .vscode/
