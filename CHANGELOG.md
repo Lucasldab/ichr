@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] -- 2026-05-12
+
+### Added
+
+- **`frame_idle` palette slot.** Lets users tune the chrome of every
+  frame border independently from the `dim` slot (which now only drives
+  placeholder text and similar subdued content). Default keeps v0.3.1
+  behavior (frame_idle = DarkGray), so existing configs are unaffected
+  -- opt in by setting `frame_idle = "..."` in `[colors]`. Motivating
+  use-case: kitty's `inactive_border_color = #3A3A3A` is darker than
+  the readable placeholder text color, and v0.3.1's single `dim` slot
+  forced one to compromise.
+
 ## [0.3.1] -- 2026-05-12
 
 ### Fixed

@@ -19,7 +19,9 @@ pub struct Palette {
     /// Primary accent: focused-input borders, active filter chips,
     /// the "running" badge, etc. Default: Yellow.
     pub accent: ColorSpec,
-    /// Subdued / placeholder text and inactive borders. Default: DarkGray.
+    /// Subdued / placeholder text. Default: DarkGray. (Frame borders
+    /// use the separate `frame_idle` slot so users can tune the chrome
+    /// quieter than the placeholder text.)
     pub dim: ColorSpec,
     /// Errors, fatal status. Default: Red.
     pub error: ColorSpec,
@@ -32,6 +34,12 @@ pub struct Palette {
     pub text: ColorSpec,
     /// Selected-row background highlight in lists. Default: Blue.
     pub selected_bg: ColorSpec,
+    /// Idle frame border color -- the chrome of every `Block::default()
+    /// .borders(...)` site. Distinct from `dim` so users can have
+    /// readable placeholder text and quieter frames at the same time.
+    /// Default: DarkGray (matches v0.3.1 behavior, where borders used
+    /// the `dim` slot).
+    pub frame_idle: ColorSpec,
 }
 
 impl Default for Palette {
@@ -44,6 +52,7 @@ impl Default for Palette {
             info: ColorSpec::Named(NamedColor::Cyan),
             text: ColorSpec::Named(NamedColor::Gray),
             selected_bg: ColorSpec::Named(NamedColor::Blue),
+            frame_idle: ColorSpec::Named(NamedColor::DarkGray),
         }
     }
 }
@@ -271,5 +280,6 @@ mod tests {
         assert_eq!(Color::from(p.info), Color::Cyan);
         assert_eq!(Color::from(p.text), Color::Gray);
         assert_eq!(Color::from(p.selected_bg), Color::Blue);
+        assert_eq!(Color::from(p.frame_idle), Color::DarkGray);
     }
 }

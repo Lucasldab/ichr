@@ -9,9 +9,9 @@ use ratatui::widgets::{Block, Borders};
 
 use crate::config::Palette;
 
-/// Style for inactive frame borders -- reads `palette.dim`.
-pub fn dim_border(palette: &Palette) -> Style {
-    Style::default().fg(palette.dim.to_color())
+/// Style for inactive frame borders -- reads `palette.frame_idle`.
+pub fn idle_border(palette: &Palette) -> Style {
+    Style::default().fg(palette.frame_idle.to_color())
 }
 
 /// Convenience constructor: `Block::default().borders(Borders::ALL)` with
@@ -19,5 +19,5 @@ pub fn dim_border(palette: &Palette) -> Style {
 pub fn block(palette: &Palette) -> Block<'static> {
     Block::default()
         .borders(Borders::ALL)
-        .border_style(dim_border(palette))
+        .border_style(idle_border(palette))
 }
