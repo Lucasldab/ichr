@@ -3,6 +3,7 @@
 pub mod app;
 pub mod run;
 pub mod terminal;
+pub mod theme;
 pub mod view;
 pub mod views;
 

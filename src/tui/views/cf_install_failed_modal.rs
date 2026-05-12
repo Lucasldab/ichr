@@ -11,7 +11,7 @@ use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
+use ratatui::widgets::{Clear, Paragraph, Wrap};
 use ratatui::Frame;
 
 use crate::tui::app::{Action, ActiveView, AppState};
@@ -46,8 +46,7 @@ pub fn render_cf_install_failed_modal(f: &mut Frame, area: Rect, state: &AppStat
     };
 
     f.render_widget(Clear, rect);
-    let outer = Block::default()
-        .borders(Borders::ALL)
+    let outer = crate::tui::theme::block(palette)
         .title(format!("Install failed: {mod_title}   (Esc to dismiss)"));
     f.render_widget(outer, rect);
 

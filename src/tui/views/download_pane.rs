@@ -1,15 +1,16 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::Span;
-use ratatui::widgets::{Block, Borders, LineGauge, Paragraph};
+use ratatui::widgets::{LineGauge, Paragraph};
 use ratatui::Frame;
 
 use crate::tui::app::AppState;
 
 pub fn render_download_pane(f: &mut Frame, area: Rect, state: &AppState) {
+    let palette = &state.config.colors;
     if state.active_jobs.is_empty() {
         let idle = Paragraph::new(Span::raw("idle -- press c to create an instance"))
-            .block(Block::default().borders(Borders::ALL).title("Downloads"));
+            .block(crate::tui::theme::block(palette).title("Downloads"));
         f.render_widget(idle, area);
         return;
     }
@@ -28,7 +29,7 @@ pub fn render_download_pane(f: &mut Frame, area: Rect, state: &AppState) {
         .map(|_| Constraint::Length(row_height))
         .collect();
 
-    let block = Block::default().borders(Borders::ALL).title("Downloads");
+    let block = crate::tui::theme::block(palette).title("Downloads");
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -37,7 +38,6 @@ pub fn render_download_pane(f: &mut Frame, area: Rect, state: &AppState) {
         .constraints(constraints)
         .split(inner);
 
-    let palette = &state.config.colors;
     for (idx, (_, pct, msg)) in state.active_jobs.iter().enumerate() {
         if idx >= rows.len() {
             break;

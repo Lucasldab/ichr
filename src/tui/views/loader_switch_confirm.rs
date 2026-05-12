@@ -6,7 +6,7 @@
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::widgets::{Clear, Paragraph};
 use ratatui::Frame;
 
 use crate::tui::app::{Action, ActiveView, AppState};
@@ -61,7 +61,7 @@ pub fn render_loader_switch_confirm(f: &mut Frame, area: Rect, state: &AppState)
     };
     let para = Paragraph::new(lines)
         .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL).title(title));
+        .block(crate::tui::theme::block(palette).title(title));
     f.render_widget(para, modal_area);
 }
 

@@ -1,7 +1,7 @@
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::widgets::{Clear, Paragraph};
 use ratatui::Frame;
 
 use crate::tui::app::{ActiveView, AppState};
@@ -29,8 +29,7 @@ pub fn render_delete_confirm(f: &mut Frame, area: Rect, state: &AppState) {
     ];
 
     let para = Paragraph::new(lines).alignment(Alignment::Center).block(
-        Block::default()
-            .borders(Borders::ALL)
+        crate::tui::theme::block(palette)
             .title("Confirm Delete (y / N)"),
     );
     f.render_widget(para, modal_area);

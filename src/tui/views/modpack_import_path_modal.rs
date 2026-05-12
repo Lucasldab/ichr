@@ -7,7 +7,7 @@
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::widgets::{Clear, Paragraph};
 use ratatui::Frame;
 
 use crate::tui::app::{Action, ActiveView, AppState};
@@ -43,8 +43,7 @@ pub fn render_modpack_import_path_modal(f: &mut Frame, area: Rect, state: &AppSt
     }
 
     let para = Paragraph::new(lines).alignment(Alignment::Left).block(
-        Block::default()
-            .borders(Borders::ALL)
+        crate::tui::theme::block(palette)
             .title("Import Modpack (Enter to import / Esc to cancel)"),
     );
     f.render_widget(para, chunks[0]);

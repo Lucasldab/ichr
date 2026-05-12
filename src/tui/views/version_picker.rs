@@ -1,7 +1,7 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph};
+use ratatui::widgets::{Clear, List, ListItem, Paragraph};
 use ratatui::Frame;
 
 use crate::tui::app::{ActiveView, AppState, CreateStep, VersionFilter};
@@ -45,8 +45,7 @@ pub fn render_version_picker(f: &mut Frame, area: Rect, state: &AppState) {
         )),
     ];
     let header = Paragraph::new(header_text).block(
-        Block::default()
-            .borders(Borders::ALL)
+        crate::tui::theme::block(palette)
             .title("Select Version"),
     );
     f.render_widget(header, chunks[0]);
@@ -63,7 +62,7 @@ pub fn render_version_picker(f: &mut Frame, area: Rect, state: &AppState) {
         } else {
             palette.accent.to_color()
         }))
-        .block(Block::default().borders(Borders::ALL).title("Filter"));
+        .block(crate::tui::theme::block(palette).title("Filter"));
     f.render_widget(search_para, chunks[1]);
 
     // Version list filtered by filter + search
@@ -85,8 +84,7 @@ pub fn render_version_picker(f: &mut Frame, area: Rect, state: &AppState) {
         })
         .collect();
 
-    let mut error_block = Block::default()
-        .borders(Borders::ALL)
+    let mut error_block = crate::tui::theme::block(palette)
         .title("Versions (Enter / Esc)");
     if let Some(err) = error {
         error_block = error_block.title(format!("Versions -- {err}"));

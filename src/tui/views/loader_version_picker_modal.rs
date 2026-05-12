@@ -5,7 +5,7 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph};
+use ratatui::widgets::{Clear, List, ListItem, Paragraph};
 use ratatui::Frame;
 
 use crate::loader::types::LoaderType;
@@ -77,8 +77,7 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
         )),
     ])
     .block(
-        Block::default()
-            .borders(Borders::ALL)
+        crate::tui::theme::block(palette)
             .title(format!(" {kind} Loader versions -- {slug} ")),
     );
     f.render_widget(header, chunks[0]);
@@ -95,7 +94,7 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
         } else {
             palette.accent.to_color()
         }))
-        .block(Block::default().borders(Borders::ALL).title("Filter"));
+        .block(crate::tui::theme::block(palette).title("Filter"));
     f.render_widget(search_para, chunks[1]);
 
     // Version list
@@ -151,8 +150,7 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
             .collect()
     };
 
-    let list_block = Block::default()
-        .borders(Borders::ALL)
+    let list_block = crate::tui::theme::block(palette)
         .title("Versions (Enter / Esc)");
     let list = List::new(items).block(list_block);
     let mut list_state = ratatui::widgets::ListState::default();

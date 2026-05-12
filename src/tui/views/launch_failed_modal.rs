@@ -5,7 +5,7 @@
 
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
+use ratatui::widgets::{Clear, Paragraph, Wrap};
 use ratatui::Frame;
 
 use crate::tui::app::{ActiveView, AppState};
@@ -30,9 +30,9 @@ pub fn render_launch_failed_modal(f: &mut Frame, area: Rect, state: &AppState) {
         height: h,
     };
 
+    let palette = &state.config.colors;
     f.render_widget(Clear, rect);
-    let outer = Block::default()
-        .borders(Borders::ALL)
+    let outer = crate::tui::theme::block(palette)
         .title(format!("Launch failed: {slug}   (Esc to dismiss)"));
     f.render_widget(outer, rect);
 
@@ -47,7 +47,6 @@ pub fn render_launch_failed_modal(f: &mut Frame, area: Rect, state: &AppState) {
         .constraints([Constraint::Length(3), Constraint::Min(1)])
         .split(inner);
 
-    let palette = &state.config.colors;
     let err_p = Paragraph::new(error.as_str())
         .style(
             Style::default()

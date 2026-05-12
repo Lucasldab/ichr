@@ -14,7 +14,7 @@ use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifier
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
+use ratatui::widgets::{Block, List, ListItem, Paragraph, Wrap};
 use ratatui::Frame;
 use ratatui_image::Image;
 
@@ -39,6 +39,8 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
         return;
     };
 
+    let palette = &state.config.colors;
+
     // ---- Vertical layout: header / search / body / footer ----
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -56,8 +58,7 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
         PackKind::Shader => "Shader Packs",
     };
     let header_para = Paragraph::new(format!("{kind_label} -- {slug}")).block(
-        Block::default()
-            .borders(Borders::ALL)
+        crate::tui::theme::block(palette)
             .title(format!(" {kind_label} -- {slug} ")),
     );
     f.render_widget(header_para, chunks[0]);
@@ -66,7 +67,6 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
     // Color slots and hint text both consult the user config, so a
     // rebound `browser_begin_search` shows up in the placeholder and
     // title automatically.
-    let palette = &state.config.colors;
     let search_label = state
         .config
         .keybinds
@@ -98,8 +98,7 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
         format!("Search [{search_label}]")
     };
     let search_para = Paragraph::new(search_display).style(search_style).block(
-        Block::default()
-            .borders(Borders::ALL)
+        crate::tui::theme::block(palette)
             .title(title_str)
             .border_style(Style::default().fg(border_color)),
     );
@@ -170,7 +169,7 @@ fn render_results_pane_table(
     let dim_style = Style::default()
         .fg(palette.dim.to_color())
         .add_modifier(Modifier::DIM);
-    let block = Block::default().borders(Borders::ALL).title(" Results ");
+    let block = crate::tui::theme::block(palette).title(" Results ");
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -247,7 +246,7 @@ fn render_results_pane_rich(
     let dim_style = Style::default()
         .fg(palette.dim.to_color())
         .add_modifier(Modifier::DIM);
-    let block = Block::default().borders(Borders::ALL).title(" Results ");
+    let block = crate::tui::theme::block(palette).title(" Results ");
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -349,7 +348,7 @@ fn render_detail_pane(
     let dim_style = Style::default()
         .fg(palette.dim.to_color())
         .add_modifier(Modifier::DIM);
-    let block = Block::default().borders(Borders::ALL).title(" Detail ");
+    let block = crate::tui::theme::block(palette).title(" Detail ");
     let inner = block.inner(area);
     f.render_widget(block, area);
 

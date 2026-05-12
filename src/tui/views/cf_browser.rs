@@ -20,7 +20,7 @@ use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifier
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
+use ratatui::widgets::{List, ListItem, Paragraph, Wrap};
 use ratatui::Frame;
 use ratatui_image::Image;
 
@@ -107,8 +107,7 @@ pub fn render_cf_browser(f: &mut Frame, area: Rect, state: &AppState) {
         Span::styled(format!("[{loader_chip_text}]"), loader_chip_style),
     ]);
     let header_para = Paragraph::new(header_line).block(
-        Block::default()
-            .borders(Borders::ALL)
+        crate::tui::theme::block(palette)
             .title(format!(" CurseForge Mods -- {slug} ")),
     );
     f.render_widget(header_para, chunks[0]);
@@ -128,8 +127,7 @@ pub fn render_cf_browser(f: &mut Frame, area: Rect, state: &AppState) {
     // focus indicator. Both browsers must communicate focus identically
     // for visual consistency across mod sources.
     let search_para = Paragraph::new(search_display).style(search_style).block(
-        Block::default()
-            .borders(Borders::ALL)
+        crate::tui::theme::block(palette)
             .title("Search")
             .border_style(accent_style),
     );
@@ -175,7 +173,7 @@ fn render_results_pane(
     let dim_style = Style::default()
         .fg(palette.dim.to_color())
         .add_modifier(Modifier::DIM);
-    let block = Block::default().borders(Borders::ALL).title(" Results ");
+    let block = crate::tui::theme::block(palette).title(" Results ");
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -250,7 +248,7 @@ fn render_detail_pane(
     let dim_style = Style::default()
         .fg(palette.dim.to_color())
         .add_modifier(Modifier::DIM);
-    let block = Block::default().borders(Borders::ALL).title(" Detail ");
+    let block = crate::tui::theme::block(palette).title(" Detail ");
     let inner = block.inner(area);
     f.render_widget(block, area);
 

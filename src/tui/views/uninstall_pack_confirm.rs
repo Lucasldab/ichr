@@ -10,13 +10,14 @@ use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::widgets::{Clear, Paragraph};
 use ratatui::Frame;
 
 use crate::packs::kind::PackKind;
 use crate::tui::app::{Action, ActiveView, AppState};
 
 pub fn render_uninstall_pack_confirm(f: &mut Frame, area: Rect, state: &AppState) {
+    let palette = &state.config.colors;
     let ActiveView::UninstallPackConfirm {
         slug,
         kind,
@@ -68,7 +69,7 @@ pub fn render_uninstall_pack_confirm(f: &mut Frame, area: Rect, state: &AppState
 
     let para = Paragraph::new(lines)
         .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL).title(title));
+        .block(crate::tui::theme::block(palette).title(title));
     f.render_widget(para, modal_area);
 }
 

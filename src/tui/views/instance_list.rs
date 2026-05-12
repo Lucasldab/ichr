@@ -1,6 +1,6 @@
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
-use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState};
+use ratatui::widgets::{Cell, Paragraph, Row, Table, TableState};
 use ratatui::Frame;
 
 use crate::tui::app::{ActiveView, AppState};
@@ -69,7 +69,7 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
     // Stateful render keeps the selected instance in view when the list
     // exceeds the terminal height.
     .row_highlight_style(Style::default().bg(palette.selected_bg.to_color()))
-    .block(Block::default().borders(Borders::ALL).title(title));
+    .block(crate::tui::theme::block(palette).title(title));
     let mut ts = TableState::default().with_selected(selected);
     f.render_stateful_widget(table, table_area, &mut ts);
 
@@ -97,6 +97,7 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
 }
 
 pub fn render_group_inline_overlay(f: &mut Frame, area: Rect, state: &AppState) {
+    let palette = &state.config.colors;
     if let ActiveView::GroupInline { slug, buffer, .. } = &state.active_view {
         let w = area.width.min(60);
         let h = 3u16;
@@ -110,8 +111,7 @@ pub fn render_group_inline_overlay(f: &mut Frame, area: Rect, state: &AppState) 
         };
         let text = format!("Group for {slug}: {buffer}_   (Enter=save, empty=clear, Esc=cancel)");
         let p = Paragraph::new(text).block(
-            Block::default()
-                .borders(Borders::ALL)
+            crate::tui::theme::block(palette)
                 .title("Set group (g)"),
         );
         f.render_widget(ratatui::widgets::Clear, rect);

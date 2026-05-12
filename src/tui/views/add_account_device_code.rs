@@ -6,12 +6,13 @@ use std::time::Instant;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::widgets::{Clear, Paragraph};
 use ratatui::Frame;
 
 use crate::tui::app::{ActiveView, AppState};
 
 pub fn render_add_account_device_code(f: &mut Frame, area: Rect, state: &AppState) {
+    let palette = &state.config.colors;
     let (user_code, uri, expires_at, stage) = match &state.active_view {
         ActiveView::AddAccountDeviceCode {
             user_code,
@@ -46,14 +47,14 @@ pub fn render_add_account_device_code(f: &mut Frame, area: Rect, state: &AppStat
         "Add Microsoft Account",
         Style::default().add_modifier(Modifier::BOLD),
     )))
-    .block(Block::default().borders(Borders::ALL));
+    .block(crate::tui::theme::block(palette));
     f.render_widget(title, chunks[0]);
 
     let code = Paragraph::new(Line::from(Span::styled(
         user_code.clone(),
         Style::default().add_modifier(Modifier::BOLD),
     )))
-    .block(Block::default().borders(Borders::ALL).title(" Code "));
+    .block(crate::tui::theme::block(palette).title(" Code "));
     f.render_widget(code, chunks[1]);
 
     let uri_p = Paragraph::new(Line::from(format!("Visit: {uri}")));
@@ -62,7 +63,7 @@ pub fn render_add_account_device_code(f: &mut Frame, area: Rect, state: &AppStat
     let count = Paragraph::new(Line::from(format!("Expires in: {remaining}s  |  {stage}")));
     f.render_widget(count, chunks[3]);
 
-    let hint = Paragraph::new("Esc to cancel").block(Block::default().borders(Borders::ALL));
+    let hint = Paragraph::new("Esc to cancel").block(crate::tui::theme::block(palette));
     f.render_widget(hint, chunks[4]);
 }
 

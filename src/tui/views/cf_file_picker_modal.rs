@@ -14,7 +14,7 @@ use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph};
+use ratatui::widgets::{Clear, List, ListItem, Paragraph};
 use ratatui::Frame;
 
 use crate::tui::app::{Action, ActiveView, AppState};
@@ -82,8 +82,7 @@ pub fn render_cf_file_picker_modal(f: &mut Frame, area: Rect, state: &AppState) 
     };
 
     let list = List::new(items).block(
-        Block::default()
-            .borders(Borders::ALL)
+        crate::tui::theme::block(palette)
             .title(format!("{} -- files", mod_detail.name)),
     );
     let mut list_state = ratatui::widgets::ListState::default();

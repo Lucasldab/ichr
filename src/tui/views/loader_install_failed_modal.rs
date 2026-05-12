@@ -4,13 +4,14 @@
 
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
+use ratatui::widgets::{Clear, Paragraph, Wrap};
 use ratatui::Frame;
 
 use crate::loader::types::LoaderType;
 use crate::tui::app::{Action, ActiveView, AppState};
 
 pub fn render_loader_install_failed_modal(f: &mut Frame, area: Rect, state: &AppState) {
+    let palette = &state.config.colors;
     let ActiveView::LoaderInstallFailedModal {
         slug,
         loader,
@@ -39,8 +40,7 @@ pub fn render_loader_install_failed_modal(f: &mut Frame, area: Rect, state: &App
         LoaderType::Forge => "Forge",
         LoaderType::NeoForge => "NeoForge",
     };
-    let outer = Block::default()
-        .borders(Borders::ALL)
+    let outer = crate::tui::theme::block(palette)
         .title(format!("Install failed: {slug}   (Esc to dismiss)"));
     f.render_widget(outer, rect);
 

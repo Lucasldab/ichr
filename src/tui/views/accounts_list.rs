@@ -4,12 +4,13 @@
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Borders, Paragraph, Row, Table, TableState};
+use ratatui::widgets::{Paragraph, Row, Table, TableState};
 use ratatui::Frame;
 
 use crate::tui::app::{ActiveView, AppState};
 
 pub fn render_accounts_list(f: &mut Frame, area: Rect, state: &AppState) {
+    let palette = &state.config.colors;
     let chunks = Layout::vertical([
         Constraint::Length(3), // header
         Constraint::Min(5),    // table
@@ -18,7 +19,7 @@ pub fn render_accounts_list(f: &mut Frame, area: Rect, state: &AppState) {
     .split(area);
 
     let header = Paragraph::new("Microsoft Accounts")
-        .block(Block::default().borders(Borders::ALL).title(" Accounts "));
+        .block(crate::tui::theme::block(palette).title(" Accounts "));
     f.render_widget(header, chunks[0]);
 
     let selected = match &state.active_view {
@@ -28,7 +29,7 @@ pub fn render_accounts_list(f: &mut Frame, area: Rect, state: &AppState) {
 
     if state.accounts.is_empty() {
         let empty = Paragraph::new("No accounts -- press `a` to add a Microsoft account.")
-            .block(Block::default().borders(Borders::ALL));
+            .block(crate::tui::theme::block(palette));
         f.render_widget(empty, chunks[1]);
     } else {
         let rows: Vec<Row> = state
@@ -59,13 +60,13 @@ pub fn render_accounts_list(f: &mut Frame, area: Rect, state: &AppState) {
             // Stateful render scrolls the viewport so the selected account
             // stays visible when the list exceeds the table area.
             .row_highlight_style(Style::default().bg(state.config.colors.selected_bg.to_color()))
-            .block(Block::default().borders(Borders::ALL).title(" Accounts "));
+            .block(crate::tui::theme::block(palette).title(" Accounts "));
         let mut ts = TableState::default().with_selected(Some(selected));
         f.render_stateful_widget(table, chunks[1], &mut ts);
     }
 
     let hint = Paragraph::new(Line::from("a add  x remove  Enter activate  Esc close"))
-        .block(Block::default().borders(Borders::ALL));
+        .block(crate::tui::theme::block(palette));
     f.render_widget(hint, chunks[2]);
 }
 

@@ -13,7 +13,7 @@ use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState};
+use ratatui::widgets::{Cell, Paragraph, Row, Table, TableState};
 use ratatui::Frame;
 
 use crate::mods::types::ModSource;
@@ -65,8 +65,7 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
         let p = Paragraph::new("No packs installed -- press Esc and R/S to browse")
             .style(dim_style)
             .block(
-                Block::default()
-                    .borders(Borders::ALL)
+                crate::tui::theme::block(palette)
                     .title(format!("{kind_label} -- {slug}  (e/x/Tab/Esc)")),
             );
         f.render_widget(p, table_area);
@@ -116,8 +115,7 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
         // when the list exceeds the viewport.
         .row_highlight_style(Style::default().bg(palette.selected_bg.to_color()))
         .block(
-            Block::default()
-                .borders(Borders::ALL)
+            crate::tui::theme::block(palette)
                 .title(format!("{kind_label} -- {slug}  (e/x/Tab/Esc)")),
         );
         let mut ts = TableState::default().with_selected(Some(*selected));

@@ -7,7 +7,7 @@
 use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::{Modifier, Style};
-use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState};
+use ratatui::widgets::{Cell, Paragraph, Row, Table, TableState};
 use ratatui::Frame;
 
 use crate::mods::types::ModSource;
@@ -33,8 +33,7 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
         let p = Paragraph::new("No mods installed -- press Esc and M to browse")
             .style(dim_style)
             .block(
-                Block::default()
-                    .borders(Borders::ALL)
+                crate::tui::theme::block(palette)
                     .title(format!("Installed Mods -- {slug}  (e/x/Esc)")),
             );
         f.render_widget(p, area);
@@ -85,8 +84,7 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
     // exceeds the viewport.
     .row_highlight_style(Style::default().bg(palette.selected_bg.to_color()))
     .block(
-        Block::default()
-            .borders(Borders::ALL)
+        crate::tui::theme::block(palette)
             .title(format!("Installed Mods -- {slug}  (e/x/Esc)")),
     );
     let mut ts = TableState::default().with_selected(Some(*selected));

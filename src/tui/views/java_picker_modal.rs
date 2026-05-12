@@ -8,13 +8,14 @@
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
+use ratatui::widgets::{List, ListItem, Paragraph};
 use ratatui::Frame;
 
 use crate::tui::app::{Action, ActiveView, AppState, JavaPickerRow};
 
 /// Render the centered Java picker modal over whatever is beneath it.
 pub fn render_java_picker_modal(f: &mut Frame, area: Rect, state: &AppState) {
+    let palette = &state.config.colors;
     let (slug, options, selected) = match &state.active_view {
         ActiveView::JavaPickerModal {
             slug,
@@ -40,8 +41,7 @@ pub fn render_java_picker_modal(f: &mut Frame, area: Rect, state: &AppState) {
     f.render_widget(ratatui::widgets::Clear, modal_area);
 
     // Outer block.
-    let block = Block::default()
-        .borders(Borders::ALL)
+    let block = crate::tui::theme::block(palette)
         .title(format!(" Java Runtime -- {slug} "));
     let inner = block.inner(modal_area);
     f.render_widget(block, modal_area);

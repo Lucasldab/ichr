@@ -8,7 +8,7 @@
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::widgets::{Clear, Paragraph};
 use ratatui::Frame;
 
 use crate::packs::kind::PackKind;
@@ -61,7 +61,7 @@ pub fn render_pack_drop_path_modal(f: &mut Frame, area: Rect, state: &AppState) 
 
     let para = Paragraph::new(lines)
         .alignment(Alignment::Left)
-        .block(Block::default().borders(Borders::ALL).title(title));
+        .block(crate::tui::theme::block(palette).title(title));
     f.render_widget(para, chunks[0]);
 }
 

@@ -1,7 +1,7 @@
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::widgets::{Clear, Paragraph};
 use ratatui::Frame;
 
 use crate::tui::app::{ActiveView, AppState, CreateStep};
@@ -36,8 +36,7 @@ pub fn render_create_modal(f: &mut Frame, area: Rect, state: &AppState) {
             }
 
             let para = Paragraph::new(lines).alignment(Alignment::Left).block(
-                Block::default()
-                    .borders(Borders::ALL)
+                crate::tui::theme::block(palette)
                     .title("Create Instance (Enter / Esc)"),
             );
             f.render_widget(para, chunks[0]);
@@ -58,8 +57,7 @@ pub fn render_create_modal(f: &mut Frame, area: Rect, state: &AppState) {
             ];
 
             let para = Paragraph::new(lines).alignment(Alignment::Left).block(
-                Block::default()
-                    .borders(Borders::ALL)
+                crate::tui::theme::block(palette)
                     .title("Rename Instance (Enter / Esc)"),
             );
             f.render_widget(para, chunks[0]);

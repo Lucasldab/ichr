@@ -8,7 +8,7 @@ use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::widgets::{Clear, Paragraph};
 use ratatui::Frame;
 
 use crate::mods::types::{DepKind, ResolvedDep};
@@ -52,8 +52,7 @@ pub fn render_dep_confirm_modal(f: &mut Frame, area: Rect, state: &AppState) {
     };
 
     f.render_widget(Clear, rect);
-    let outer = Block::default()
-        .borders(Borders::ALL)
+    let outer = crate::tui::theme::block(palette)
         .title(format!("Install {project_title} {version_label}"));
     f.render_widget(outer, rect);
 

@@ -7,7 +7,7 @@
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
-use ratatui::widgets::{Block, Borders, Clear, LineGauge, Paragraph, Wrap};
+use ratatui::widgets::{Clear, LineGauge, Paragraph, Wrap};
 use ratatui::Frame;
 
 use crate::tui::app::{Action, ActiveView, AppState};
@@ -40,8 +40,7 @@ pub fn render_modpack_import_progress_modal(f: &mut Frame, area: Rect, state: &A
     };
 
     f.render_widget(Clear, modal_area);
-    let block = Block::default()
-        .borders(Borders::ALL)
+    let block = crate::tui::theme::block(palette)
         .title(format!(" Importing {modpack_name} "));
     let inner = block.inner(modal_area);
     f.render_widget(block, modal_area);

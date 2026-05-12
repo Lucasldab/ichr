@@ -6,7 +6,7 @@
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph};
+use ratatui::widgets::{Clear, List, ListItem, Paragraph};
 use ratatui::Frame;
 
 use crate::tui::app::{Action, ActiveView, AppState};
@@ -20,6 +20,7 @@ const ROW_LABELS: [&str; 5] = [
 ];
 
 pub fn render_loader_picker_modal(f: &mut Frame, area: Rect, state: &AppState) {
+    let palette = &state.config.colors;
     let (slug, selected) = match &state.active_view {
         ActiveView::LoaderPickerModal { slug, selected } => (slug, *selected),
         _ => return,
@@ -38,8 +39,7 @@ pub fn render_loader_picker_modal(f: &mut Frame, area: Rect, state: &AppState) {
 
     f.render_widget(Clear, modal_area);
 
-    let block = Block::default()
-        .borders(Borders::ALL)
+    let block = crate::tui::theme::block(palette)
         .title(format!(" Install Loader -- {slug} "));
     let inner = block.inner(modal_area);
     f.render_widget(block, modal_area);
