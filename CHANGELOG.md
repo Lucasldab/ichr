@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] -- 2026-05-12
+
+### Fixed
+
+- **User palette in `~/.config/ichr/config.toml` now drives every TUI
+  view.** Phase 14 introduced the `[colors]` slot system, but only the
+  mod_browser and pack_browser search bars consulted it -- every other
+  view still hardcoded `Color::Red/Green/Yellow/DarkGray`, and views
+  that used only `Modifier::BOLD/DIM/REVERSED` fell through to the
+  terminal default fg. Every fg slot now flows through `state.config.colors`
+  across all 21 views (`accent`, `dim`, `error`, `success`, `text`).
+- **`selected_bg` and the `accent` "running badge"** were defined in
+  the palette but read by no view: selection highlights used
+  `Modifier::REVERSED` (terminal inversion) and the instance_list
+  running cell used `Modifier::BOLD` only. Both slots are now wired --
+  every Table/List highlight paints `bg = palette.selected_bg`, and
+  the running cell paints `fg = palette.accent + Modifier::BOLD`.
+- **Block borders ignored the palette** -- 60 `Block::default().borders(Borders::ALL)`
+  sites rendered borders with the default Style, so the user's `dim`
+  slot never reached the frames. New `tui::theme::block(palette)`
+  helper preassigns the idle border style to `palette.dim`; every
+  view's frames now consult the configured color. Focused search-bar
+  borders (mod_browser / pack_browser / cf_browser) still flip to
+  `accent` on top of the helper.
+
 ## [0.3.0] -- 2026-05-10
 
 This is the first download-able successor to v0.2.0. v0.2.1 was tagged
