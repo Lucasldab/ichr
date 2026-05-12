@@ -1,5 +1,5 @@
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui::Frame;
@@ -11,6 +11,7 @@ pub fn render_delete_confirm(f: &mut Frame, area: Rect, state: &AppState) {
         return;
     };
 
+    let palette = &state.config.colors;
     let modal_area = centered_rect(50, 20, area);
     f.render_widget(Clear, modal_area);
 
@@ -18,12 +19,12 @@ pub fn render_delete_confirm(f: &mut Frame, area: Rect, state: &AppState) {
         Line::from(""),
         Line::from(Span::styled(
             format!("Delete \"{display_name}\"?"),
-            Style::default().fg(Color::Red),
+            Style::default().fg(palette.error.to_color()),
         )),
         Line::from(""),
         Line::from(Span::styled(
             "Press y to confirm, any other key to cancel.",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(palette.dim.to_color()),
         )),
     ];
 

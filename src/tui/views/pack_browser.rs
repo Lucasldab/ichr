@@ -12,12 +12,13 @@
 
 use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
 use ratatui::Frame;
 use ratatui_image::Image;
 
+use crate::config::Palette;
 use crate::icons::IconSource;
 use crate::mods::types::{ModBrowserFetchState, ModrinthSearchHit};
 use crate::packs::kind::PackKind;
@@ -153,7 +154,7 @@ fn render_results_pane(
             state,
         );
     } else {
-        render_results_pane_table(f, area, results, selected, fetch_state);
+        render_results_pane_table(f, area, results, selected, fetch_state, &state.config.colors);
     }
 }
 
@@ -164,7 +165,11 @@ fn render_results_pane_table(
     results: &[ModrinthSearchHit],
     selected: usize,
     fetch_state: &ModBrowserFetchState,
+    palette: &Palette,
 ) {
+    let dim_style = Style::default()
+        .fg(palette.dim.to_color())
+        .add_modifier(Modifier::DIM);
     let block = Block::default().borders(Borders::ALL).title(" Results ");
     let inner = block.inner(area);
     f.render_widget(block, area);
@@ -177,9 +182,7 @@ fn render_results_pane_table(
     };
     if let Some(text) = placeholder {
         let style = match fetch_state {
-            ModBrowserFetchState::Loading | ModBrowserFetchState::Ready => Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::DIM),
+            ModBrowserFetchState::Loading | ModBrowserFetchState::Ready => dim_style,
             ModBrowserFetchState::Error(_) => Style::default(),
         };
         f.render_widget(Paragraph::new(text).style(style), inner);
@@ -204,7 +207,7 @@ fn render_results_pane_table(
                     Span::raw(name),
                     Span::styled(
                         installed_suffix.to_string(),
-                        Style::default().fg(Color::Green),
+                        Style::default().fg(palette.success.to_color()),
                     ),
                     Span::raw(cursor_glyph.to_string()),
                 ])
@@ -212,12 +215,7 @@ fn render_results_pane_table(
                 Line::from(vec![Span::raw(name), Span::raw(cursor_glyph.to_string())])
             };
             let desc = truncate(&hit.description, width.saturating_sub(3));
-            let line2 = Line::from(Span::styled(
-                format!("  {desc}"),
-                Style::default()
-                    .fg(Color::DarkGray)
-                    .add_modifier(Modifier::DIM),
-            ));
+            let line2 = Line::from(Span::styled(format!("  {desc}"), dim_style));
             let style = if i == selected {
                 Style::default().add_modifier(Modifier::REVERSED)
             } else {
@@ -245,6 +243,10 @@ fn render_results_pane_rich(
     fetch_state: &ModBrowserFetchState,
     state: &AppState,
 ) {
+    let palette = &state.config.colors;
+    let dim_style = Style::default()
+        .fg(palette.dim.to_color())
+        .add_modifier(Modifier::DIM);
     let block = Block::default().borders(Borders::ALL).title(" Results ");
     let inner = block.inner(area);
     f.render_widget(block, area);
@@ -257,9 +259,7 @@ fn render_results_pane_rich(
     };
     if let Some(text) = placeholder {
         let style = match fetch_state {
-            ModBrowserFetchState::Loading | ModBrowserFetchState::Ready => Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::DIM),
+            ModBrowserFetchState::Loading | ModBrowserFetchState::Ready => dim_style,
             ModBrowserFetchState::Error(_) => Style::default(),
         };
         f.render_widget(Paragraph::new(text).style(style), inner);
@@ -325,7 +325,7 @@ fn render_results_pane_rich(
                 Span::raw(name),
                 Span::styled(
                     installed_suffix.to_string(),
-                    Style::default().fg(Color::Green),
+                    Style::default().fg(palette.success.to_color()),
                 ),
                 Span::raw(cursor_glyph.to_string()),
             ])
@@ -333,12 +333,7 @@ fn render_results_pane_rich(
             Line::from(vec![Span::raw(name), Span::raw(cursor_glyph.to_string())])
         };
         let desc = truncate(&hit.description, width);
-        let line2 = Line::from(Span::styled(
-            desc,
-            Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::DIM),
-        ));
+        let line2 = Line::from(Span::styled(desc, dim_style));
         f.render_widget(Paragraph::new(vec![line1, line2]), text_rect);
     }
 }
@@ -350,16 +345,16 @@ fn render_detail_pane(
     fetch_state: &ModBrowserFetchState,
     state: &AppState,
 ) {
+    let palette = &state.config.colors;
+    let dim_style = Style::default()
+        .fg(palette.dim.to_color())
+        .add_modifier(Modifier::DIM);
     let block = Block::default().borders(Borders::ALL).title(" Detail ");
     let inner = block.inner(area);
     f.render_widget(block, area);
 
     let Some(hit) = selected_hit else {
-        let p = Paragraph::new("Select a pack to see details").style(
-            Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::DIM),
-        );
+        let p = Paragraph::new("Select a pack to see details").style(dim_style);
         f.render_widget(p, inner);
         return;
     };
@@ -409,12 +404,7 @@ fn render_detail_pane(
         )));
     }
     let divider: String = "─".repeat(body_area.width.max(1) as usize);
-    lines.push(Line::from(Span::styled(
-        divider,
-        Style::default()
-            .fg(Color::DarkGray)
-            .add_modifier(Modifier::DIM),
-    )));
+    lines.push(Line::from(Span::styled(divider, dim_style)));
     lines.push(Line::raw(hit.description.clone()));
     lines.push(Line::raw(""));
     lines.push(Line::raw(format!(
@@ -425,9 +415,7 @@ fn render_detail_pane(
         lines.push(Line::raw(""));
         lines.push(Line::from(Span::styled(
             "Could not load details -- check network".to_string(),
-            Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::DIM),
+            dim_style,
         )));
     }
 

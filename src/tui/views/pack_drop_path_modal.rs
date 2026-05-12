@@ -6,7 +6,7 @@
 //!  - Shader:   "Add Shader Pack (Enter / Esc)"
 
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui::Frame;
@@ -25,6 +25,7 @@ pub fn render_pack_drop_path_modal(f: &mut Frame, area: Rect, state: &AppState) 
         return;
     };
 
+    let palette = &state.config.colors;
     let modal_area = centered_rect(60, 30, area);
     f.render_widget(Clear, modal_area);
 
@@ -47,14 +48,14 @@ pub fn render_pack_drop_path_modal(f: &mut Frame, area: Rect, state: &AppState) 
         Line::from(""),
         Line::from(Span::styled(
             format!("> {buffer}_"),
-            Style::default().fg(Color::Yellow),
+            Style::default().fg(palette.accent.to_color()),
         )),
     ];
     if let Some(err) = error {
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             err.clone(),
-            Style::default().fg(Color::Red),
+            Style::default().fg(palette.error.to_color()),
         )));
     }
 

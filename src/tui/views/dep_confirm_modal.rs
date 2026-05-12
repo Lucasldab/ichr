@@ -6,7 +6,7 @@
 
 use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui::Frame;
@@ -30,6 +30,14 @@ pub fn render_dep_confirm_modal(f: &mut Frame, area: Rect, state: &AppState) {
     else {
         return;
     };
+
+    let palette = &state.config.colors;
+    let dim_style = Style::default()
+        .fg(palette.dim.to_color())
+        .add_modifier(Modifier::DIM);
+    let error_bold = Style::default()
+        .fg(palette.error.to_color())
+        .add_modifier(Modifier::BOLD);
 
     // ---- Modal centering: 70 × 20 cap (UI-SPEC line 295) ----
     let w = area.width.min(70);
@@ -99,22 +107,9 @@ pub fn render_dep_confirm_modal(f: &mut Frame, area: Rect, state: &AppState) {
         .iter()
         .map(|d| {
             let (prefix_text, prefix_style) = match d.kind {
-                DepKind::Required => (
-                    "  required  ",
-                    Style::default()
-                        .fg(Color::DarkGray)
-                        .add_modifier(Modifier::DIM),
-                ),
-                DepKind::Optional => (
-                    "  optional  ",
-                    Style::default()
-                        .fg(Color::DarkGray)
-                        .add_modifier(Modifier::DIM),
-                ),
-                DepKind::Incompatible => (
-                    "  incompatible",
-                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                ),
+                DepKind::Required => ("  required  ", dim_style),
+                DepKind::Optional => ("  optional  ", dim_style),
+                DepKind::Incompatible => ("  incompatible", error_bold),
                 DepKind::Embedded => unreachable!("filtered above"),
             };
             // Body: "{title} {version}" -- version may be None for Optional / Incompatible.
@@ -133,12 +128,7 @@ pub fn render_dep_confirm_modal(f: &mut Frame, area: Rect, state: &AppState) {
                 Span::raw(body_text),
             ];
             if d.already_satisfied {
-                spans.push(Span::styled(
-                    " (already satisfied)".to_string(),
-                    Style::default()
-                        .fg(Color::DarkGray)
-                        .add_modifier(Modifier::DIM),
-                ));
+                spans.push(Span::styled(" (already satisfied)".to_string(), dim_style));
             }
             Line::from(spans)
         })
@@ -170,18 +160,13 @@ pub fn render_dep_confirm_modal(f: &mut Frame, area: Rect, state: &AppState) {
             .unwrap_or_else(|| "(unknown)".to_string());
         let warn = Paragraph::new(Line::from(Span::styled(
             format!("WARNING: {conflict_name} conflicts with installed mod"),
-            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            error_bold,
         )));
         f.render_widget(warn, chunks[4]);
     } else {
         // DIM horizontal divider.
         let n = chunks[4].width.max(1) as usize;
-        let divider = Paragraph::new(Line::from(Span::styled(
-            "─".repeat(n),
-            Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::DIM),
-        )));
+        let divider = Paragraph::new(Line::from(Span::styled("─".repeat(n), dim_style)));
         f.render_widget(divider, chunks[4]);
     }
 

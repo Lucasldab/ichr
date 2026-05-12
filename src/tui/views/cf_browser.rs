@@ -18,12 +18,13 @@
 
 use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
 use ratatui::Frame;
 use ratatui_image::Image;
 
+use crate::config::Palette;
 use crate::icons::IconSource;
 use crate::mods::curseforge::types::{CurseForgeProjectDetail, CurseForgeSearchHit};
 use crate::mods::types::ModBrowserFetchState;
@@ -43,6 +44,12 @@ pub fn render_cf_browser(f: &mut Frame, area: Rect, state: &AppState) {
     else {
         return;
     };
+
+    let palette = &state.config.colors;
+    let dim_style = Style::default()
+        .fg(palette.dim.to_color())
+        .add_modifier(Modifier::DIM);
+    let accent_style = Style::default().fg(palette.accent.to_color());
 
     // ---- Vertical layout: header / search / body / footer ----
     let chunks = Layout::default()
@@ -79,22 +86,18 @@ pub fn render_cf_browser(f: &mut Frame, area: Rect, state: &AppState) {
         Some(_) => "MC: any (v=any)".to_string(),
     };
     let mc_chip_style = if mc_filter.is_none() {
-        Style::default()
-            .fg(Color::DarkGray)
-            .add_modifier(Modifier::DIM)
+        dim_style
     } else {
-        Style::default().fg(Color::Yellow)
+        accent_style
     };
     let loader_chip_text = match loader_filter {
         None => format!("Loader: {inst_loader} (l=any)"),
         Some(_) => "Loader: any (l=any)".to_string(),
     };
     let loader_chip_style = if loader_filter.is_none() {
-        Style::default()
-            .fg(Color::DarkGray)
-            .add_modifier(Modifier::DIM)
+        dim_style
     } else {
-        Style::default().fg(Color::Yellow)
+        accent_style
     };
 
     let header_line = Line::from(vec![
@@ -117,11 +120,9 @@ pub fn render_cf_browser(f: &mut Frame, area: Rect, state: &AppState) {
         format!("search: {search_input}_")
     };
     let search_style = if search_input.is_empty() {
-        Style::default()
-            .fg(Color::DarkGray)
-            .add_modifier(Modifier::DIM)
+        dim_style
     } else {
-        Style::default().fg(Color::Yellow)
+        accent_style
     };
     // GAP-FOCUS-INDICATOR-08 (Phase 8.2): symmetric mirror of mod_browser
     // focus indicator. Both browsers must communicate focus identically
@@ -130,7 +131,7 @@ pub fn render_cf_browser(f: &mut Frame, area: Rect, state: &AppState) {
         Block::default()
             .borders(Borders::ALL)
             .title("Search")
-            .border_style(Style::default().fg(Color::Yellow)),
+            .border_style(accent_style),
     );
     f.render_widget(search_para, chunks[1]);
 
@@ -142,7 +143,7 @@ pub fn render_cf_browser(f: &mut Frame, area: Rect, state: &AppState) {
     let results_area = body_split[0];
     let detail_area = body_split[1];
 
-    render_results_pane(f, results_area, results, *selected, fetch_state);
+    render_results_pane(f, results_area, results, *selected, fetch_state, palette);
     render_detail_pane(
         f,
         detail_area,
@@ -169,7 +170,11 @@ fn render_results_pane(
     results: &[CurseForgeSearchHit],
     selected: usize,
     fetch_state: &ModBrowserFetchState,
+    palette: &Palette,
 ) {
+    let dim_style = Style::default()
+        .fg(palette.dim.to_color())
+        .add_modifier(Modifier::DIM);
     let block = Block::default().borders(Borders::ALL).title(" Results ");
     let inner = block.inner(area);
     f.render_widget(block, area);
@@ -182,9 +187,7 @@ fn render_results_pane(
     };
     if let Some(text) = placeholder {
         let style = match fetch_state {
-            ModBrowserFetchState::Loading | ModBrowserFetchState::Ready => Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::DIM),
+            ModBrowserFetchState::Loading | ModBrowserFetchState::Ready => dim_style,
             ModBrowserFetchState::Error(_) => Style::default(),
         };
         let p = Paragraph::new(text).style(style);
@@ -210,7 +213,7 @@ fn render_results_pane(
                     Span::raw(name),
                     Span::styled(
                         installed_suffix.to_string(),
-                        Style::default().fg(Color::Green),
+                        Style::default().fg(palette.success.to_color()),
                     ),
                     Span::raw(cursor_glyph.to_string()),
                 ])
@@ -218,12 +221,7 @@ fn render_results_pane(
                 Line::from(vec![Span::raw(name), Span::raw(cursor_glyph.to_string())])
             };
             let desc = truncate(&hit.summary, width.saturating_sub(3));
-            let line2 = Line::from(Span::styled(
-                format!("  {desc}"),
-                Style::default()
-                    .fg(Color::DarkGray)
-                    .add_modifier(Modifier::DIM),
-            ));
+            let line2 = Line::from(Span::styled(format!("  {desc}"), dim_style));
 
             let style = if i == selected {
                 Style::default().add_modifier(Modifier::REVERSED)
@@ -248,16 +246,16 @@ fn render_detail_pane(
     fetch_state: &ModBrowserFetchState,
     state: &AppState,
 ) {
+    let palette = &state.config.colors;
+    let dim_style = Style::default()
+        .fg(palette.dim.to_color())
+        .add_modifier(Modifier::DIM);
     let block = Block::default().borders(Borders::ALL).title(" Detail ");
     let inner = block.inner(area);
     f.render_widget(block, area);
 
     let Some(hit) = selected_hit else {
-        let p = Paragraph::new("Select a mod to see details").style(
-            Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::DIM),
-        );
+        let p = Paragraph::new("Select a mod to see details").style(dim_style);
         f.render_widget(p, inner);
         return;
     };
@@ -307,9 +305,7 @@ fn render_detail_pane(
                     .join(", ");
                 header_lines.push(Line::from(Span::styled(
                     format!("by {authors_joined}"),
-                    Style::default()
-                        .fg(Color::DarkGray)
-                        .add_modifier(Modifier::DIM),
+                    dim_style,
                 )));
             }
         }
@@ -335,12 +331,10 @@ fn render_detail_pane(
                 .join(", ");
             lines.push(Line::from(Span::styled(
                 format!("by {authors_joined}"),
-                Style::default()
-                    .fg(Color::DarkGray)
-                    .add_modifier(Modifier::DIM),
+                dim_style,
             )));
         }
-        lines.push(divider_line(body_area.width));
+        lines.push(divider_line(body_area.width, palette));
         lines.push(Line::raw(d.summary.clone()));
         lines.push(Line::raw(""));
         lines.push(Line::raw(format!(
@@ -354,7 +348,7 @@ fn render_detail_pane(
             lines.push(Line::raw(format!("Website: {}", d.links.website_url)));
         }
     } else {
-        lines.push(divider_line(body_area.width));
+        lines.push(divider_line(body_area.width, palette));
         lines.push(Line::raw(hit.summary.clone()));
         lines.push(Line::raw(""));
         lines.push(Line::raw(format!(
@@ -365,9 +359,7 @@ fn render_detail_pane(
             lines.push(Line::raw(""));
             lines.push(Line::from(Span::styled(
                 "Could not load details -- check network".to_string(),
-                Style::default()
-                    .fg(Color::DarkGray)
-                    .add_modifier(Modifier::DIM),
+                dim_style,
             )));
         }
     }
@@ -407,13 +399,13 @@ fn thousands(n: u64) -> String {
     String::from_utf8(out).unwrap()
 }
 
-fn divider_line(width: u16) -> Line<'static> {
+fn divider_line(width: u16, palette: &Palette) -> Line<'static> {
     let n = width.max(1) as usize;
     let s: String = "─".repeat(n);
     Line::from(Span::styled(
         s,
         Style::default()
-            .fg(Color::DarkGray)
+            .fg(palette.dim.to_color())
             .add_modifier(Modifier::DIM),
     ))
 }

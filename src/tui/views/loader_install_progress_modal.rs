@@ -7,7 +7,7 @@
 //! divider to surface installer subprocess output without clobbering the gauge.
 
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
 use ratatui::widgets::{Block, Borders, Clear, LineGauge, Paragraph, Wrap};
 use ratatui::Frame;
@@ -32,6 +32,7 @@ pub fn render_loader_install_progress_modal(f: &mut Frame, area: Rect, state: &A
         return;
     };
 
+    let palette = &state.config.colors;
     let kind = match loader {
         LoaderType::Fabric => "Fabric",
         LoaderType::Quilt => "Quilt",
@@ -96,7 +97,7 @@ pub fn render_loader_install_progress_modal(f: &mut Frame, area: Rect, state: &A
     let gauge = LineGauge::default()
         .ratio(ratio.clamp(0.0, 1.0))
         .label(Span::raw(gauge_label))
-        .filled_style(Style::default().fg(Color::Green));
+        .filled_style(Style::default().fg(palette.success.to_color()));
     f.render_widget(gauge, chunks[2]);
 
     // Row 4: step counter

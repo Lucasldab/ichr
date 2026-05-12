@@ -12,7 +12,7 @@
 
 use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph};
 use ratatui::Frame;
@@ -30,6 +30,10 @@ pub fn render_cf_file_picker_modal(f: &mut Frame, area: Rect, state: &AppState) 
         return;
     };
 
+    let palette = &state.config.colors;
+    let dim_style = Style::default()
+        .fg(palette.dim.to_color())
+        .add_modifier(Modifier::DIM);
     let modal_w = area.width.min(70);
     let modal_h = (area.height.saturating_sub(4)).min(20);
     let x = area.x + area.width.saturating_sub(modal_w) / 2;
@@ -54,11 +58,8 @@ pub fn render_cf_file_picker_modal(f: &mut Frame, area: Rect, state: &AppState) 
     // ---- File list ----
     let items: Vec<ListItem> = if files.is_empty() {
         vec![
-            ListItem::new("No files match MC + loader -- press Esc and adjust filters").style(
-                Style::default()
-                    .fg(Color::DarkGray)
-                    .add_modifier(Modifier::DIM),
-            ),
+            ListItem::new("No files match MC + loader -- press Esc and adjust filters")
+                .style(dim_style),
         ]
     } else {
         files
@@ -68,12 +69,7 @@ pub fn render_cf_file_picker_modal(f: &mut Frame, area: Rect, state: &AppState) 
                 let label = format!("{} ({})", f.display_name, release_type_str(f.release_type));
                 let mut spans = vec![Span::raw(label)];
                 if Some(i) == first_release_idx {
-                    spans.push(Span::styled(
-                        "   ← latest".to_string(),
-                        Style::default()
-                            .fg(Color::DarkGray)
-                            .add_modifier(Modifier::DIM),
-                    ));
+                    spans.push(Span::styled("   ← latest".to_string(), dim_style));
                 }
                 let style = if i == *selected {
                     Style::default().add_modifier(Modifier::REVERSED)

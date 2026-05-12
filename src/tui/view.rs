@@ -1,6 +1,8 @@
 //! Top-level view dispatcher. Pure function of `&AppState`.
 
 use ratatui::layout::{Constraint, Direction, Layout};
+use ratatui::style::Style;
+use ratatui::widgets::Block;
 use ratatui::Frame;
 
 use super::app::{ActiveView, AppState, CreateStep};
@@ -41,6 +43,16 @@ use super::views::{
 
 pub fn view(state: &AppState, f: &mut Frame) {
     let area = f.area();
+
+    // Paint base palette.text fg under everything. Widgets that don't set
+    // their own fg inherit this (ratatui Style::patch leaves the existing
+    // fg when the new fg is None), so terminal-default white stops leaking
+    // into views that only use Modifier::BOLD/DIM/REVERSED.
+    f.render_widget(
+        Block::default().style(Style::default().fg(state.config.colors.text.to_color())),
+        area,
+    );
+
     let layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([

@@ -3,7 +3,7 @@
 //! Mirrors `version_picker.rs`. Filter bar + scrollable list + Yellow/DarkGray.
 
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph};
 use ratatui::Frame;
@@ -25,6 +25,10 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
         return;
     };
 
+    let palette = &state.config.colors;
+    let dim_style = Style::default()
+        .fg(palette.dim.to_color())
+        .add_modifier(Modifier::DIM);
     let kind = match loader {
         LoaderType::Fabric => "Fabric",
         LoaderType::Quilt => "Quilt",
@@ -69,7 +73,7 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
         Line::from(format!("Instance: {slug}")),
         Line::from(Span::styled(
             filter_label,
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(palette.dim.to_color()),
         )),
     ])
     .block(
@@ -87,9 +91,9 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
     };
     let search_para = Paragraph::new(search_display)
         .style(Style::default().fg(if search.is_empty() {
-            Color::DarkGray
+            palette.dim.to_color()
         } else {
-            Color::Yellow
+            palette.accent.to_color()
         }))
         .block(Block::default().borders(Borders::ALL).title("Filter"));
     f.render_widget(search_para, chunks[1]);
@@ -123,11 +127,7 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
     };
 
     let items: Vec<ListItem> = if visible.is_empty() {
-        vec![ListItem::new(empty_msg).style(
-            Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::DIM),
-        )]
+        vec![ListItem::new(empty_msg).style(dim_style)]
     } else {
         visible
             .iter()

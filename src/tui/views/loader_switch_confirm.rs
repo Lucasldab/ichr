@@ -4,7 +4,7 @@
 //! currently-installed one. y/Y confirms; any other key cancels.
 
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui::Frame;
@@ -22,6 +22,7 @@ pub fn render_loader_switch_confirm(f: &mut Frame, area: Rect, state: &AppState)
         return;
     };
 
+    let palette = &state.config.colors;
     let modal_area = centered_rect(60, 25, area);
     f.render_widget(Clear, modal_area);
 
@@ -29,7 +30,9 @@ pub fn render_loader_switch_confirm(f: &mut Frame, area: Rect, state: &AppState)
     if *type_switch {
         lines.push(Line::from(Span::styled(
             "WARNING: switching loader type may break installed mods.",
-            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(palette.error.to_color())
+                .add_modifier(Modifier::BOLD),
         )));
     }
 

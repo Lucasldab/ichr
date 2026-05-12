@@ -1,5 +1,5 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::text::Span;
 use ratatui::widgets::{Block, Borders, LineGauge, Paragraph};
 use ratatui::Frame;
@@ -37,6 +37,7 @@ pub fn render_download_pane(f: &mut Frame, area: Rect, state: &AppState) {
         .constraints(constraints)
         .split(inner);
 
+    let palette = &state.config.colors;
     for (idx, (_, pct, msg)) in state.active_jobs.iter().enumerate() {
         if idx >= rows.len() {
             break;
@@ -45,7 +46,7 @@ pub fn render_download_pane(f: &mut Frame, area: Rect, state: &AppState) {
         let gauge = LineGauge::default()
             .ratio(ratio)
             .label(Span::raw(format!("{msg} ({pct}%)")))
-            .filled_style(Style::default().fg(Color::Green));
+            .filled_style(Style::default().fg(palette.success.to_color()));
         f.render_widget(gauge, rows[idx]);
     }
 }

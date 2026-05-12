@@ -6,7 +6,7 @@
 
 use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState};
 use ratatui::Frame;
 
@@ -23,14 +23,15 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
         return;
     };
 
+    let palette = &state.config.colors;
+    let dim_style = Style::default()
+        .fg(palette.dim.to_color())
+        .add_modifier(Modifier::DIM);
+
     if mods.is_empty() {
         // UI-SPEC line 365 -- empty-state copy, DIM, single line.
         let p = Paragraph::new("No mods installed -- press Esc and M to browse")
-            .style(
-                Style::default()
-                    .fg(Color::DarkGray)
-                    .add_modifier(Modifier::DIM),
-            )
+            .style(dim_style)
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -49,35 +50,15 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
             let (source_label, source_style) = match m.source {
                 ModSource::Modrinth => ("[M]", Style::default()),
                 ModSource::CurseForge => ("[CF]", Style::default()),
-                ModSource::Manual => (
-                    "manual",
-                    Style::default()
-                        .fg(Color::DarkGray)
-                        .add_modifier(Modifier::DIM),
-                ),
-                ModSource::Modpack => (
-                    "modpack",
-                    Style::default()
-                        .fg(Color::DarkGray)
-                        .add_modifier(Modifier::DIM),
-                ),
-                ModSource::Local => (
-                    "local",
-                    Style::default()
-                        .fg(Color::DarkGray)
-                        .add_modifier(Modifier::DIM),
-                ),
+                ModSource::Manual => ("manual", dim_style),
+                ModSource::Modpack => ("modpack", dim_style),
+                ModSource::Local => ("local", dim_style),
             };
             // State cell -- body for enabled, DIM for disabled.
             let (state_label, state_style) = if m.enabled {
                 ("enabled", Style::default())
             } else {
-                (
-                    "disabled",
-                    Style::default()
-                        .fg(Color::DarkGray)
-                        .add_modifier(Modifier::DIM),
-                )
+                ("disabled", dim_style)
             };
 
             Row::new(vec![

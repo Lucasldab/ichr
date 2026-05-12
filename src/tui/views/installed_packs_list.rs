@@ -11,7 +11,7 @@
 
 use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState};
 use ratatui::Frame;
@@ -31,6 +31,11 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
     else {
         return;
     };
+
+    let palette = &state.config.colors;
+    let dim_style = Style::default()
+        .fg(palette.dim.to_color())
+        .add_modifier(Modifier::DIM);
 
     let kind_label = match kind {
         PackKind::Resource => "Resource Packs",
@@ -58,11 +63,7 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
 
     if packs.is_empty() {
         let p = Paragraph::new("No packs installed -- press Esc and R/S to browse")
-            .style(
-                Style::default()
-                    .fg(Color::DarkGray)
-                    .add_modifier(Modifier::DIM),
-            )
+            .style(dim_style)
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -76,43 +77,18 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
                 let (source_label, source_style) = match m.source {
                     ModSource::Modrinth => ("[M]", Style::default()),
                     ModSource::CurseForge => ("[CF]", Style::default()),
-                    ModSource::Manual => (
-                        "manual",
-                        Style::default()
-                            .fg(Color::DarkGray)
-                            .add_modifier(Modifier::DIM),
-                    ),
-                    ModSource::Modpack => (
-                        "modpack",
-                        Style::default()
-                            .fg(Color::DarkGray)
-                            .add_modifier(Modifier::DIM),
-                    ),
-                    ModSource::Local => (
-                        "local",
-                        Style::default()
-                            .fg(Color::DarkGray)
-                            .add_modifier(Modifier::DIM),
-                    ),
+                    ModSource::Manual => ("manual", dim_style),
+                    ModSource::Modpack => ("modpack", dim_style),
+                    ModSource::Local => ("local", dim_style),
                 };
                 // Shader packs cannot be toggled -- state cell shows "n/a".
                 let (state_label, state_style) = match kind {
-                    PackKind::Shader => (
-                        "n/a",
-                        Style::default()
-                            .fg(Color::DarkGray)
-                            .add_modifier(Modifier::DIM),
-                    ),
+                    PackKind::Shader => ("n/a", dim_style),
                     PackKind::Resource => {
                         if m.enabled {
                             ("enabled", Style::default())
                         } else {
-                            (
-                                "disabled",
-                                Style::default()
-                                    .fg(Color::DarkGray)
-                                    .add_modifier(Modifier::DIM),
-                            )
+                            ("disabled", dim_style)
                         }
                     }
                 };
@@ -152,7 +128,7 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
     if let (Some(area), Some(msg)) = (status_area, transient_status) {
         let p = Paragraph::new(Line::from(msg.clone())).style(
             Style::default()
-                .fg(Color::Yellow)
+                .fg(palette.accent.to_color())
                 .add_modifier(Modifier::DIM),
         );
         f.render_widget(p, area);

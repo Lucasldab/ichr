@@ -1,5 +1,5 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph};
 use ratatui::Frame;
@@ -18,6 +18,7 @@ pub fn render_version_picker(f: &mut Frame, area: Rect, state: &AppState) {
     };
 
     // Center a modal box.
+    let palette = &state.config.colors;
     let modal_area = centered_rect(70, 80, area);
     f.render_widget(Clear, modal_area);
 
@@ -40,7 +41,7 @@ pub fn render_version_picker(f: &mut Frame, area: Rect, state: &AppState) {
         Line::from(format!("Instance: {name}")),
         Line::from(Span::styled(
             filter_label,
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(palette.dim.to_color()),
         )),
     ];
     let header = Paragraph::new(header_text).block(
@@ -58,9 +59,9 @@ pub fn render_version_picker(f: &mut Frame, area: Rect, state: &AppState) {
     };
     let search_para = Paragraph::new(search_display)
         .style(Style::default().fg(if search.is_empty() {
-            Color::DarkGray
+            palette.dim.to_color()
         } else {
-            Color::Yellow
+            palette.accent.to_color()
         }))
         .block(Block::default().borders(Borders::ALL).title("Filter"));
     f.render_widget(search_para, chunks[1]);

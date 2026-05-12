@@ -9,7 +9,7 @@
 
 use ratatui::crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 use ratatui::Frame;
@@ -27,6 +27,11 @@ pub fn render_cf_install_failed_modal(f: &mut Frame, area: Rect, state: &AppStat
     else {
         return;
     };
+
+    let palette = &state.config.colors;
+    let dim_style = Style::default()
+        .fg(palette.dim.to_color())
+        .add_modifier(Modifier::DIM);
 
     // 80 × 20 cap (mirrors mod_install_failed_modal.rs).
     let w = area.width.min(80);
@@ -83,7 +88,7 @@ pub fn render_cf_install_failed_modal(f: &mut Frame, area: Rect, state: &AppStat
         .style(
             Style::default()
                 .add_modifier(Modifier::BOLD)
-                .fg(Color::Yellow),
+                .fg(palette.accent.to_color()),
         )
         .wrap(Wrap { trim: false });
     f.render_widget(head_p, split[0]);
@@ -93,17 +98,12 @@ pub fn render_cf_install_failed_modal(f: &mut Frame, area: Rect, state: &AppStat
         let divider = Paragraph::new("");
         f.render_widget(divider, split[1]);
 
-        // Link block: "Open in browser:" (DIM) above "  {url}" (Yellow).
+        // Link block: "Open in browser:" (DIM) above "  {url}" (accent).
         let link_lines = vec![
-            Line::from(Span::styled(
-                "Open in browser:".to_string(),
-                Style::default()
-                    .fg(Color::DarkGray)
-                    .add_modifier(Modifier::DIM),
-            )),
+            Line::from(Span::styled("Open in browser:".to_string(), dim_style)),
             Line::from(Span::styled(
                 format!("  {url}"),
-                Style::default().fg(Color::Yellow),
+                Style::default().fg(palette.accent.to_color()),
             )),
         ];
         let link_p = Paragraph::new(link_lines).wrap(Wrap { trim: false });
@@ -113,21 +113,13 @@ pub fn render_cf_install_failed_modal(f: &mut Frame, area: Rect, state: &AppStat
         let body_text = "The mod author has disabled third-party downloads. \
 You can download the file from CurseForge in your browser, then drop it into the instance mods folder.";
         let body_p = Paragraph::new(body_text)
-            .style(
-                Style::default()
-                    .fg(Color::DarkGray)
-                    .add_modifier(Modifier::DIM),
-            )
+            .style(dim_style)
             .wrap(Wrap { trim: false });
         f.render_widget(body_p, split[3]);
     } else {
         // Body for non-restricted errors -- repeat error_message for context.
         let body_p = Paragraph::new(error_message.as_str())
-            .style(
-                Style::default()
-                    .fg(Color::DarkGray)
-                    .add_modifier(Modifier::DIM),
-            )
+            .style(dim_style)
             .wrap(Wrap { trim: false });
         f.render_widget(body_p, split[1]);
     }
