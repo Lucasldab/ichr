@@ -67,7 +67,7 @@ pub fn render_mod_version_picker_modal(f: &mut Frame, area: Rect, state: &AppSta
                     spans.push(Span::styled("   ← latest".to_string(), dim_style));
                 }
                 let style = if i == *selected {
-                    Style::default().add_modifier(Modifier::REVERSED)
+                    Style::default().bg(palette.selected_bg.to_color())
                 } else {
                     Style::default().add_modifier(Modifier::DIM)
                 };

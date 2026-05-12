@@ -72,7 +72,7 @@ pub fn render_cf_file_picker_modal(f: &mut Frame, area: Rect, state: &AppState) 
                     spans.push(Span::styled("   ← latest".to_string(), dim_style));
                 }
                 let style = if i == *selected {
-                    Style::default().add_modifier(Modifier::REVERSED)
+                    Style::default().bg(palette.selected_bg.to_color())
                 } else {
                     Style::default().add_modifier(Modifier::DIM)
                 };

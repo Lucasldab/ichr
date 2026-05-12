@@ -114,7 +114,7 @@ pub fn render_installed_packs_list(f: &mut Frame, area: Rect, state: &AppState) 
         .header(Row::new(vec!["Name", "Version", "Source", "State"]))
         // Stateful render auto-scrolls so the selected pack stays visible
         // when the list exceeds the viewport.
-        .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
+        .row_highlight_style(Style::default().bg(palette.selected_bg.to_color()))
         .block(
             Block::default()
                 .borders(Borders::ALL)

@@ -224,7 +224,7 @@ fn render_results_pane(
             let line2 = Line::from(Span::styled(format!("  {desc}"), dim_style));
 
             let style = if i == selected {
-                Style::default().add_modifier(Modifier::REVERSED)
+                Style::default().bg(palette.selected_bg.to_color())
             } else {
                 Style::default()
             };

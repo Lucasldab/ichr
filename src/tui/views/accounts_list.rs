@@ -2,7 +2,7 @@
 //! the active account marked. Empty state prompts for first add.
 
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Modifier, Style};
+use ratatui::style::Style;
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Paragraph, Row, Table, TableState};
 use ratatui::Frame;
@@ -58,7 +58,7 @@ pub fn render_accounts_list(f: &mut Frame, area: Rect, state: &AppState) {
             .header(Row::new(["", "Username", "UUID", "Storage"]))
             // Stateful render scrolls the viewport so the selected account
             // stays visible when the list exceeds the table area.
-            .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
+            .row_highlight_style(Style::default().bg(state.config.colors.selected_bg.to_color()))
             .block(Block::default().borders(Borders::ALL).title(" Accounts "));
         let mut ts = TableState::default().with_selected(Some(selected));
         f.render_stateful_widget(table, chunks[1], &mut ts);

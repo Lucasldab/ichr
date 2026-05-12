@@ -12,6 +12,7 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
     let table_area = chunks[0];
     let footer_area = chunks[1];
 
+    let palette = &state.config.colors;
     let selected = match &state.active_view {
         ActiveView::InstanceList { selected } => Some(*selected),
         _ => None,
@@ -21,7 +22,11 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
         .iter()
         .map(|m| {
             let last_col = if state.running_instances.contains_key(&m.slug) {
-                Cell::from("running").style(Style::default().add_modifier(Modifier::BOLD))
+                Cell::from("running").style(
+                    Style::default()
+                        .fg(palette.accent.to_color())
+                        .add_modifier(Modifier::BOLD),
+                )
             } else if let Some(loader) = &m.loader {
                 let kind = match loader.kind {
                     crate::domain::instance::ModloaderKind::Fabric => "fabric",
@@ -63,7 +68,7 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
     .header(Row::new(vec!["Name", "MC Version", "Group", "Last played"]))
     // Stateful render keeps the selected instance in view when the list
     // exceeds the terminal height.
-    .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
+    .row_highlight_style(Style::default().bg(palette.selected_bg.to_color()))
     .block(Block::default().borders(Borders::ALL).title(title));
     let mut ts = TableState::default().with_selected(selected);
     f.render_stateful_widget(table, table_area, &mut ts);

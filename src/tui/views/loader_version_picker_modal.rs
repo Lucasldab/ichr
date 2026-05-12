@@ -142,7 +142,7 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
                     }
                 }
                 let style = if row_i == *selected {
-                    Style::default().add_modifier(Modifier::REVERSED)
+                    Style::default().bg(palette.selected_bg.to_color())
                 } else {
                     Style::default().add_modifier(Modifier::DIM)
                 };

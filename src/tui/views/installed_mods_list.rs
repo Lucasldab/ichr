@@ -83,7 +83,7 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
     // REVERSED across the entire row when selected (UI-SPEC line 362).
     // Stateful render keeps the selected row in view even when the list
     // exceeds the viewport.
-    .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
+    .row_highlight_style(Style::default().bg(palette.selected_bg.to_color()))
     .block(
         Block::default()
             .borders(Borders::ALL)

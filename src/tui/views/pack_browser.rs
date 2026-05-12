@@ -217,7 +217,7 @@ fn render_results_pane_table(
             let desc = truncate(&hit.description, width.saturating_sub(3));
             let line2 = Line::from(Span::styled(format!("  {desc}"), dim_style));
             let style = if i == selected {
-                Style::default().add_modifier(Modifier::REVERSED)
+                Style::default().bg(palette.selected_bg.to_color())
             } else {
                 Style::default()
             };
@@ -288,7 +288,7 @@ fn render_results_pane_rich(
 
         if is_selected {
             let highlight =
-                Block::default().style(Style::default().add_modifier(Modifier::REVERSED));
+                Block::default().style(Style::default().bg(palette.selected_bg.to_color()));
             f.render_widget(highlight, row_rect);
         }
 

@@ -51,7 +51,7 @@ pub fn render_loader_picker_modal(f: &mut Frame, area: Rect, state: &AppState) {
         .enumerate()
         .map(|(i, label)| {
             let style = if i == selected {
-                Style::default().add_modifier(Modifier::REVERSED)
+                Style::default().bg(state.config.colors.selected_bg.to_color())
             } else {
                 Style::default().add_modifier(Modifier::DIM)
             };

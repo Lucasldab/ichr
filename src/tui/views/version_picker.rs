@@ -1,5 +1,5 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Modifier, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph};
 use ratatui::Frame;
@@ -97,7 +97,7 @@ pub fn render_version_picker(f: &mut Frame, area: Rect, state: &AppState) {
         .enumerate()
         .map(|(i, v)| {
             let style = if i == 0 {
-                Style::default().add_modifier(Modifier::REVERSED)
+                Style::default().bg(palette.selected_bg.to_color())
             } else {
                 Style::default()
             };
