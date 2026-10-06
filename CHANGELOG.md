@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] -- 2026-10-06
+
+### Fixed
+
+- **Mod icons render inside tmux.** ratatui-image 10.x wrote a whole row
+  of kitty unicode placeholders into a single cell, which tmux cannot
+  store, so kitty received a malformed grid and drew nothing -- icons
+  were detected, fetched and decoded, then silently missing. ratatui-image
+  is now pinned to the upstream merge of the per-cell placeholder fix
+  (ratatui/ratatui-image#201) until a release past v11.0.8 ships.
+
 ## [0.3.2] -- 2026-05-12
 
 ### Added

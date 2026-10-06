@@ -1,6 +1,6 @@
 [package]
 name = "ichr"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2021"
 rust-version = "1.90"
 description = "Terminal-UI Minecraft Java Edition launcher"
@@ -51,7 +51,10 @@ time = { version = "0.3", default-features = false, features = ["std", "formatti
 # v0.2.1 release pipeline. We don't use chafa (we render via
 # kitty/sixel/iterm2/halfblocks), so disable defaults and pull just the
 # pieces we need.
-ratatui-image = { version = "10.0.8", default-features = false, features = ["crossterm", "image-defaults"] }
+# Pinned to the upstream merge of the per-cell kitty placeholder fix
+# (ratatui/ratatui-image#201) so icons render under tmux. Move back to a
+# crates.io version once a release past v11.0.8 ships.
+ratatui-image = { git = "https://github.com/ratatui/ratatui-image", rev = "1eef14c", default-features = false, features = ["crossterm", "image-defaults"] }
 image = { version = "0.25", default-features = false, features = ["png", "webp"] }
 # Bounded in-memory cache of decoded icon `Protocol`s (Phase 13). Already
 # in the dep tree transitively; declaring it explicitly so we can `use lru::LruCache`.

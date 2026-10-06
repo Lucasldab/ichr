@@ -128,7 +128,7 @@ impl IconService {
 
         let protocol = self
             .picker
-            .new_protocol(img, target, Resize::Fit(None))
+            .new_protocol(img, target.into(), Resize::Fit(None))
             .map_err(|e| AppError::Http(format!("icon new_protocol: {e}")))?;
 
         let key: IconKey = (source, project_id.to_string(), target.width, target.height);
