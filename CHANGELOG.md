@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.4] -- 2026-11-05
+
+### Changed
+
+- **ratatui-image comes from crates.io again.** 11.1.0 ships the per-cell
+  kitty placeholder fix (ratatui/ratatui-image#201), so the git pin added in
+  0.3.3 is gone. Mod icons keep rendering inside tmux.
+
 ## [0.3.3] -- 2026-10-06
 
 ### Fixed
