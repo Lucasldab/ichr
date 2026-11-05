@@ -83,10 +83,7 @@ pub fn render_installed_mods_list(f: &mut Frame, area: Rect, state: &AppState) {
     // Stateful render keeps the selected row in view even when the list
     // exceeds the viewport.
     .row_highlight_style(Style::default().bg(palette.selected_bg.to_color()))
-    .block(
-        crate::tui::theme::block(palette)
-            .title(format!("Installed Mods -- {slug}  (e/x/Esc)")),
-    );
+    .block(crate::tui::theme::block(palette).title(format!("Installed Mods -- {slug}  (e/x/Esc)")));
     let mut ts = TableState::default().with_selected(Some(*selected));
     f.render_stateful_widget(table, area, &mut ts);
 }

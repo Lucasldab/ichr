@@ -40,8 +40,7 @@ pub fn render_modpack_import_progress_modal(f: &mut Frame, area: Rect, state: &A
     };
 
     f.render_widget(Clear, modal_area);
-    let block = crate::tui::theme::block(palette)
-        .title(format!(" Importing {modpack_name} "));
+    let block = crate::tui::theme::block(palette).title(format!(" Importing {modpack_name} "));
     let inner = block.inner(modal_area);
     f.render_widget(block, modal_area);
 

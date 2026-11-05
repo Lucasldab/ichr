@@ -106,10 +106,8 @@ pub fn render_cf_browser(f: &mut Frame, area: Rect, state: &AppState) {
         Span::raw("  "),
         Span::styled(format!("[{loader_chip_text}]"), loader_chip_style),
     ]);
-    let header_para = Paragraph::new(header_line).block(
-        crate::tui::theme::block(palette)
-            .title(format!(" CurseForge Mods -- {slug} ")),
-    );
+    let header_para = Paragraph::new(header_line)
+        .block(crate::tui::theme::block(palette).title(format!(" CurseForge Mods -- {slug} ")));
     f.render_widget(header_para, chunks[0]);
 
     // ---- Search bar (always-focused, single-line, Yellow when non-empty) ----

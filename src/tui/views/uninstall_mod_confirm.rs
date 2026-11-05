@@ -49,10 +49,9 @@ pub fn render_uninstall_mod_confirm(f: &mut Frame, area: Rect, state: &AppState)
         )),
     ];
 
-    let para = Paragraph::new(lines).alignment(Alignment::Center).block(
-        crate::tui::theme::block(palette)
-            .title("Uninstall mod?"),
-    );
+    let para = Paragraph::new(lines)
+        .alignment(Alignment::Center)
+        .block(crate::tui::theme::block(palette).title("Uninstall mod?"));
     f.render_widget(para, modal_area);
 }
 

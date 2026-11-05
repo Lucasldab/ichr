@@ -41,8 +41,7 @@ pub fn render_java_picker_modal(f: &mut Frame, area: Rect, state: &AppState) {
     f.render_widget(ratatui::widgets::Clear, modal_area);
 
     // Outer block.
-    let block = crate::tui::theme::block(palette)
-        .title(format!(" Java Runtime -- {slug} "));
+    let block = crate::tui::theme::block(palette).title(format!(" Java Runtime -- {slug} "));
     let inner = block.inner(modal_area);
     f.render_widget(block, modal_area);
 

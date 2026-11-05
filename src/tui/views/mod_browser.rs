@@ -110,10 +110,8 @@ pub fn render_mod_browser(f: &mut Frame, area: Rect, state: &AppState) {
         Span::raw("  "),
         Span::styled(format!("[{loader_chip_text}]"), loader_chip_style),
     ]);
-    let header_para = Paragraph::new(header_line).block(
-        crate::tui::theme::block(chip_palette)
-            .title(format!(" Mods -- {slug} ")),
-    );
+    let header_para = Paragraph::new(header_line)
+        .block(crate::tui::theme::block(chip_palette).title(format!(" Mods -- {slug} ")));
     f.render_widget(header_para, chunks[0]);
 
     // ---- Search bar ---------------------------------------------------------
@@ -225,7 +223,14 @@ fn render_results_pane(
             state,
         );
     } else {
-        render_results_pane_table(f, area, results, selected, fetch_state, &state.config.colors);
+        render_results_pane_table(
+            f,
+            area,
+            results,
+            selected,
+            fetch_state,
+            &state.config.colors,
+        );
     }
 }
 

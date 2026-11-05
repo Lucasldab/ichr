@@ -39,8 +39,7 @@ pub fn render_loader_picker_modal(f: &mut Frame, area: Rect, state: &AppState) {
 
     f.render_widget(Clear, modal_area);
 
-    let block = crate::tui::theme::block(palette)
-        .title(format!(" Install Loader -- {slug} "));
+    let block = crate::tui::theme::block(palette).title(format!(" Install Loader -- {slug} "));
     let inner = block.inner(modal_area);
     f.render_widget(block, modal_area);
 

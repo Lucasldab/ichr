@@ -76,10 +76,7 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
             Style::default().fg(palette.dim.to_color()),
         )),
     ])
-    .block(
-        crate::tui::theme::block(palette)
-            .title(format!(" {kind} Loader versions -- {slug} ")),
-    );
+    .block(crate::tui::theme::block(palette).title(format!(" {kind} Loader versions -- {slug} ")));
     f.render_widget(header, chunks[0]);
 
     // Filter bar
@@ -150,8 +147,7 @@ pub fn render_loader_version_picker_modal(f: &mut Frame, area: Rect, state: &App
             .collect()
     };
 
-    let list_block = crate::tui::theme::block(palette)
-        .title("Versions (Enter / Esc)");
+    let list_block = crate::tui::theme::block(palette).title("Versions (Enter / Esc)");
     let list = List::new(items).block(list_block);
     let mut list_state = ratatui::widgets::ListState::default();
     list_state.select(Some(*selected));

@@ -43,8 +43,7 @@ pub fn render_modpack_import_path_modal(f: &mut Frame, area: Rect, state: &AppSt
     }
 
     let para = Paragraph::new(lines).alignment(Alignment::Left).block(
-        crate::tui::theme::block(palette)
-            .title("Import Modpack (Enter to import / Esc to cancel)"),
+        crate::tui::theme::block(palette).title("Import Modpack (Enter to import / Esc to cancel)"),
     );
     f.render_widget(para, chunks[0]);
 }

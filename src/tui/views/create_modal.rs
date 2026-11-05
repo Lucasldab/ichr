@@ -35,10 +35,9 @@ pub fn render_create_modal(f: &mut Frame, area: Rect, state: &AppState) {
                 )));
             }
 
-            let para = Paragraph::new(lines).alignment(Alignment::Left).block(
-                crate::tui::theme::block(palette)
-                    .title("Create Instance (Enter / Esc)"),
-            );
+            let para = Paragraph::new(lines)
+                .alignment(Alignment::Left)
+                .block(crate::tui::theme::block(palette).title("Create Instance (Enter / Esc)"));
             f.render_widget(para, chunks[0]);
         }
         ActiveView::RenameInline { current, .. } => {
@@ -56,10 +55,9 @@ pub fn render_create_modal(f: &mut Frame, area: Rect, state: &AppState) {
                 )),
             ];
 
-            let para = Paragraph::new(lines).alignment(Alignment::Left).block(
-                crate::tui::theme::block(palette)
-                    .title("Rename Instance (Enter / Esc)"),
-            );
+            let para = Paragraph::new(lines)
+                .alignment(Alignment::Left)
+                .block(crate::tui::theme::block(palette).title("Rename Instance (Enter / Esc)"));
             f.render_widget(para, chunks[0]);
         }
         _ => {}

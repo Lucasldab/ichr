@@ -52,8 +52,8 @@ pub fn render_loader_install_progress_modal(f: &mut Frame, area: Rect, state: &A
     };
 
     f.render_widget(Clear, modal_area);
-    let block = crate::tui::theme::block(palette)
-        .title(format!(" Installing {kind} {version} -- {slug} "));
+    let block =
+        crate::tui::theme::block(palette).title(format!(" Installing {kind} {version} -- {slug} "));
     let inner = block.inner(modal_area);
     f.render_widget(block, modal_area);
 

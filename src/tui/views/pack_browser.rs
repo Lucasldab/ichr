@@ -57,10 +57,8 @@ pub fn render_pack_browser(f: &mut Frame, area: Rect, state: &AppState) {
         PackKind::Resource => "Resource Packs",
         PackKind::Shader => "Shader Packs",
     };
-    let header_para = Paragraph::new(format!("{kind_label} -- {slug}")).block(
-        crate::tui::theme::block(palette)
-            .title(format!(" {kind_label} -- {slug} ")),
-    );
+    let header_para = Paragraph::new(format!("{kind_label} -- {slug}"))
+        .block(crate::tui::theme::block(palette).title(format!(" {kind_label} -- {slug} ")));
     f.render_widget(header_para, chunks[0]);
 
     // ---- Search bar (vim-style focus indicator; mirrors mod_browser.rs) ----
@@ -153,7 +151,14 @@ fn render_results_pane(
             state,
         );
     } else {
-        render_results_pane_table(f, area, results, selected, fetch_state, &state.config.colors);
+        render_results_pane_table(
+            f,
+            area,
+            results,
+            selected,
+            fetch_state,
+            &state.config.colors,
+        );
     }
 }
 

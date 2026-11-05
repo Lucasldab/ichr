@@ -44,10 +44,8 @@ pub fn render_version_picker(f: &mut Frame, area: Rect, state: &AppState) {
             Style::default().fg(palette.dim.to_color()),
         )),
     ];
-    let header = Paragraph::new(header_text).block(
-        crate::tui::theme::block(palette)
-            .title("Select Version"),
-    );
+    let header = Paragraph::new(header_text)
+        .block(crate::tui::theme::block(palette).title("Select Version"));
     f.render_widget(header, chunks[0]);
 
     // Search bar
@@ -84,8 +82,7 @@ pub fn render_version_picker(f: &mut Frame, area: Rect, state: &AppState) {
         })
         .collect();
 
-    let mut error_block = crate::tui::theme::block(palette)
-        .title("Versions (Enter / Esc)");
+    let mut error_block = crate::tui::theme::block(palette).title("Versions (Enter / Esc)");
     if let Some(err) = error {
         error_block = error_block.title(format!("Versions -- {err}"));
     }

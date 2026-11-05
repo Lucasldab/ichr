@@ -17,10 +17,9 @@ pub fn render_account_auth_failed(f: &mut Frame, area: Rect, state: &AppState) {
     let area = centered_rect(60, 40, area);
     f.render_widget(Clear, area);
     let chunks = Layout::vertical([Constraint::Min(3), Constraint::Length(3)]).split(area);
-    let body = Paragraph::new(reason).wrap(Wrap { trim: true }).block(
-        crate::tui::theme::block(palette)
-            .title(" Authentication Failed "),
-    );
+    let body = Paragraph::new(reason)
+        .wrap(Wrap { trim: true })
+        .block(crate::tui::theme::block(palette).title(" Authentication Failed "));
     f.render_widget(body, chunks[0]);
     let hint =
         Paragraph::new(Line::from("Esc to dismiss")).block(crate::tui::theme::block(palette));

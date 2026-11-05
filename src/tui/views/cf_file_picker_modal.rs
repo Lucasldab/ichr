@@ -81,10 +81,8 @@ pub fn render_cf_file_picker_modal(f: &mut Frame, area: Rect, state: &AppState) 
             .collect()
     };
 
-    let list = List::new(items).block(
-        crate::tui::theme::block(palette)
-            .title(format!("{} -- files", mod_detail.name)),
-    );
+    let list = List::new(items)
+        .block(crate::tui::theme::block(palette).title(format!("{} -- files", mod_detail.name)));
     let mut list_state = ratatui::widgets::ListState::default();
     list_state.select(Some(*selected));
     f.render_stateful_widget(list, chunks[0], &mut list_state);

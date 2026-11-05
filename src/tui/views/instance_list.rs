@@ -110,10 +110,8 @@ pub fn render_group_inline_overlay(f: &mut Frame, area: Rect, state: &AppState) 
             height: h,
         };
         let text = format!("Group for {slug}: {buffer}_   (Enter=save, empty=clear, Esc=cancel)");
-        let p = Paragraph::new(text).block(
-            crate::tui::theme::block(palette)
-                .title("Set group (g)"),
-        );
+        let p =
+            Paragraph::new(text).block(crate::tui::theme::block(palette).title("Set group (g)"));
         f.render_widget(ratatui::widgets::Clear, rect);
         f.render_widget(p, rect);
     }

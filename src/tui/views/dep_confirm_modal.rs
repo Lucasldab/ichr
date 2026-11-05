@@ -52,8 +52,8 @@ pub fn render_dep_confirm_modal(f: &mut Frame, area: Rect, state: &AppState) {
     };
 
     f.render_widget(Clear, rect);
-    let outer = crate::tui::theme::block(palette)
-        .title(format!("Install {project_title} {version_label}"));
+    let outer =
+        crate::tui::theme::block(palette).title(format!("Install {project_title} {version_label}"));
     f.render_widget(outer, rect);
 
     let inner = Rect {

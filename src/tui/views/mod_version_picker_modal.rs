@@ -76,10 +76,8 @@ pub fn render_mod_version_picker_modal(f: &mut Frame, area: Rect, state: &AppSta
             .collect()
     };
 
-    let list = List::new(items).block(
-        crate::tui::theme::block(palette)
-            .title(format!("{project_title} -- versions")),
-    );
+    let list = List::new(items)
+        .block(crate::tui::theme::block(palette).title(format!("{project_title} -- versions")));
     let mut list_state = ratatui::widgets::ListState::default();
     list_state.select(Some(*selected));
     f.render_stateful_widget(list, chunks[0], &mut list_state);
