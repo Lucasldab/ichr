@@ -21,28 +21,32 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
         .instances
         .iter()
         .map(|m| {
+            let loader_col = match &m.loader {
+                Some(loader) => {
+                    let kind = match loader.kind {
+                        crate::domain::instance::ModloaderKind::Fabric => "fabric",
+                        crate::domain::instance::ModloaderKind::Quilt => "quilt",
+                        crate::domain::instance::ModloaderKind::Forge => "forge",
+                        crate::domain::instance::ModloaderKind::NeoForge => "neoforge",
+                        crate::domain::instance::ModloaderKind::Vanilla => "vanilla",
+                    };
+                    format!("{kind} {}", loader.version)
+                }
+                None => "vanilla".to_string(),
+            };
             let last_col = if state.running_instances.contains_key(&m.slug) {
                 Cell::from("running").style(
                     Style::default()
                         .fg(palette.accent.to_color())
                         .add_modifier(Modifier::BOLD),
                 )
-            } else if let Some(loader) = &m.loader {
-                let kind = match loader.kind {
-                    crate::domain::instance::ModloaderKind::Fabric => "fabric",
-                    crate::domain::instance::ModloaderKind::Quilt => "quilt",
-                    crate::domain::instance::ModloaderKind::Forge => "forge",
-                    crate::domain::instance::ModloaderKind::NeoForge => "neoforge",
-                    crate::domain::instance::ModloaderKind::Vanilla => "vanilla",
-                };
-                let n = loader.version.len().min(6);
-                Cell::from(format!("{kind}:{}", &loader.version[..n]))
             } else {
-                Cell::from(m.last_played_at.clone().unwrap_or_default())
+                Cell::from(last_played_date(m.last_played_at.as_deref()))
             };
             Row::new(vec![
                 Cell::from(m.display_name.clone()),
                 Cell::from(m.mc_version_id.clone()),
+                Cell::from(loader_col),
                 Cell::from(m.group.clone().unwrap_or_default()),
                 last_col,
             ])
@@ -59,13 +63,20 @@ pub fn render_instance_list(f: &mut Frame, area: Rect, state: &AppState) {
     let table = Table::new(
         rows,
         [
-            Constraint::Percentage(40),
-            Constraint::Percentage(15),
+            Constraint::Percentage(34),
+            Constraint::Percentage(12),
             Constraint::Percentage(20),
-            Constraint::Percentage(25),
+            Constraint::Percentage(16),
+            Constraint::Percentage(18),
         ],
     )
-    .header(Row::new(vec!["Name", "MC Version", "Group", "Last played"]))
+    .header(Row::new(vec![
+        "Name",
+        "MC Version",
+        "Loader",
+        "Group",
+        "Last played",
+    ]))
     // Stateful render keeps the selected instance in view when the list
     // exceeds the terminal height.
     .row_highlight_style(Style::default().bg(palette.selected_bg.to_color()))
@@ -114,5 +125,35 @@ pub fn render_group_inline_overlay(f: &mut Frame, area: Rect, state: &AppState) 
             Paragraph::new(text).block(crate::tui::theme::block(palette).title("Set group (g)"));
         f.render_widget(ratatui::widgets::Clear, rect);
         f.render_widget(p, rect);
+    }
+}
+
+/// The date part of a stored RFC 3339 timestamp ("2026-04-20T09:00:00Z" ->
+/// "2026-04-20"); empty for an instance that has never been launched.
+fn last_played_date(at: Option<&str>) -> &str {
+    match at {
+        Some(s) => s.get(..10).unwrap_or(s),
+        None => "",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::last_played_date;
+
+    #[test]
+    fn last_played_shows_the_date_only() {
+        assert_eq!(last_played_date(Some("2026-04-20T09:00:00Z")), "2026-04-20");
+    }
+
+    #[test]
+    fn never_played_is_blank() {
+        assert_eq!(last_played_date(None), "");
+    }
+
+    #[test]
+    fn short_or_odd_values_are_shown_as_is() {
+        assert_eq!(last_played_date(Some("1713600000")), "1713600000");
+        assert_eq!(last_played_date(Some("2026")), "2026");
     }
 }
