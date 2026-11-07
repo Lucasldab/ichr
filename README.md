@@ -1,5 +1,8 @@
 # ichr
 
+[![CI](https://github.com/Lucasldab/ichr/actions/workflows/ci.yml/badge.svg)](https://github.com/Lucasldab/ichr/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/Lucasldab/ichr)](https://github.com/Lucasldab/ichr/releases/latest)
+
 Terminal-UI Minecraft Java Edition launcher for Linux and Windows.
 
 Create instances, install modloaders, browse and install mods from
@@ -40,8 +43,8 @@ Minecraft -- without leaving the terminal.
 
 ## Status
 
-**v0.1.0** -- first public release. The core path (create instance, install
-modloader, install mods from Modrinth, launch) works end-to-end on Linux.
+Pre-1.0. The core path (create instance, install modloader, install mods from
+Modrinth, launch) works end-to-end on Linux.
 
 **Microsoft Account sign-in works out of the box.** ichr's Azure AD app
 was approved by Mojang Enforcement and the production AppID is embedded
