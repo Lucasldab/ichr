@@ -9,17 +9,7 @@ Create instances, install modloaders, browse and install mods from
 Modrinth, import modpacks, manage resource and shader packs, launch
 Minecraft -- without leaving the terminal.
 
-```
-┌─ ichr ────────────────────────────────────────────────┐
-│ Instances                                             │
-│   ► fabric-1.20.4         vanilla -> Fabric 0.16      │
-│     forge-1.20.1          Forge 47.4.10               │
-│     vanilla-1.21.4        latest release              │
-│                                                       │
-│ c new   Enter launch   L loader   M mods   d delete   │
-│ A accounts   J java   R packs   q quit                │
-└───────────────────────────────────────────────────────┘
-```
+![The Modrinth mod browser for a Fabric instance: search results with icons, filtered by Minecraft version and loader, and the selected mod's details](docs/screenshot.png)
 
 ## Features
 
