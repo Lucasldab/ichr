@@ -11,6 +11,27 @@ Minecraft -- without leaving the terminal.
 
 ![The Modrinth mod browser for a Fabric instance: search results with icons, filtered by Minecraft version and loader, and the selected mod's details](docs/screenshot.png)
 
+## Highlights
+
+- **Microsoft sign-in works out of the box.** ichr's Azure AD app was
+  approved by Mojang, so players sign in with a device code and no setup.
+  The launcher never sees a password.
+- **Downloads are checked against the hashes their source publishes.** Mojang
+  files are verified by SHA-1 and Modrinth files by SHA-512 (Modrinth URLs
+  must also be HTTPS), and a file that fails is refused, never installed. (Quilt's
+  metadata publishes no hashes for some libraries, so those cannot be checked.)
+  Modpack archives can come from anyone, so entries that try to escape the
+  instance folder (`..`, absolute paths) are rejected and symlinks are skipped.
+- **Tokens stay out of plain files.** They go to the OS keychain, with an
+  AES-256-GCM encrypted file as the fallback when no keychain is available.
+- **Mod icons render inside tmux** because of an upstream fix I wrote for
+  ratatui-image ([#201](https://github.com/ratatui/ratatui-image/pull/201)),
+  released in 11.1.
+- **About 1,100 tests, on Linux and Windows.** Every pull request runs
+  formatting, clippy with warnings as errors and the test suite on both, plus
+  a Windows job that installs from source and starts the binary. Releases are
+  built for both platforms with shell and PowerShell installers.
+
 ## Features
 
 - **Instances**: per-instance `.minecraft/`, isolated game directories,
@@ -62,7 +83,7 @@ console.curseforge.com.
 ### From source
 
 ```bash
-cargo install --git https://github.com/Lucasldab/ichr
+cargo install --locked --git https://github.com/Lucasldab/ichr
 ```
 
 Requires the Rust toolchain (>= 1.90; pinned in `rust-toolchain.toml`).
